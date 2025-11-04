@@ -99,7 +99,7 @@ export const authAPI = {
     const collegeId =
       meUser.collegeId ?? meUser.college_id ?? meUser.college?.id ?? null;
 
-    return { ...meUser, collegeId }; 
+    return { ...meUser, collegeId };
   },
 
   logout: () => {
@@ -112,10 +112,9 @@ export const authAPI = {
     !!(
       localStorage.getItem("auth_token") || sessionStorage.getItem("auth_token")
     ),
-    googleLogin: (googleData) => api.post("/auth/google-login", googleData),
-    
-    googleSignup: (googleData) => api.post("/auth/signup-google", googleData),
-    
+  googleLogin: (googleData) => api.post("/auth/google-login", googleData),
+
+  googleSignup: (googleData) => api.post("/auth/signup-google", googleData),
 
   bulkRegister: (formData) =>
     api.post("/auth/registrations/bulk", formData, {
@@ -437,7 +436,10 @@ export const progressAPI = {
 
 export const departmentAPI = {
   getDepartments: () => api.get("/auth/signup/departments-catalog"),
-  postDepartment: (data) => api.post("auth/departments", data),
+  postDepartment: (data) => api.post("/auth/departments", data),
+  getCollegeDepartments: (collegeId) =>
+    api.get(`/auth/colleges/${collegeId}/departments`),
+  addDepartmentToCatalog: (data) =>
+    api.post("/admin/departments-catalog/add", data),
 };
-
 export default api;

@@ -806,6 +806,13 @@ export default function SuperAdminDashboardPage() {
                   <span className="sm:hidden">User</span>
                 </Button>
               </Link>
+               <Link to="/add_department" state={{ allowWhenLoggedIn: true }} className="col-span-1">
+                <Button size="sm" className="w-full">
+                  <Plus size={16} className="mr-2" />
+                  <span className="hidden sm:inline">Add Department</span>
+                  <span className="sm:hidden">college</span>
+                </Button>
+              </Link>
             </div>
           </div>
         </div>

@@ -24,6 +24,7 @@ import Certificate from "./components/Certificate";
 import CourseListPage from "./pages/CourseListPage";
 import CertificatePreviewPage from "./pages/CertificatePreviewPage";
 import ViewFinalTest from "./pages/ViewFinalTest";
+import AddDepartments from "./pages/AddDepartments";
 const ROLE = {
   SUPERADMIN: "SUPERADMIN",
   ADMIN: "ADMIN",
@@ -51,7 +52,7 @@ const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const role = normalizeRole(userRole);
-  const need = allowedRoles.map(normalizeRole); 
+  const need = allowedRoles.map(normalizeRole);
 
   if (role === ROLE.SUPERADMIN) return children;
 
@@ -211,6 +212,20 @@ const App = () => {
           element={
             <ProtectedRoute allowedRoles={[ROLE.ADMIN, ROLE.SUPERADMIN]}>
               <RegisterPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/add_department"
+          element={
+            <ProtectedRoute
+              allowedRoles={[
+                ROLE.ADMIN,
+                ROLE.SUPERADMIN,
+              ]}
+            >
+              <AddDepartments />
             </ProtectedRoute>
           }
         />

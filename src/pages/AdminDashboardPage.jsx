@@ -538,53 +538,6 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // useEffect(() => {
-  //   const loadStudents = async () => {
-  //     try {
-  //       setLoading(true);
-
-
-  //       const { user } = useAuthStore.getState();
-  //       const collegeId = user?.collegeId || user?.college?.id;
-
-  //       if (!collegeId) {
-  //         toast.error("College ID not found");
-  //         return;
-  //       }
-
-  //       console.log("Loading students for college:", collegeId);
-
-  //       // Get students - already includes stats
-  //       const response = await adminScopedAPI.students(collegeId);
-  //       const studentsData = response.data || response;
-
-  //       console.log("Students with stats:", studentsData);
-
-  //       setStudents(studentsData);
-
-  //       // Convert to stats map for easier lookup
-  //       const statsMap = studentsData.reduce((acc, s) => {
-  //         acc[s.id] = {
-  //           finalTests: s.finalTests || 0,
-  //           interviews: s.interviews || 0,
-  //           certifications: s.certifications || 0,
-  //         };
-  //         return acc;
-  //       }, {});
-
-  //       setStudentStats(statsMap);
-  //       setLoadingStats(false);
-  //     } catch (e) {
-  //       console.error("Error loading students:", e);
-  //       toast.error("Failed to load students");
-  //     } finally {
-  //       setLoading(false);
-  //     }
-  //   };
-
-  //   loadStudents();
-  // }, []);
-
 
   if (loading) {
     return (
@@ -643,6 +596,12 @@ export default function AdminDashboardPage() {
                 <Button size="sm" className="w-full sm:w-auto">
                   <Plus size={16} className="mr-2" />
                   Add User
+                </Button>
+              </Link>
+              <Link to="/add_department" state={{ allowWhenLoggedIn: true }}>
+                <Button size="sm" className="w-full sm:w-auto">
+                  <Plus size={16} className="mr-2" />
+                  Add Department
                 </Button>
               </Link>
             </div>

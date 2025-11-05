@@ -1,7 +1,7 @@
 import axios from "axios";
 import useAuthStore from "../store/useAuthStore";
 import { setAuthToken, getToken } from "./token";
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_URL;
 
 export const FALLBACK_THUMB =
   "data:image/svg+xml;utf8," +

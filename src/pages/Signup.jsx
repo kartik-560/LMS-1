@@ -70,9 +70,6 @@ const SignupPage = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
-
-  // ✅ Google Signup Handler
-  // ✅ Google Signup Handler
   const handleGoogleSignup = async (credentialResponse) => {
     setIsLoading(true);
     try {
@@ -88,44 +85,11 @@ const SignupPage = () => {
         throw new Error("Malformed signup response");
       }
 
-      const canonicalRole = getCanonicalRole(user);
-
-      const userForStore = {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
-        role: canonicalRole,
-        collegeId: user.collegeId,
-        departmentId: user.departmentId,
-      };
-
-      // ✅ Save to localStorage
-      localStorage.setItem("auth_token", token);
-      localStorage.setItem("user_role", canonicalRole);
-      localStorage.setItem("user", JSON.stringify(userForStore));
-      // ❌ REMOVED: setAuthToken(token);
-
-      // ✅ Update Zustand store
-      login(userForStore, token);
-
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       toast.success("Sign up successful!");
+      navigate("/login", { replace: true })
 
-      switch (canonicalRole) {
-        case "SUPERADMIN":
-          navigate("/superadmin", { replace: true });
-          break;
-        case "ADMIN":
-          navigate("/admin", { replace: true });
-          break;
-        case "INSTRUCTOR":
-          navigate("/instructor", { replace: true });
-          break;
-        default:
-          navigate("/dashboard", { replace: true });
-          break;
-      }
     } catch (e) {
       console.error("Google signup error:", e);
       toast.error(

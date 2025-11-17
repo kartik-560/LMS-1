@@ -1,4 +1,4 @@
-# PUGARCH Learning Management System
+# Learning Management System
 
 A modern, responsive Learning Management System built with React, featuring a beautiful UI and comprehensive functionality for students, instructors, and administrators.
 

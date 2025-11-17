@@ -17,7 +17,7 @@ const Register = () => {
     if (storedData) {
       try {
         const parsedData = JSON.parse(storedData);
-      
+
 
         setUserData(parsedData);
         setRole(parsedData.role);
@@ -65,7 +65,9 @@ const Register = () => {
 
       formData.email = registrationData.email;
       formData.collegeId = registrationData.collegeId;
-      formData.departmentId = registrationData.department?.id || null;
+      if (registrationData.department?.id) {
+        formData.departmentId = registrationData.department.id;
+      }
 
 
       const response = await authAPI.completeSignup(formData);

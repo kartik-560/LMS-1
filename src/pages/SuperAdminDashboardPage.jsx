@@ -203,18 +203,72 @@ export default function SuperAdminDashboardPage() {
     }
   }
 
-  async function saveAdminToggle(userId, patch) {
+async function saveAdminToggle(userId, patch) {
     try {
-      await collegesAPI.updateAdminPermissions(collegeDetailVM.college.id, userId, patch);
+      // Find current admin
+      const admin = permAdmins.find(a => a.id === userId);
+
+      // Merge existing permissions with the patch
+      const mergedPermissions = {
+        ...(admin?.permissions || {}),
+        ...patch
+      };
+
+      // Send merged permissions to backend
+      await collegesAPI.updateAdminPermissions(
+        collegeDetailVM.college.id,
+        userId,
+        mergedPermissions
+      );
+
+      // Update local state
       setPermAdmins(prev =>
         prev.map(a =>
-          a.id === userId ? { ...a, permissions: { ...a.permissions, ...patch } } : a
+          a.id === userId
+            ? { ...a, permissions: mergedPermissions }
+            : a
         )
       );
+
+      toast.success("Permission updated successfully");
     } catch (e) {
+      console.error("Error updating permission:", e);
       toast.error(e?.response?.data?.error || e.message || "Failed to update");
     }
+}
+
+const fetchCollegePermissions = async () => {
+  try {
+    setPermLoading(true);
+    
+    const permResponse = await collegesAPI.getPermissions(collegeDetailVM.college.id);
+    const { limits, adminPermissions } = permResponse.data;
+    
+    setPermLimits(limits);
+    setPermAdmins(adminPermissions);
+    
+  } catch (err) {
+    toast.error(err?.response?.data?.error || "Failed to load permissions");
+  } finally {
+    setPermLoading(false);
   }
+};
+
+
+  useEffect(() => {
+    console.log('🔥 useEffect triggered', {
+      tab: collegeDetailTab,
+      collegeId: collegeDetailVM?.college?.id
+    });
+
+    if (collegeDetailTab === "permissions" && collegeDetailVM?.college?.id) {
+      console.log('🔥 Calling fetchCollegePermissions');
+      fetchCollegePermissions();
+    } else {
+      console.log('❌ Conditions not met');
+    }
+  }, [collegeDetailTab, collegeDetailVM?.college?.id]);
+
 
   const handleApiError = (err, fallback) => {
     const msg =
@@ -399,7 +453,7 @@ export default function SuperAdminDashboardPage() {
 
   // Fetch courses data
   const fetchCourses = async () => {
-    if (loadedTabs.has("assignments")) return; 
+    if (loadedTabs.has("assignments")) return;
 
     try {
       setLoadingCourses(true);
@@ -446,12 +500,12 @@ export default function SuperAdminDashboardPage() {
         break;
     }
   };
-  
+
   const collegesWithCounts = useMemo(() => {
     if (!colleges) return [];
 
     return colleges.map(college => {
-    
+
       const instructorCount = college.instructorCount || 0;
       const studentCount = college.studentCount || 0;
       const courseCount = college.courseCount || 0;
@@ -466,8 +520,8 @@ export default function SuperAdminDashboardPage() {
         certificatesGenerated: certificatesCount,
       };
     });
-  }, 
-  [colleges]);
+  },
+    [colleges]);
 
   const filteredColleges = useMemo(() => {
     const q = (collegesSearch || "").toLowerCase();
@@ -806,7 +860,7 @@ export default function SuperAdminDashboardPage() {
                   <span className="sm:hidden">User</span>
                 </Button>
               </Link>
-               <Link to="/add_department" state={{ allowWhenLoggedIn: true }} className="col-span-1">
+              <Link to="/add_department" state={{ allowWhenLoggedIn: true }} className="col-span-1">
                 <Button size="sm" className="w-full">
                   <Plus size={16} className="mr-2" />
                   <span className="hidden sm:inline">Add Department</span>
@@ -1643,31 +1697,45 @@ export default function SuperAdminDashboardPage() {
                                           </div>
 
                                           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                            {[
-                                              { key: "canCreateCourses", label: "Create Courses" },
-                                              { key: "canCreateTests", label: "Create Tests" },
-                                              { key: "canManageTests", label: "Manage Tests" },
-                                            ].map(({ key, label }) => {
-                                              const checked = !!(admin.permissions?.[key]);
+                                            {permAdmins.map((admin) => {
+                                              console.log('Admin:', admin.id, 'Permissions:', admin.permissions);
                                               return (
-                                                <label
-                                                  key={key}
-                                                  className="flex items-center justify-between border rounded-lg px-3 py-2"
-                                                >
-                                                  <span className="text-sm text-gray-700">{label}</span>
-                                                  <input
-                                                    type="checkbox"
-                                                    className="h-4 w-4"
-                                                    checked={checked}
-                                                    disabled={permLoading}
-                                                    onChange={(e) =>
-                                                      saveAdminToggle(admin.id, { [key]: e.target.checked })
-                                                    }
-                                                    aria-label={label}
-                                                  />
-                                                </label>
+                                                <div key={admin.id} className="border border-gray-200 rounded-lg p-4">
+                                                  {/* ... rest of your code ... */}
+
+                                                  {[
+                                                    { key: "canCreateCourses", label: "Create Courses" },
+                                                    { key: "canCreateTests", label: "Create Tests" },
+                                                    { key: "canManageTests", label: "Manage Tests" },
+                                                  ].map(({ key, label }) => {
+                                                    const checked = admin.permissions?.[key] || false;
+
+                                                    console.log(`${label}:`, checked); // DEBUG
+
+                                                    return (
+                                                      <label
+                                                        key={key}
+                                                        className="flex items-center justify-between border rounded-lg px-3 py-2"
+                                                      >
+                                                        <span className="text-sm text-gray-700">{label}</span>
+                                                        <input
+                                                          type="checkbox"
+                                                          className="h-4 w-4"
+                                                          checked={checked}
+                                                          disabled={permLoading}
+                                                          onChange={(e) =>
+                                                            saveAdminToggle(admin.id, { [key]: e.target.checked })
+                                                          }
+                                                          aria-label={label}
+                                                        />
+                                                      </label>
+                                                    );
+                                                  })}
+                                                </div>
                                               );
                                             })}
+
+
                                           </div>
                                         </div>
                                       </div>
@@ -2059,7 +2127,7 @@ export default function SuperAdminDashboardPage() {
           </TabsContent>
 
           <TabsContent value="admins">
-            {loadingUsers? (
+            {loadingUsers ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
                 <p>Loading admins...</p>

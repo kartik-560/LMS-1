@@ -147,8 +147,7 @@ const LoginPage = () => {
         email: user.email,
         fullName: user.fullName,
         role: canonicalRole,
-
-        collegeId: user.permissions?.collegeId,
+        collegeId: user.collegeId,
       };
 
 

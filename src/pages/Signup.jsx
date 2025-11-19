@@ -140,70 +140,97 @@ const SignupPage = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col justify-center py-8 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center mb-6">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-r from-primary-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <BookOpen size={28} className="text-white" />
-          </div>
+return (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="w-full max-w-md">
+      {/* Header */}
+      <header className="flex flex-col items-center mb-8">
+        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-primary-600 to-purple-600 rounded-3xl flex items-center justify-center shadow-lg">
+          <BookOpen size={28} className="text-white" />
         </div>
 
-        <div className="text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            Welcome to PugArch LMS
-          </h2>
-          <p className="text-sm sm:text-base text-gray-600 mb-3">
-            Sign in to access your learning dashboard
-          </p>
-          <Link to="/login">
+        <h1 className="mt-4 text-center text-2xl sm:text-3xl font-extrabold text-gray-900">
+          Welcome to PugArch LMS
+        </h1>
 
-            <div className="text-large text-blue-700">
-              Login to your account
+        <p className="mt-2 text-sm sm:text-base text-gray-600 text-center">
+          Sign in or create an account to access your learning dashboard.
+        </p>
+
+        <Link
+          to="/login"
+          className="mt-3 text-sm text-primary-700 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-300 rounded px-2 py-1"
+        >
+          Already have an account? Log in
+        </Link>
+      </header>
+
+      {/* Card */}
+      <main className="bg-white py-8 px-6 sm:px-8 shadow-xl rounded-2xl border border-gray-100">
+        {/* Choice Step */}
+        {step === "choice" && (
+          <div className="space-y-4">
+            {/* Google Login Button */}
+            <div className="w-full [&>div]:w-full [&>div>div]:w-full">
+              <GoogleLogin
+                onSuccess={handleGoogleSignup}
+                onError={handleGoogleSignupError}
+                size="large"
+                text="signup_with"
+                shape="rectangular"
+                width="400"
+              />
             </div>
-          </Link>
-        </div>
-      </div>
 
-      <div className="mt-6 sm:mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-6 px-4 sm:py-8 sm:px-10 shadow-xl sm:rounded-2xl border border-gray-100">
-          {step === "choice" && (
-            <div className="space-y-4">
-              {/* Google button */}
-              <div className="w-full flex items-center justify-center">
-                <GoogleLogin
-                  onSuccess={handleGoogleSignup}
-                  onError={handleGoogleSignupError}
-                  size="large"
-                  width="100%"
-                  text="signup_with"
-                  shape="rectangular"
-                />
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
               </div>
-
-
-              {/* Email button */}
-              <Button
-                onClick={() => setStep("email")}
-                variant="outline"
-                className="w-full flex items-center justify-center space-x-2"
-                size="lg"
-              >
-                <Mail size={20} className="text-gray-500" />
-                <span>Signup with Email</span>
-              </Button>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-gray-500">Or</span>
+              </div>
             </div>
-          )}
 
-          {step === "email" && (
-            <form
-              className="space-y-5 sm:space-y-6"
-              onSubmit={handleSubmit(otpSent ? handleVerifyOtp : handleSendOtp)}
+            {/* Email Button */}
+            <Button
+              onClick={() => setStep("email")}
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2"
+              size="lg"
+              aria-label="Sign up with email"
             >
+              <Mail size={18} className="text-gray-500" />
+              <span>Sign up with email</span>
+            </Button>
+
+            <p className="text-center text-xs text-gray-500 pt-2">
+              By continuing you agree to our{" "}
+              <Link to="/terms" className="text-primary-600 hover:underline">
+                Terms
+              </Link>{" "}
+              and{" "}
+              <Link to="/privacy" className="text-primary-600 hover:underline">
+                Privacy Policy
+              </Link>
+              .
+            </p>
+          </div>
+        )}
+
+        {/* Email + OTP Step */}
+        {step === "email" && (
+          <form
+            className="space-y-5"
+            onSubmit={handleSubmit(otpSent ? handleVerifyOtp : handleSendOtp)}
+            aria-label="Email signup form"
+          >
+            <div>
               <Input
+                id="email"
                 label="Email address"
                 type="email"
-                placeholder="Enter your email"
+                placeholder="name@example.com"
                 error={errors.email?.message}
                 {...register("email", {
                   required: "Email is required",
@@ -214,18 +241,24 @@ const SignupPage = () => {
                 })}
                 leftElement={
                   <Mail
-                    size={20}
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                    size={18}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
                   />
                 }
                 className="pl-10"
+                aria-invalid={!!errors.email}
+                required
               />
+            </div>
 
-              {otpSent && (
+            {otpSent && (
+              <div>
                 <Input
+                  id="otp"
                   label="OTP"
                   type="text"
-                  placeholder="Enter the OTP"
+                  inputMode="numeric"
+                  placeholder="Enter the 4+ digit code"
                   error={errors.otp?.message}
                   {...register("otp", {
                     required: "OTP is required",
@@ -234,55 +267,63 @@ const SignupPage = () => {
                       message: "OTP must be at least 4 digits",
                     },
                   })}
+                  aria-invalid={!!errors.otp}
                 />
-              )}
+                <p className="mt-2 text-xs text-gray-500">
+                  Didn't receive the code? Check your spam folder or resend after a few seconds.
+                </p>
+              </div>
+            )}
 
+            <div className="space-y-3">
               <Button
                 type="submit"
-                className="w-full flex items-center justify-center"
+                className="w-full flex items-center justify-center gap-2"
                 disabled={isLoading || isLocked}
                 size="lg"
+                aria-busy={isLoading}
               >
-                {/* {isLoading && (
-                  <Loader2 size={20} className="mr-2 animate-spin" />
-                )} */}
-                {isLocked && !isLoading && <Lock size={20} className="mr-2" />}
-                {isLoading
-                  ? otpSent
-                    ? "Verifying OTP..."
-                    : "Sending OTP..."
-                  : isLocked
-                    ? `Locked (${formatLockTime(lockTimer)})`
-                    : otpSent
-                      ? "Verify OTP"
-                      : "Send OTP"}
+                {isLoading ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    <span>{otpSent ? "Verifying OTP..." : "Sending OTP..."}</span>
+                  </>
+                ) : isLocked ? (
+                  <>
+                    <Lock size={16} />
+                    <span>Locked ({formatLockTime(lockTimer)})</span>
+                  </>
+                ) : (
+                  <span>{otpSent ? "Verify OTP" : "Send OTP"}</span>
+                )}
               </Button>
 
-              {/* Back button */}
               <Button
                 type="button"
                 onClick={() => setStep("choice")}
                 variant="ghost"
                 className="w-full"
+                aria-label="Go back to signup choice"
               >
                 ← Back
               </Button>
-            </form>
-          )}
-
-          <div className="mt-5 sm:mt-6 p-3 bg-gray-50 rounded-lg text-center">
-            <div className="flex items-center justify-center space-x-2">
-              <Shield size={14} className="text-gray-500" />
-              <span className="text-xs sm:text-sm text-gray-600">
-                Your data is protected with enterprise-grade security
-              </span>
             </div>
+          </form>
+        )}
+
+        {/* Security Note */}
+        <div className="mt-6 p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-center gap-2">
+            <Shield size={14} className="text-gray-500 flex-shrink-0" />
+            <span className="text-xs sm:text-sm text-gray-600">
+              Your data is protected with enterprise-grade security.
+            </span>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* Footer */}
-      <div className="mt-6 sm:mt-8 text-center">
+      <footer className="mt-8 text-center">
         <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500">
           <Link to="/help" className="hover:text-gray-700 transition-colors">
             Help Center
@@ -294,12 +335,14 @@ const SignupPage = () => {
             Terms
           </Link>
         </div>
-        <p className="mt-2 text-xs text-gray-400">
-          © 2025 Pugarch. All rights reserved.
-        </p>
-      </div>
+        <p className="mt-3 text-xs text-gray-400">© 2025 Pugarch. All rights reserved.</p>
+      </footer>
     </div>
-  );
+  </div>
+);
+
+
+
 };
 
 export default SignupPage;

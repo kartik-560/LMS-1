@@ -31,7 +31,7 @@ import Tabs, {
 import { useCallback } from "react";
 import useAuthStore from "../store/useAuthStore";
 
-import { superAdminAPI, coursesAPI, collegesAPI } from "../services/api";
+import { superAdminAPI, coursesAPI, collegesAPI ,departmentAPI} from "../services/api";
 
 const normalizeRole = (r) =>
   String(r || "")
@@ -78,18 +78,24 @@ export default function SuperAdminDashboardPage() {
   const [collegeError, setCollegeError] = useState("");
   const [permRaw, setPermRaw] = useState([]);
   const [permLoading, setPermLoading] = useState(false);
+ const [allDepartments, setAllDepartments] = useState([]);
+const [loadingDepartments, setLoadingDepartments] = useState(false);
+
   const [permLimits, setPermLimits] = useState({
     studentLimit: 0,
     adminLimit: 0,
     instructorLimit: 0,
   });
   const [loadingCourses, setLoadingCourses] = useState(false);
-  const [collegeCertificateCounts, setCollegeCertificateCounts] = useState(new Map());
+  const [collegeCertificateCounts, setCollegeCertificateCounts] = useState(
+    new Map()
+  );
   const [permAdmins, setPermAdmins] = useState([]);
   const [loadedTabs, setLoadedTabs] = useState(new Set(["colleges"]));
   const [activeTab, setActiveTab] = useState("colleges");
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [courseToAssign, setCourseToAssign] = useState(null);
+  const [collegeDepartments, setCollegeDepartments] = useState([]);
 
   const asArray = (p) => {
     if (Array.isArray(p)) return p;
@@ -110,8 +116,13 @@ export default function SuperAdminDashboardPage() {
     try {
       const { data } = await collegesAPI.getPermissions(collegeId);
       const payload = data?.data ?? data ?? {};
-      const limits = payload.limits ?? { studentLimit: 0, adminLimit: 0, instructorLimit: 0 };
-      const permsRaw = payload.adminPermissions ?? payload.admins ?? payload.records ?? [];
+      const limits = payload.limits ?? {
+        studentLimit: 0,
+        adminLimit: 0,
+        instructorLimit: 0,
+      };
+      const permsRaw =
+        payload.adminPermissions ?? payload.admins ?? payload.records ?? [];
 
       setPermLimits(limits);
       setPermRaw(permsRaw); // store raw
@@ -119,7 +130,9 @@ export default function SuperAdminDashboardPage() {
       const vmAdmins = collegeDetailVM?.lists?.admins ?? [];
       setPermAdmins(hydrateAdminPerms(permsRaw, vmAdmins));
     } catch (e) {
-      toast.error(e?.response?.data?.error || e.message || "Unable to load permissions");
+      toast.error(
+        e?.response?.data?.error || e.message || "Unable to load permissions"
+      );
     } finally {
       setPermLoading(false);
     }
@@ -128,7 +141,7 @@ export default function SuperAdminDashboardPage() {
   function hydrateAdminPerms(permsRaw, vmAdmins = []) {
     // index admins by id from VM (name/email/avatar/role)
     const adminIndex = new Map(
-      (vmAdmins ?? []).map(a => [
+      (vmAdmins ?? []).map((a) => [
         a.id,
         {
           id: a.id,
@@ -165,10 +178,11 @@ export default function SuperAdminDashboardPage() {
     }
 
     // union of all ids (VM admins + permission rows)
-    const allIds = Array.from(adminIndex.keys())
-      .sort((a, b) => (adminIndex.get(a).name || "").localeCompare(adminIndex.get(b).name || ""));
+    const allIds = Array.from(adminIndex.keys()).sort((a, b) =>
+      (adminIndex.get(a).name || "").localeCompare(adminIndex.get(b).name || "")
+    );
 
-    return allIds.map(id => ({
+    return allIds.map((id) => ({
       ...adminIndex.get(id),
       permissions: {
         canCreateCourses: false,
@@ -180,7 +194,6 @@ export default function SuperAdminDashboardPage() {
   }
 
   useEffect(() => {
-
     if (!selectedCollegeId || collegeDetailTab !== "permissions") return;
 
     const id = collegeDetailVM?.college?.id;
@@ -199,16 +212,24 @@ export default function SuperAdminDashboardPage() {
       await collegesAPI.updateLimits(collegeDetailVM.college.id, permLimits);
       toast.success("Limits saved");
     } catch (e) {
-      toast.error(e?.response?.data?.error || e.message || "Failed to save limits");
+      toast.error(
+        e?.response?.data?.error || e.message || "Failed to save limits"
+      );
     }
   }
 
   async function saveAdminToggle(userId, patch) {
     try {
-      await collegesAPI.updateAdminPermissions(collegeDetailVM.college.id, userId, patch);
-      setPermAdmins(prev =>
-        prev.map(a =>
-          a.id === userId ? { ...a, permissions: { ...a.permissions, ...patch } } : a
+      await collegesAPI.updateAdminPermissions(
+        collegeDetailVM.college.id,
+        userId,
+        patch
+      );
+      setPermAdmins((prev) =>
+        prev.map((a) =>
+          a.id === userId
+            ? { ...a, permissions: { ...a.permissions, ...patch } }
+            : a
         )
       );
     } catch (e) {
@@ -293,7 +314,6 @@ export default function SuperAdminDashboardPage() {
     totalColleges: ov.totalColleges ?? ov.colleges ?? ov.collegeCount ?? 0,
   });
 
-
   const fetchInitialData = async () => {
     try {
       setLoading(true);
@@ -310,10 +330,15 @@ export default function SuperAdminDashboardPage() {
       setColleges(colleges);
       setSystemAnalytics({
         overview: normalizedOv,
-        performanceMetrics: overviewRaw?.performanceMetrics ?? overviewRaw?.data?.performanceMetrics ?? null,
-        collegeBreakdown: overviewRaw?.courseBreakdown ?? overviewRaw?.data?.courseBreakdown ?? null,
+        performanceMetrics:
+          overviewRaw?.performanceMetrics ??
+          overviewRaw?.data?.performanceMetrics ??
+          null,
+        collegeBreakdown:
+          overviewRaw?.courseBreakdown ??
+          overviewRaw?.data?.courseBreakdown ??
+          null,
       });
-
     } catch (err) {
       handleApiError(err, "Failed to load system data");
     } finally {
@@ -333,11 +358,15 @@ export default function SuperAdminDashboardPage() {
       setAllAdmins(
         normalizeUsers(admins).map((a) => ({
           ...a,
-          avatar: a.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(a.name || "Admin")}&background=random`,
+          avatar:
+            a.avatar ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              a.name || "Admin"
+            )}&background=random`,
         }))
       );
 
-      setLoadedTabs(prev => new Set([...prev, "admins"]));
+      setLoadedTabs((prev) => new Set([...prev, "admins"]));
     } catch (err) {
       handleApiError(err, "Failed to load admins");
     } finally {
@@ -356,11 +385,15 @@ export default function SuperAdminDashboardPage() {
 
       const normalizedInstructors = normalizeUsers(instructors).map((i) => ({
         ...i,
-        avatar: i.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(i.name || "Instructor")}&background=random`,
+        avatar:
+          i.avatar ||
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(
+            i.name || "Instructor"
+          )}&background=random`,
       }));
 
       setAllInstructors(normalizedInstructors);
-      setLoadedTabs(prev => new Set([...prev, "instructors"]));
+      setLoadedTabs((prev) => new Set([...prev, "instructors"]));
     } catch (err) {
       handleApiError(err, "Failed to load instructors");
     } finally {
@@ -380,16 +413,20 @@ export default function SuperAdminDashboardPage() {
 
       setAllStudents(
         normalizedStudents.map((s) => {
-          const originalStudent = students.find(st => st.id === s.id);
+          const originalStudent = students.find((st) => st.id === s.id);
           return {
             ...s,
             enrolledCoursesCount: originalStudent?.enrolledCoursesCount || 0,
-            avatar: s.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(s.name || "Student")}&background=random`,
+            avatar:
+              s.avatar ||
+              `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                s.name || "Student"
+              )}&background=random`,
           };
         })
       );
 
-      setLoadedTabs(prev => new Set([...prev, "students"]));
+      setLoadedTabs((prev) => new Set([...prev, "students"]));
     } catch (err) {
       handleApiError(err, "Failed to load students");
     } finally {
@@ -399,7 +436,7 @@ export default function SuperAdminDashboardPage() {
 
   // Fetch courses data
   const fetchCourses = async () => {
-    if (loadedTabs.has("assignments")) return; 
+    if (loadedTabs.has("assignments")) return;
 
     try {
       setLoadingCourses(true);
@@ -414,13 +451,52 @@ export default function SuperAdminDashboardPage() {
         }))
       );
 
-      setLoadedTabs(prev => new Set([...prev, "assignments"]));
+      setLoadedTabs((prev) => new Set([...prev, "assignments"]));
     } catch (err) {
       handleApiError(err, "Failed to load courses");
     } finally {
       setLoadingCourses(false);
     }
   };
+
+const fetchDepartments = async () => {
+  if (loadedTabs.has("departments")) return;
+
+  try {
+    setLoadingDepartments(true);
+    const response = await departmentAPI.getDepartments();
+    
+    // Try different possible structures
+    let departments = [];
+      
+    if (response?.data?.data?.items) {
+      departments = response.data.data.items;
+      
+    } else if (response?.data?.items) {
+      departments = response.data.items;
+      console.log("Found at: response.data.items");
+    } else if (Array.isArray(response?.data?.data)) {
+      departments = response.data.data;
+  
+    } else if (Array.isArray(response?.data)) {
+      departments = response.data;
+   
+    }
+    
+   
+    
+    setAllDepartments(departments);
+    setLoadedTabs((prev) => new Set([...prev, "departments"]));
+  } catch (error) {
+    console.error("Error fetching departments:", error);
+    toast.error("Failed to load departments");
+    setAllDepartments([]);
+  } finally {
+    setLoadingDepartments(false);
+  }
+};
+
+
 
   const handleTabChange = async (tabValue) => {
     setActiveTab(tabValue);
@@ -439,6 +515,9 @@ export default function SuperAdminDashboardPage() {
       case "assignments":
         await fetchCourses();
         break;
+        case "departments":  // 👈 ADD THIS CASE
+      await fetchDepartments();
+      break;
       case "colleges":
         // Already loaded on initial mount
         break;
@@ -446,12 +525,11 @@ export default function SuperAdminDashboardPage() {
         break;
     }
   };
-  
+
   const collegesWithCounts = useMemo(() => {
     if (!colleges) return [];
 
-    return colleges.map(college => {
-    
+    return colleges.map((college) => {
       const instructorCount = college.instructorCount || 0;
       const studentCount = college.studentCount || 0;
       const courseCount = college.courseCount || 0;
@@ -466,8 +544,7 @@ export default function SuperAdminDashboardPage() {
         certificatesGenerated: certificatesCount,
       };
     });
-  }, 
-  [colleges]);
+  }, [colleges]);
 
   const filteredColleges = useMemo(() => {
     const q = (collegesSearch || "").toLowerCase();
@@ -480,87 +557,221 @@ export default function SuperAdminDashboardPage() {
     );
   }, [colleges, collegesSearch]);
 
-  useEffect(() => {
-    if (!selectedCollegeId) return;
+  // useEffect(() => {
+  //   if (!selectedCollegeId) return;
 
-    const run = async () => {
-      setCollegeLoading(true);
-      setCollegeError("");
-      try {
-        const { data: raw } = await collegesAPI.getCollege(selectedCollegeId);
-        const payload = raw?.data ?? raw ?? {};
+  //   const run = async () => {
+  //     setCollegeLoading(true);
+  //     setCollegeError("");
+  //     try {
+  //       const [collegeRes, deptRes] = await Promise.all([
+  //         collegesAPI.getCollege(selectedCollegeId),
+  //         collegesAPI
+  //           .getDepartmentsForCollege(selectedCollegeId)
+  //           .catch((err) => {
+  //             console.warn("Departments fetch failed:", err);
+  //             return { data: [] };
+  //           }),
+  //       ]);
 
-        const co = payload?.college ?? {};
-        const lists = payload?.lists ?? {};
-        const counts = payload?.counts ?? {};
+  //       const { data: raw } = collegeRes;
+  //       const payload = raw?.data ?? raw ?? {};
 
-        const courses = lists?.courses ?? [];
-        const instructors = lists?.instructors ?? [];
-        const students = lists?.students ?? [];
-        const admins = lists?.admins ?? [];
+  //       const co = payload?.college ?? {};
+  //       const lists = payload?.lists ?? {};
+  //       const counts = payload?.counts ?? {};
 
-        const idToTitle = new Map(
-          courses.map((c) => [c.id, c.title || c.name || "Untitled Course"])
-        );
+  //       const courses = lists?.courses ?? [];
+  //       const instructors = lists?.instructors ?? [];
+  //       const students = lists?.students ?? [];
+  //       const admins = lists?.admins ?? [];
 
+  //       // Handle departments response - could be { data: [...] } or just [...]
+  //       let departments = [];
+  //       if (deptRes) {
+  //         if (Array.isArray(deptRes)) {
+  //           departments = deptRes;
+  //         } else if (deptRes.data && Array.isArray(deptRes.data)) {
+  //           departments = deptRes.data;
+  //         } else if (deptRes.data && Array.isArray(deptRes.data.data)) {
+  //           departments = deptRes.data.data;
+  //         }
+  //       }
 
-        const normInstructors = instructors.map((i) => {
-          const assigned = i.assignedCourseIds || i.assignedCourses || [];
-          return {
-            ...i,
-            role: String(i.role || "").toUpperCase(),
-            collegeName: co?.name || "",
-            assignedCourseIds: assigned,
-            assignedCourseNames: assigned.map((cid) => idToTitle.get(cid)).filter(Boolean),
-          };
-        });
+  //       console.log("Departments fetched:", departments);
 
-        const normStudents = students.map((s) => {
-          const enrolled = s.enrolledCoursesCount || 0;
-          return {
-            ...s,
-            role: String(s.role || "").toUpperCase(),
-            enrolledCourses: enrolled || 0,
-            finalTestsTaken: s.finalTestAttemptsCount || 0,
-            interviewsAttempted: s.assessmentAttempts || 0,
-            certificationsCompleted: s.certificatesCount || 0,
-          };
-        });
+  //       const idToTitle = new Map(
+  //         courses.map((c) => [c.id, c.title || c.name || "Untitled Course"])
+  //       );
 
+  //       const normInstructors = instructors.map((i) => {
+  //         const assigned = i.assignedCourseIds || i.assignedCourses || [];
+  //         return {
+  //           ...i,
+  //           role: String(i.role || "").toUpperCase(),
+  //           collegeName: co?.name || "",
+  //           assignedCourseIds: assigned,
+  //           assignedCourseNames: assigned
+  //             .map((cid) => idToTitle.get(cid))
+  //             .filter(Boolean),
+  //         };
+  //       });
 
-        const normAdmins = admins.map((a) => {
-          const assigned = a.assignedCourseIds || a.assignedCourses || [];
-          return {
-            ...a,
-            role: String(a.role || "").toUpperCase(), // ✅ if UI filters by "ADMIN"
-            collegeName: co?.name || "",
-            assignedCourseIds: assigned,
-            assignedCourseNames: assigned.map((cid) => idToTitle.get(cid)).filter(Boolean),
-          };
-        });
+  //       const normStudents = students.map((s) => {
+  //         const enrolled = s.enrolledCoursesCount || 0;
+  //         return {
+  //           ...s,
+  //           role: String(s.role || "").toUpperCase(),
+  //           enrolledCourses: enrolled || 0,
+  //           finalTestsTaken: s.finalTestAttemptsCount || 0,
+  //           interviewsAttempted: s.assessmentAttempts || 0,
+  //           certificationsCompleted: s.certificatesCount || 0,
+  //         };
+  //       });
 
-        setCollegeDetailVM({
-          college: co,
-          lists: {
-            courses,
-            instructors: normInstructors,
-            students: normStudents,
-            admins: normAdmins,
-          },
-          counts,
-        });
+  //       const normAdmins = admins.map((a) => {
+  //         const assigned = a.assignedCourseIds || a.assignedCourses || [];
+  //         return {
+  //           ...a,
+  //           role: String(a.role || "").toUpperCase(), // ✅ if UI filters by "ADMIN"
+  //           collegeName: co?.name || "",
+  //           assignedCourseIds: assigned,
+  //           assignedCourseNames: assigned
+  //             .map((cid) => idToTitle.get(cid))
+  //             .filter(Boolean),
+  //         };
+  //       });
 
-        console.log("payload:", payload);
+  //       setCollegeDetailVM({
+  //         college: co,
+  //         lists: {
+  //           courses,
+  //           instructors: normInstructors,
+  //           students: normStudents,
+  //           admins: normAdmins,
+  //         },
+  //         counts,
+  //       });
 
-      } catch (e) {
-        setCollegeError(e?.message || "Failed to load college");
-      } finally {
-        setCollegeLoading(false);
+  //       setCollegeDepartments(departments);
+
+  //       console.log("payload:", payload);
+  //     } catch (e) {
+  //       setCollegeError(e?.message || "Failed to load college");
+  //     } finally {
+  //       setCollegeLoading(false);
+  //     }
+  //   };
+
+  //   run();
+  // }, [selectedCollegeId]);
+
+useEffect(() => {
+  if (!selectedCollegeId) return;
+
+  const run = async () => {
+    setCollegeLoading(true);
+    setCollegeError("");
+    try {
+      const [collegeRes, deptRes] = await Promise.all([
+        collegesAPI.getCollege(selectedCollegeId),
+        collegesAPI.getDepartmentsForCollege(selectedCollegeId).catch(err => {
+          console.warn("Departments fetch failed:", err);
+          return { data: [] };
+        })
+      ]);
+
+      const { data: raw } = collegeRes;
+      const payload = raw?.data ?? raw ?? {};
+
+      const co = payload?.college ?? {};
+      const lists = payload?.lists ?? {};
+      const counts = payload?.counts ?? {};
+
+      const courses = lists?.courses ?? [];
+      const instructors = lists?.instructors ?? [];
+      const students = lists?.students ?? [];
+      const admins = lists?.admins ?? [];
+
+      // ✅ Handle departments response with counts
+      let departments = [];
+      if (deptRes) {
+        // Extract the array from various response structures
+        const rawDepts = deptRes?.data?.data?.items 
+                      || deptRes?.data?.data 
+                      || deptRes?.data?.items
+                      || deptRes?.data 
+                      || deptRes;
+        
+        if (Array.isArray(rawDepts)) {
+          departments = rawDepts;
+        }
       }
-    };
+      
+      console.log("Departments fetched:", departments);
 
-    run();
-  }, [selectedCollegeId]);
+      const idToTitle = new Map(
+        courses.map((c) => [c.id, c.title || c.name || "Untitled Course"])
+      );
+
+      const normInstructors = instructors.map((i) => {
+        const assigned = i.assignedCourseIds || i.assignedCourses || [];
+        return {
+          ...i,
+          role: String(i.role || "").toUpperCase(),
+          collegeName: co?.name || "",
+          assignedCourseIds: assigned,
+          assignedCourseNames: assigned.map((cid) => idToTitle.get(cid)).filter(Boolean),
+        };
+      });
+
+      const normStudents = students.map((s) => {
+        const enrolled = s.enrolledCoursesCount || 0;
+        return {
+          ...s,
+          role: String(s.role || "").toUpperCase(),
+          enrolledCourses: enrolled || 0,
+          finalTestsTaken: s.finalTestAttemptsCount || 0,
+          interviewsAttempted: s.assessmentAttempts || 0,
+          certificationsCompleted: s.certificatesCount || 0,
+        };
+      });
+
+      const normAdmins = admins.map((a) => {
+        const assigned = a.assignedCourseIds || a.assignedCourses || [];
+        return {
+          ...a,
+          role: String(a.role || "").toUpperCase(),
+          collegeName: co?.name || "",
+          assignedCourseIds: assigned,
+          assignedCourseNames: assigned.map((cid) => idToTitle.get(cid)).filter(Boolean),
+        };
+      });
+
+      setCollegeDetailVM({
+        college: co,
+        lists: {
+          courses,
+          instructors: normInstructors,
+          students: normStudents,
+          admins: normAdmins,
+        },
+        counts,
+      });
+
+      setCollegeDepartments(departments);
+
+      console.log("payload:", payload);
+
+    } catch (e) {
+      setCollegeError(e?.message || "Failed to load college");
+    } finally {
+      setCollegeLoading(false);
+    }
+  };
+
+  run();
+}, [selectedCollegeId]);
 
   const handleOpenAssignModal = (course) => {
     setCourseToAssign(course);
@@ -641,8 +852,10 @@ export default function SuperAdminDashboardPage() {
         // Simply return students and filter by college if needed
 
         if (studentFilter === "college") {
-          return student.collegeId === selectedFilterValue ||
-            student.collegeName === selectedFilterValue;
+          return (
+            student.collegeId === selectedFilterValue ||
+            student.collegeName === selectedFilterValue
+          );
         }
 
         return true;
@@ -650,12 +863,7 @@ export default function SuperAdminDashboardPage() {
     }
 
     return filtered;
-  }, [
-    allStudents,
-    studentSearch,
-    studentFilter,
-    selectedFilterValue,
-  ]);
+  }, [allStudents, studentSearch, studentFilter, selectedFilterValue]);
 
   const savePermissions = async () => {
     try {
@@ -695,9 +903,11 @@ export default function SuperAdminDashboardPage() {
   };
 
   const handleUnassign = async (course) => {
-
-
-    if (!window.confirm(`Are you sure you want to unassign "${course.title}" from this college?`)) {
+    if (
+      !window.confirm(
+        `Are you sure you want to unassign "${course.title}" from this college?`
+      )
+    ) {
       return;
     }
 
@@ -708,9 +918,7 @@ export default function SuperAdminDashboardPage() {
         departmentId: course.departmentId || null,
       });
 
-
       toast.success("Course unassigned successfully.");
-
     } catch (err) {
       toast.error(err.response?.data?.error || "Failed to unassign course.");
       console.error("Unassign failed:", err);
@@ -799,14 +1007,22 @@ export default function SuperAdminDashboardPage() {
                 </Button>
               </Link>
 
-              <Link to="/register" state={{ allowWhenLoggedIn: true }} className="col-span-1">
+              <Link
+                to="/register"
+                state={{ allowWhenLoggedIn: true }}
+                className="col-span-1"
+              >
                 <Button size="sm" className="w-full">
                   <Plus size={16} className="mr-2" />
                   <span className="hidden sm:inline">Add User</span>
                   <span className="sm:hidden">User</span>
                 </Button>
               </Link>
-               <Link to="/add_department" state={{ allowWhenLoggedIn: true }} className="col-span-1">
+              <Link
+                to="/add_department"
+                state={{ allowWhenLoggedIn: true }}
+                className="col-span-1"
+              >
                 <Button size="sm" className="w-full">
                   <Plus size={16} className="mr-2" />
                   <span className="hidden sm:inline">Add Department</span>
@@ -817,14 +1033,12 @@ export default function SuperAdminDashboardPage() {
           </div>
         </div>
 
-
         <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-6 lg:mb-8">
-
-
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === 'colleges' ? 'ring-2 ring-red-500 bg-red-50' : ''
-              }`}
-            onClick={() => setActiveTab('colleges')}
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${
+              activeTab === "colleges" ? "ring-2 ring-red-500 bg-red-50" : ""
+            }`}
+            onClick={() => setActiveTab("colleges")}
           >
             <div className="flex items-center">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-lg flex items-center justify-center flex-none">
@@ -842,9 +1056,10 @@ export default function SuperAdminDashboardPage() {
           </Card>
 
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === 'permissions' ? 'ring-2 ring-red-500 bg-red-50' : ''
-              }`}
-            onClick={() => setActiveTab('admins')}
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${
+              activeTab === "permissions" ? "ring-2 ring-red-500 bg-red-50" : ""
+            }`}
+            onClick={() => setActiveTab("admins")}
           >
             <div className="flex items-center">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-lg flex items-center justify-center flex-none">
@@ -862,9 +1077,12 @@ export default function SuperAdminDashboardPage() {
           </Card>
 
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === 'permissions' ? 'ring-2 ring-green-500 bg-green-50' : ''
-              }`}
-            onClick={() => setActiveTab('instructors')}
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${
+              activeTab === "permissions"
+                ? "ring-2 ring-green-500 bg-green-50"
+                : ""
+            }`}
+            onClick={() => setActiveTab("instructors")}
           >
             <div className="flex items-center">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center flex-none">
@@ -882,9 +1100,12 @@ export default function SuperAdminDashboardPage() {
           </Card>
 
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === 'students' ? 'ring-2 ring-purple-500 bg-purple-50' : ''
-              }`}
-            onClick={() => setActiveTab('students')}
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${
+              activeTab === "students"
+                ? "ring-2 ring-purple-500 bg-purple-50"
+                : ""
+            }`}
+            onClick={() => setActiveTab("students")}
           >
             <div className="flex items-center">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-none">
@@ -902,9 +1123,12 @@ export default function SuperAdminDashboardPage() {
           </Card>
 
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === 'assignments' ? 'ring-2 ring-yellow-500 bg-yellow-50' : ''
-              }`}
-            onClick={() => setActiveTab('assignments')}
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${
+              activeTab === "assignments"
+                ? "ring-2 ring-yellow-500 bg-yellow-50"
+                : ""
+            }`}
+            onClick={() => setActiveTab("assignments")}
           >
             <div className="flex items-center">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-lg flex items-center justify-center flex-none">
@@ -920,7 +1144,6 @@ export default function SuperAdminDashboardPage() {
               </div>
             </div>
           </Card>
-
         </div>
 
         {/* Tabs */}
@@ -939,19 +1162,6 @@ export default function SuperAdminDashboardPage() {
                 </TabsTrigger>
 
                 <TabsTrigger
-                  value="assignments"
-                  className="whitespace-nowrap snap-start px-3 sm:px-4 py-2 text-xs sm:text-sm"
-                >
-                  Course Assignments
-                </TabsTrigger>
-
-                <TabsTrigger
-                  value="students"
-                  className="whitespace-nowrap snap-start px-3 sm:px-4 py-2 text-xs sm:text-sm"
-                >
-                  Students
-                </TabsTrigger>
-                <TabsTrigger
                   value="admins"
                   className="whitespace-nowrap snap-start px-3 sm:px-4 py-2 text-xs sm:text-sm"
                 >
@@ -962,6 +1172,26 @@ export default function SuperAdminDashboardPage() {
                   className="whitespace-nowrap snap-start px-3 sm:px-4 py-2 text-xs sm:text-sm"
                 >
                   Instructor
+                </TabsTrigger>
+
+                <TabsTrigger
+                  value="students"
+                  className="whitespace-nowrap snap-start px-3 sm:px-4 py-2 text-xs sm:text-sm"
+                >
+                  Students
+                </TabsTrigger>
+
+                <TabsTrigger
+                  value="assignments"
+                  className="whitespace-nowrap snap-start px-3 sm:px-4 py-2 text-xs sm:text-sm"
+                >
+                  Course Assignments
+                </TabsTrigger>
+                <TabsTrigger
+                  value="departments"
+                  className="whitespace-nowrap snap-start px-3 sm:px-4 py-2 text-xs sm:text-sm"
+                >
+                  Departments
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -975,8 +1205,6 @@ export default function SuperAdminDashboardPage() {
                   <div className="flex items-center justify-center p-6">
                     <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-600 rounded-full animate-spin"></div>
                   </div>
-
-
                 )}
 
                 {!collegeLoading && collegeError && (
@@ -1064,37 +1292,57 @@ export default function SuperAdminDashboardPage() {
                             {/* Permissions Button */}
                             <button
                               onClick={() => setCollegeDetailTab("permissions")}
-                              className={`px-5 py-2 rounded-lg text-sm font-medium border transition shadow-sm whitespace-nowrap w-full md:w-auto ${collegeDetailTab === "permissions"
-                                ? "border-primary-500 bg-primary-50 text-primary-600"
-                                : "border-gray-300 bg-white text-gray-600 hover:text-gray-800 hover:border-gray-400"
-                                }`}
+                              className={`px-5 py-2 rounded-lg text-sm font-medium border transition shadow-sm whitespace-nowrap w-full md:w-auto ${
+                                collegeDetailTab === "permissions"
+                                  ? "border-primary-500 bg-primary-50 text-primary-600"
+                                  : "border-gray-300 bg-white text-gray-600 hover:text-gray-800 hover:border-gray-400"
+                              }`}
                             >
                               Permissions
                             </button>
                           </div>
 
-
                           {/* Correct 5-Column Stats Grid */}
                           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
                             <div className="text-center p-4 bg-red-50 rounded-lg">
-                              <div className="text-2xl font-bold text-red-600">{stats.instructors}</div>
-                              <div className="text-sm text-red-800">Instructors</div>
+                              <div className="text-2xl font-bold text-red-600">
+                                {stats.instructors}
+                              </div>
+                              <div className="text-sm text-red-800">
+                                Instructors
+                              </div>
                             </div>
                             <div className="text-center p-4 bg-blue-50 rounded-lg">
-                              <div className="text-2xl font-bold text-blue-600">{stats.studentsAssigned}</div>
-                              <div className="text-sm text-blue-800">Students</div>
+                              <div className="text-2xl font-bold text-blue-600">
+                                {stats.studentsAssigned}
+                              </div>
+                              <div className="text-sm text-blue-800">
+                                Students
+                              </div>
                             </div>
                             <div className="text-center p-4 bg-green-50 rounded-lg">
-                              <div className="text-2xl font-bold text-green-600">{stats.studentsEnrolled}</div>
-                              <div className="text-sm text-green-800">Enrolled</div>
+                              <div className="text-2xl font-bold text-green-600">
+                                {stats.studentsEnrolled}
+                              </div>
+                              <div className="text-sm text-green-800">
+                                Enrolled
+                              </div>
                             </div>
                             <div className="text-center p-4 bg-yellow-50 rounded-lg">
-                              <div className="text-2xl font-bold text-yellow-600">{stats.courses}</div>
-                              <div className="text-sm text-yellow-800">Courses</div>
+                              <div className="text-2xl font-bold text-yellow-600">
+                                {stats.courses}
+                              </div>
+                              <div className="text-sm text-yellow-800">
+                                Courses
+                              </div>
                             </div>
                             <div className="text-center p-4 bg-purple-50 rounded-lg">
-                              <div className="text-2xl font-bold text-purple-600">{stats.certificatesGenerated}</div>
-                              <div className="text-sm text-purple-800">Certificates</div>
+                              <div className="text-2xl font-bold text-purple-600">
+                                {stats.certificatesGenerated}
+                              </div>
+                              <div className="text-sm text-purple-800">
+                                Certificates
+                              </div>
                             </div>
                           </div>
                         </Card>
@@ -1104,44 +1352,66 @@ export default function SuperAdminDashboardPage() {
                           <div className="mb-4">
                             <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
                               <button
-                                onClick={() => setCollegeDetailTab("instructors")}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${collegeDetailTab === "instructors"
-                                  ? "border-primary-500 text-primary-600"
-                                  : "border-transparent text-gray-500 hover:text-gray-700"
-                                  }`}
+                                onClick={() => setCollegeDetailTab("admin")}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
+                                  collegeDetailTab === "admin"
+                                    ? "border-primary-500 text-primary-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700"
+                                }`}
+                              >
+                                Admins (
+                                {(collegeDetailVM?.lists?.admins ?? []).length})
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  setCollegeDetailTab("instructors")
+                                }
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
+                                  collegeDetailTab === "instructors"
+                                    ? "border-primary-500 text-primary-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700"
+                                }`}
                               >
                                 Instructors ({collegeInstructors.length})
                               </button>
+
                               <button
                                 onClick={() => setCollegeDetailTab("students")}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${collegeDetailTab === "students"
-                                  ? "border-primary-500 text-primary-600"
-                                  : "border-transparent text-gray-500 hover:text-gray-700"
-                                  }`}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
+                                  collegeDetailTab === "students"
+                                    ? "border-primary-500 text-primary-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700"
+                                }`}
                               >
                                 Students ({collegeStudents.length})
                               </button>
+
                               <button
-                                onClick={() => setCollegeDetailTab("admin")}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${collegeDetailTab === "admin"
-                                  ? "border-primary-500 text-primary-600"
-                                  : "border-transparent text-gray-500 hover:text-gray-700"
-                                  }`}
+                                onClick={() =>
+                                  setCollegeDetailTab("departments")
+                                }
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
+                                  collegeDetailTab === "departments"
+                                    ? "border-primary-500 text-primary-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700"
+                                }`}
                               >
-                                Admins ({(collegeDetailVM?.lists?.admins ?? []).length})
+                                Departments ({collegeDepartments?.length ?? 0})
                               </button>
+
                               <button
                                 onClick={() => setCollegeDetailTab("courses")}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${collegeDetailTab === "courses"
-                                  ? "border-primary-500 text-primary-600"
-                                  : "border-transparent text-gray-500 hover:text-gray-700"
-                                  }`}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
+                                  collegeDetailTab === "courses"
+                                    ? "border-primary-500 text-primary-600"
+                                    : "border-transparent text-gray-500 hover:text-gray-700"
+                                }`}
                               >
                                 Courses ({collegeCourses.length})
                               </button>
                             </div>
                           </div>
-
 
                           {/* Instructors Tab */}
                           {collegeDetailTab === "instructors" && (
@@ -1187,7 +1457,7 @@ export default function SuperAdminDashboardPage() {
                                                   instructor.avatar ||
                                                   `https://ui-avatars.com/api/?name=${encodeURIComponent(
                                                     instructor.name ||
-                                                    "Instructor"
+                                                      "Instructor"
                                                   )}&background=random`
                                                 }
                                                 alt={
@@ -1344,7 +1614,8 @@ export default function SuperAdminDashboardPage() {
                                         <td className="py-4 px-4">
                                           <div className="text-center">
                                             <Badge variant="info" size="sm">
-                                              {student.enrolledCoursesCount ?? 0}
+                                              {student.enrolledCoursesCount ??
+                                                0}
                                             </Badge>
                                           </div>
                                         </td>
@@ -1384,74 +1655,96 @@ export default function SuperAdminDashboardPage() {
                               <table className="w-full text-sm">
                                 <thead>
                                   <tr className="text-xs text-gray-500 uppercase border-b border-gray-200">
-                                    <th className="py-3 px-4 text-left">Admin</th>
-                                    <th className="py-3 px-4 text-left">College</th>
-                                    <th className="py-3 px-4 text-left">Managed Courses</th>
+                                    <th className="py-3 px-4 text-left">
+                                      Admin
+                                    </th>
+                                    <th className="py-3 px-4 text-left">
+                                      College
+                                    </th>
+                                    <th className="py-3 px-4 text-left">
+                                      Managed Courses
+                                    </th>
                                   </tr>
                                 </thead>
                                 <tbody>
-                                  {(collegeDetailVM?.lists?.admins ?? []).length === 0 ? (
+                                  {(collegeDetailVM?.lists?.admins ?? [])
+                                    .length === 0 ? (
                                     <tr>
-                                      <td colSpan={3} className="py-8 text-center text-gray-500">
+                                      <td
+                                        colSpan={3}
+                                        className="py-8 text-center text-gray-500"
+                                      >
                                         No admins assigned to this college.
                                       </td>
                                     </tr>
                                   ) : (
-                                    collegeDetailVM.lists.admins.map((admin) => (
-                                      <tr
-                                        key={admin.id}
-                                        className="border-b border-gray-100 hover:bg-gray-50 transition"
-                                      >
-                                        <td className="py-4 px-4">
-                                          <div className="flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex-none">
-                                              <img
-                                                src={
-                                                  admin.avatar ||
-                                                  `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                    collegeDetailVM.lists.admins.map(
+                                      (admin) => (
+                                        <tr
+                                          key={admin.id}
+                                          className="border-b border-gray-100 hover:bg-gray-50 transition"
+                                        >
+                                          <td className="py-4 px-4">
+                                            <div className="flex items-center gap-3">
+                                              <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex-none">
+                                                <img
+                                                  src={
+                                                    admin.avatar ||
+                                                    `https://ui-avatars.com/api/?name=${encodeURIComponent(
+                                                      admin.fullName || "Admin"
+                                                    )}&background=random`
+                                                  }
+                                                  alt={
                                                     admin.fullName || "Admin"
-                                                  )}&background=random`
-                                                }
-                                                alt={admin.fullName || "Admin"}
-                                                className="w-full h-full object-cover"
-                                              />
+                                                  }
+                                                  className="w-full h-full object-cover"
+                                                />
+                                              </div>
+                                              <div className="min-w-0">
+                                                <h4 className="font-medium text-gray-900 truncate">
+                                                  {admin.fullName || "—"}
+                                                </h4>
+                                                <p className="text-sm text-gray-600 truncate">
+                                                  {admin.email || ""}
+                                                </p>
+                                              </div>
                                             </div>
-                                            <div className="min-w-0">
-                                              <h4 className="font-medium text-gray-900 truncate">
-                                                {admin.fullName || "—"}
-                                              </h4>
-                                              <p className="text-sm text-gray-600 truncate">
-                                                {admin.email || ""}
-                                              </p>
+                                          </td>
+                                          <td className="py-4 px-4">
+                                            <span className="font-medium text-gray-900">
+                                              {admin.collegeName}
+                                            </span>
+                                          </td>
+                                          <td className="py-4 px-4">
+                                            <div className="flex flex-wrap gap-1">
+                                              {(admin.assignedCourseNames ?? [])
+                                                .length > 0 ? (
+                                                admin.assignedCourseNames.map(
+                                                  (cname, idx) => (
+                                                    <Badge
+                                                      key={idx}
+                                                      variant="outline"
+                                                      size="sm"
+                                                    >
+                                                      {cname}
+                                                    </Badge>
+                                                  )
+                                                )
+                                              ) : (
+                                                <span className="text-gray-400 text-xs">
+                                                  No courses assigned
+                                                </span>
+                                              )}
                                             </div>
-                                          </div>
-                                        </td>
-                                        <td className="py-4 px-4">
-                                          <span className="font-medium text-gray-900">
-                                            {admin.collegeName}
-                                          </span>
-                                        </td>
-                                        <td className="py-4 px-4">
-                                          <div className="flex flex-wrap gap-1">
-                                            {(admin.assignedCourseNames ?? []).length > 0 ? (
-                                              admin.assignedCourseNames.map((cname, idx) => (
-                                                <Badge key={idx} variant="outline" size="sm">
-                                                  {cname}
-                                                </Badge>
-                                              ))
-                                            ) : (
-                                              <span className="text-gray-400 text-xs">No courses assigned</span>
-                                            )}
-                                          </div>
-                                        </td>
-                                      </tr>
-                                    ))
+                                          </td>
+                                        </tr>
+                                      )
+                                    )
                                   )}
                                 </tbody>
                               </table>
                             </div>
                           )}
-
 
                           {/* Courses Tab */}
                           {collegeDetailTab === "courses" && (
@@ -1459,22 +1752,30 @@ export default function SuperAdminDashboardPage() {
                               <table className="w-full text-sm">
                                 <thead>
                                   <tr className="border-b border-gray-200 text-xs uppercase text-gray-500">
-                                    <th className="py-3 px-4 text-left">Course</th>
-                                    <th className="py-3 px-4 text-left">Status</th>
+                                    <th className="py-3 px-4 text-left">
+                                      Course
+                                    </th>
+                                    <th className="py-3 px-4 text-left">
+                                      Status
+                                    </th>
                                     {/* Renamed Header */}
-
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {collegeCourses.length === 0 ? (
                                     <tr>
-                                      <td colSpan={3} className="py-8 text-center text-gray-500">
+                                      <td
+                                        colSpan={3}
+                                        className="py-8 text-center text-gray-500"
+                                      >
                                         No courses assigned to this college.
                                       </td>
                                     </tr>
                                   ) : (
                                     collegeCourses.map((course) => {
-                                      const active = (course.status || "").toLowerCase() === "published";
+                                      const active =
+                                        (course.status || "").toLowerCase() ===
+                                        "published";
                                       return (
                                         <tr
                                           key={course.id}
@@ -1484,7 +1785,10 @@ export default function SuperAdminDashboardPage() {
                                             <div className="flex items-center gap-3">
                                               <div className="w-12 h-12 flex-none overflow-hidden rounded-lg bg-gray-100">
                                                 <img
-                                                  src={course.thumbnail || "/placeholder.png"}
+                                                  src={
+                                                    course.thumbnail ||
+                                                    "/placeholder.png"
+                                                  }
                                                   alt={course.title}
                                                   className="h-full w-full object-cover"
                                                 />
@@ -1502,15 +1806,35 @@ export default function SuperAdminDashboardPage() {
 
                                           <td className="py-4 px-4">
                                             <button
-                                              onClick={() => handleUnassign(course)}
-                                              disabled={unassigningId === course.id}
+                                              onClick={() =>
+                                                handleUnassign(course)
+                                              }
+                                              disabled={
+                                                unassigningId === course.id
+                                              }
                                               className="inline-flex h-8 items-center justify-center rounded-md bg-red-50 px-3 text-sm font-medium text-red-600 transition-colors hover:bg-red-100 disabled:pointer-events-none disabled:opacity-50"
                                             >
                                               {unassigningId === course.id ? (
                                                 // Simple spinner for loading state
-                                                <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                                <svg
+                                                  className="h-4 w-4 animate-spin"
+                                                  xmlns="http://www.w3.org/2000/svg"
+                                                  fill="none"
+                                                  viewBox="0 0 24 24"
+                                                >
+                                                  <circle
+                                                    className="opacity-25"
+                                                    cx="12"
+                                                    cy="12"
+                                                    r="10"
+                                                    stroke="currentColor"
+                                                    strokeWidth="4"
+                                                  ></circle>
+                                                  <path
+                                                    className="opacity-75"
+                                                    fill="currentColor"
+                                                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                                                  ></path>
                                                 </svg>
                                               ) : (
                                                 "Unassign"
@@ -1523,6 +1847,107 @@ export default function SuperAdminDashboardPage() {
                                   )}
                                 </tbody>
                               </table>
+                            </div>
+                          )}
+
+                          {/* Departments Tab */}
+                          {collegeDetailTab === "departments" && (
+                            <div>
+                              {collegeLoading ? (
+                                <div className="flex items-center justify-center p-8">
+                                  <p className="text-gray-600 text-lg">
+                                    Loading departments...
+                                  </p>
+                                </div>
+                              ) : (
+                                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                                  <div className="overflow-x-auto">
+                                    <table className="min-w-full divide-y divide-gray-200">
+                                      <thead className="bg-gray-50">
+                                        <tr>
+                                          <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                                            Department
+                                          </th>
+                                          <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                                            Instructors
+                                          </th>
+                                          <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                                            Students
+                                          </th>
+                                          <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                                            Courses
+                                          </th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="bg-white divide-y divide-gray-200">
+                                        {collegeDepartments.length === 0 ? (
+                                          <tr>
+                                            <td
+                                              colSpan="4"
+                                              className="px-6 py-12 text-center"
+                                            >
+                                              <Building2
+                                                size={48}
+                                                className="mx-auto text-gray-400 mb-2"
+                                              />
+                                              <p className="text-gray-600 font-medium">
+                                                No departments found
+                                              </p>
+                                              <p className="text-gray-500 text-sm mt-1">
+                                                This college hasn't added any
+                                                departments yet.
+                                              </p>
+                                            </td>
+                                          </tr>
+                                        ) : (
+                                          collegeDepartments.map((dept) => (
+                                            <tr
+                                              key={dept.id}
+                                              className="hover:bg-gray-50"
+                                            >
+                                              <td className="px-6 py-4">
+                                                <div className="flex items-center">
+                                                  <Building2
+                                                    size={20}
+                                                    className="text-gray-400 mr-3 flex-shrink-0"
+                                                  />
+                                                  <div>
+                                                    <div className="font-medium text-gray-900">
+                                                      {dept.name ||
+                                                        dept.departmentName ||
+                                                        "—"}
+                                                    </div>
+                                                    {dept.description && (
+                                                      <div className="text-sm text-gray-500 mt-0.5">
+                                                        {dept.description}
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                </div>
+                                              </td>
+                                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 text-blue-700 text-sm font-medium">
+                                                  {dept.instructorCount || 0}
+                                                </span>
+                                              </td>
+                                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-50 text-green-700 text-sm font-medium">
+                                                  {dept.studentCount || 0}
+                                                </span>
+                                              </td>
+                                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-50 text-purple-700 text-sm font-medium">
+                                                  {dept.courseCount || 0}
+                                                </span>
+                                              </td>
+                                            </tr>
+                                          ))
+                                        )}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           )}
 
@@ -1607,7 +2032,9 @@ export default function SuperAdminDashboardPage() {
 
                                 {/* Loading state */}
                                 {permLoading && (
-                                  <p className="text-sm text-gray-500">Loading permissions…</p>
+                                  <p className="text-sm text-gray-500">
+                                    Loading permissions…
+                                  </p>
                                 )}
 
                                 <div className="space-y-4">
@@ -1619,7 +2046,10 @@ export default function SuperAdminDashboardPage() {
                                   )}
 
                                   {permAdmins.map((admin) => (
-                                    <div key={admin.id} className="border border-gray-200 rounded-lg p-4">
+                                    <div
+                                      key={admin.id}
+                                      className="border border-gray-200 rounded-lg p-4"
+                                    >
                                       <div className="flex items-center gap-4">
                                         <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex-none">
                                           <img
@@ -1644,24 +2074,42 @@ export default function SuperAdminDashboardPage() {
 
                                           <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                                             {[
-                                              { key: "canCreateCourses", label: "Create Courses" },
-                                              { key: "canCreateTests", label: "Create Tests" },
-                                              { key: "canManageTests", label: "Manage Tests" },
+                                              {
+                                                key: "canCreateCourses",
+                                                label: "Create Courses",
+                                              },
+                                              {
+                                                key: "canCreateTests",
+                                                label: "Create FinalTests",
+                                              },
+                                              {
+                                                key: "canManageTests",
+                                                label: "Manage Tests",
+                                              },
                                             ].map(({ key, label }) => {
-                                              const checked = !!(admin.permissions?.[key]);
+                                              const checked =
+                                                !!admin.permissions?.[key];
                                               return (
                                                 <label
                                                   key={key}
                                                   className="flex items-center justify-between border rounded-lg px-3 py-2"
                                                 >
-                                                  <span className="text-sm text-gray-700">{label}</span>
+                                                  <span className="text-sm text-gray-700">
+                                                    {label}
+                                                  </span>
                                                   <input
                                                     type="checkbox"
                                                     className="h-4 w-4"
                                                     checked={checked}
                                                     disabled={permLoading}
                                                     onChange={(e) =>
-                                                      saveAdminToggle(admin.id, { [key]: e.target.checked })
+                                                      saveAdminToggle(
+                                                        admin.id,
+                                                        {
+                                                          [key]:
+                                                            e.target.checked,
+                                                        }
+                                                      )
                                                     }
                                                     aria-label={label}
                                                   />
@@ -1675,7 +2123,6 @@ export default function SuperAdminDashboardPage() {
                                   ))}
                                 </div>
                               </Card>
-
                             </div>
                           )}
                         </Card>
@@ -1735,10 +2182,11 @@ export default function SuperAdminDashboardPage() {
                           return (
                             <tr
                               key={college.id}
-                              className={`border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer ${selectedCollegeId === college.id
-                                ? "bg-primary-50"
-                                : ""
-                                }`}
+                              className={`border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer ${
+                                selectedCollegeId === college.id
+                                  ? "bg-primary-50"
+                                  : ""
+                              }`}
                               onClick={() => setSelectedCollegeId(college.id)}
                             >
                               <td className="py-4 px-4">
@@ -1850,13 +2298,10 @@ export default function SuperAdminDashboardPage() {
                                 <h4 className="font-medium text-gray-900 truncate">
                                   {course.title}
                                 </h4>
-
                               </div>
                             </div>
 
                             <div className="flex gap-2 flex-wrap items-center">
-
-
                               {canEditCourse(course) && (
                                 <Button
                                   size="sm"
@@ -1878,11 +2323,8 @@ export default function SuperAdminDashboardPage() {
                                 <Pencil size={14} className="mr-1" />
                                 Assign Course
                               </Button>
-
                             </div>
                           </div>
-
-
                         </div>
                       );
                     })}
@@ -1893,7 +2335,6 @@ export default function SuperAdminDashboardPage() {
           </TabsContent>
 
           {courseToAssign && (
-
             <AssignCourseModal
               isOpen={isAssignModalOpen}
               onClose={handleCloseAssignModal}
@@ -1901,7 +2342,6 @@ export default function SuperAdminDashboardPage() {
               course={courseToAssign}
               colleges={colleges}
             />
-
           )}
 
           <TabsContent value="students">
@@ -1923,8 +2363,8 @@ export default function SuperAdminDashboardPage() {
                             studentFilter === "all"
                               ? "college"
                               : studentFilter === "college"
-                                ? "course"
-                                : "all"
+                              ? "course"
+                              : "all"
                           );
                           setSelectedFilterValue("");
                         }}
@@ -1934,14 +2374,16 @@ export default function SuperAdminDashboardPage() {
                         {studentFilter === "all"
                           ? "Filter"
                           : studentFilter === "college"
-                            ? "College"
-                            : "Course"}
+                          ? "College"
+                          : "Course"}
                       </Button>
 
                       {studentFilter !== "all" && (
                         <select
                           value={selectedFilterValue}
-                          onChange={(e) => setSelectedFilterValue(e.target.value)}
+                          onChange={(e) =>
+                            setSelectedFilterValue(e.target.value)
+                          }
                           className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                         >
                           <option value="">
@@ -2018,7 +2460,8 @@ export default function SuperAdminDashboardPage() {
                                 {student?.status && (
                                   <Badge
                                     variant={
-                                      String(student.status).toLowerCase() === "active"
+                                      String(student.status).toLowerCase() ===
+                                      "active"
                                         ? "success"
                                         : "secondary"
                                     }
@@ -2043,7 +2486,6 @@ export default function SuperAdminDashboardPage() {
                         </div>
                       );
                     })}
-
                   </div>
 
                   {getFilteredStudents().length === 0 && (
@@ -2059,7 +2501,7 @@ export default function SuperAdminDashboardPage() {
           </TabsContent>
 
           <TabsContent value="admins">
-            {loadingUsers? (
+            {loadingUsers ? (
               <div className="text-center py-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
                 <p>Loading admins...</p>
@@ -2083,10 +2525,18 @@ export default function SuperAdminDashboardPage() {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avatar</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">College</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Avatar
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Name
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Email
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              College
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -2100,13 +2550,13 @@ export default function SuperAdminDashboardPage() {
                                 />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {admin.name || 'N/A'}
+                                {admin.name || "N/A"}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {admin.email}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {admin.collegeName || 'N/A'}
+                                {admin.collegeName || "N/A"}
                               </td>
                             </tr>
                           ))}
@@ -2119,7 +2569,6 @@ export default function SuperAdminDashboardPage() {
             )}
           </TabsContent>
 
-
           <TabsContent value="instructors">
             {loadingUsers ? (
               <div className="text-center py-8">
@@ -2131,7 +2580,9 @@ export default function SuperAdminDashboardPage() {
                 <Card.Header>
                   <div className="flex items-center justify-between">
                     <Card.Title>Instructors List</Card.Title>
-                    <Badge variant="success">{allInstructors.length} Total</Badge>
+                    <Badge variant="success">
+                      {allInstructors.length} Total
+                    </Badge>
                   </div>
                 </Card.Header>
                 <Card.Content>
@@ -2145,16 +2596,29 @@ export default function SuperAdminDashboardPage() {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avatar</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">College</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Avatar
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Name
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Email
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              College
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              Department
+                            </th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                           {allInstructors.map((instructor) => (
-                            <tr key={instructor.id} className="hover:bg-gray-50">
+                            <tr
+                              key={instructor.id}
+                              className="hover:bg-gray-50"
+                            >
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <img
                                   src={instructor.avatar}
@@ -2163,16 +2627,16 @@ export default function SuperAdminDashboardPage() {
                                 />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                {instructor.name || 'N/A'}
+                                {instructor.name || "N/A"}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {instructor.email}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {instructor.collegeName || 'N/A'}
+                                {instructor.collegeName || "N/A"}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {instructor.departmentName || 'N/A'}
+                                {instructor.departmentName || "N/A"}
                               </td>
                             </tr>
                           ))}
@@ -2184,6 +2648,78 @@ export default function SuperAdminDashboardPage() {
               </Card>
             )}
           </TabsContent>
+
+        <TabsContent value="departments">
+  {loadingDepartments ? (
+    <div className="text-center py-8">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+      <p>Loading departments...</p>
+    </div>
+  ) : (
+    <Card>
+      <Card.Header>
+        <div className="flex items-center justify-between">
+          <Card.Title>Departments List</Card.Title>
+          <Badge variant="info">
+            {allDepartments.length} Total
+          </Badge>
+        </div>
+      </Card.Header>
+      <Card.Content>
+        {allDepartments.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            <School size={48} className="mx-auto mb-4 opacity-50" />
+            <p>No departments found</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Department Code
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Department Name
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {allDepartments.map((department, index) => (
+                  <tr
+                    key={department.key || index}
+                    className="hover:bg-gray-50 transition"
+                  >
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                        {department.key}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center">
+                          <School size={20} className="text-purple-600" />
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {department.name}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card.Content>
+    </Card>
+  )}
+</TabsContent>
+
+
+
 
         </Tabs>
 
@@ -2217,7 +2753,7 @@ export default function SuperAdminDashboardPage() {
                   <Badge
                     variant={
                       String(selectedUser.role).toLowerCase() === "admin" ||
-                        String(selectedUser.role).toUpperCase() === "SUPERADMIN"
+                      String(selectedUser.role).toUpperCase() === "SUPERADMIN"
                         ? "danger"
                         : "warning"
                     }
@@ -2285,58 +2821,60 @@ export default function SuperAdminDashboardPage() {
                 <div className="space-y-4">
                   {(String(selectedUser.role).toLowerCase() === "admin" ||
                     String(selectedUser.role).toUpperCase() ===
-                    "SUPERADMIN") && (
-                      <>
-                        {[
-                          {
-                            key: "canCreateCourses",
-                            title: "Create Courses",
-                            desc: "Allow user to create new courses",
-                          },
-                          {
-                            key: "canCreateTests",
-                            title: "Create Tests",
-                            desc: "Allow user to create and manage tests",
-                          },
-                          {
-                            key: "canManageTests",
-                            title: "Manage Tests",
-                            desc: "Allow user to edit and delete tests",
-                          },
-                        ].map((item) => (
-                          <div
-                            key={item.key}
-                            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-                          >
-                            <div className="pr-4">
-                              <h5 className="font-medium text-gray-900">
-                                {item.title}
-                              </h5>
-                              <p className="text-sm text-gray-600">{item.desc}</p>
-                            </div>
-                            <button
-                              onClick={() =>
-                                setEditingPermissions((p) => ({
-                                  ...p,
-                                  [item.key]: !p[item.key],
-                                }))
-                              }
-                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editingPermissions[item.key]
+                      "SUPERADMIN") && (
+                    <>
+                      {[
+                        {
+                          key: "canCreateCourses",
+                          title: "Create Courses",
+                          desc: "Allow user to create new courses",
+                        },
+                        {
+                          key: "canCreateTests",
+                          title: "Create Tests",
+                          desc: "Allow user to create and manage tests",
+                        },
+                        {
+                          key: "canManageTests",
+                          title: "Manage Tests",
+                          desc: "Allow user to edit and delete tests",
+                        },
+                      ].map((item) => (
+                        <div
+                          key={item.key}
+                          className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                        >
+                          <div className="pr-4">
+                            <h5 className="font-medium text-gray-900">
+                              {item.title}
+                            </h5>
+                            <p className="text-sm text-gray-600">{item.desc}</p>
+                          </div>
+                          <button
+                            onClick={() =>
+                              setEditingPermissions((p) => ({
+                                ...p,
+                                [item.key]: !p[item.key],
+                              }))
+                            }
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              editingPermissions[item.key]
                                 ? "bg-primary-600"
                                 : "bg-gray-200"
-                                }`}
-                            >
-                              <span
-                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editingPermissions[item.key]
+                            }`}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                editingPermissions[item.key]
                                   ? "translate-x-6"
                                   : "translate-x-1"
-                                  }`}
-                              />
-                            </button>
-                          </div>
-                        ))}
-                      </>
-                    )}
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      ))}
+                    </>
+                  )}
 
                   {String(selectedUser.role).toLowerCase() === "instructor" && (
                     <>
@@ -2384,16 +2922,18 @@ export default function SuperAdminDashboardPage() {
                                 [item.key]: !p[item.key],
                               }))
                             }
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editingPermissions[item.key]
-                              ? "bg-primary-600"
-                              : "bg-gray-200"
-                              }`}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              editingPermissions[item.key]
+                                ? "bg-primary-600"
+                                : "bg-gray-200"
+                            }`}
                           >
                             <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editingPermissions[item.key]
-                                ? "translate-x-6"
-                                : "translate-x-1"
-                                }`}
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                editingPermissions[item.key]
+                                  ? "translate-x-6"
+                                  : "translate-x-1"
+                              }`}
                             />
                           </button>
                         </div>

@@ -182,73 +182,90 @@ const LoginPage = () => {
   };
 
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex flex-col justify-center py-8 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="flex justify-center mb-6">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-r from-primary-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <BookOpen size={28} className="text-white" />
-          </div>
-        </div>
-
-        <div className="text-center">
-          <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">
-            Welcome to PugArch LMS
-          </h2>
-          <p className="text-sm sm:text-base text-gray-600 mb-3">
-            Login to access your learning account
-          </p>
-          <Link to="/signup">
-            <div className="text-large text-blue-700 hover:underline">
-              Sign up for an account
-            </div>
-          </Link>
+ 
+return (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
+    <div className="w-full max-w-md">
+      {/* Logo */}
+      <div className="flex justify-center mb-6">
+        <div className="w-14 h-14 sm:w-16 sm:h-16 bg-gradient-to-r from-primary-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+          <BookOpen size={28} className="text-white" />
         </div>
       </div>
 
-      <div className="mt-6 sm:mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <div className="bg-white py-6 px-4 sm:py-8 sm:px-10 shadow-xl sm:rounded-2xl border border-gray-100">
-          {step === "choice" && (
-            <div className="space-y-4">
-              <div className="w-full flex items-center justify-center space-x-2">
-                <GoogleLogin
-                  onSuccess={handleGoogleSuccess}
-                  onError={handleGoogleError}
-                  size="large"
-                  width="100%"
-                  text="continue_with"
-                  shape="rectangular"
-                />
-              </div>
+      {/* Title */}
+      <div className="text-center mb-8">
+        <h2 className="text-2xl sm:text-3xl font-semibold text-gray-900 mb-2">
+          Welcome to PugArch LMS
+        </h2>
+        <p className="text-sm sm:text-base text-gray-600 mb-3">
+          Login to access your learning account
+        </p>
+        <Link 
+          to="/signup" 
+          className="inline-block text-sm text-primary-700 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-200 rounded px-2 py-1"
+        >
+          Sign up for an account
+        </Link>
+      </div>
 
-              {/* <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300"></div>
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or</span>
-                </div>
-              </div> */}
-
-              <Button
-                onClick={() => setStep("email")}
-                variant="outline"
-                className="w-full flex items-center justify-center space-x-2 bg-blue-600"
-                size="lg"
-              >
-                <Mail size={20} className="text-gray-500" />
-                <span>Login with Email</span>
-              </Button>
+      {/* Card */}
+      <div className="bg-white py-8 px-6 sm:px-8 shadow-xl rounded-2xl border border-gray-100">
+        {/* CHOICE STEP */}
+        {step === "choice" && (
+          <div className="space-y-4">
+            {/* Google Login Button */}
+            <div className="w-full [&>div]:w-full [&>div>div]:w-full">
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={handleGoogleError}
+                size="large"
+                text="continue_with"
+                shape="rectangular"
+                width="400"
+              />
             </div>
-          )}
 
-          {step === "email" && (
-            <form
-              className="space-y-5 sm:space-y-6"
-              onSubmit={handleSubmit(handleEmailSignup)}
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-white px-2 text-gray-500">Or</span>
+              </div>
+            </div>
+
+            {/* Email Login Button */}
+            <Button
+              onClick={() => setStep("email")}
+              variant="outline"
+              className="w-full flex items-center justify-center gap-2"
+              size="lg"
+              aria-label="Login with Email"
             >
+              <Mail size={18} className="text-gray-500" />
+              <span>Login with Email</span>
+            </Button>
+
+            <p className="text-xs text-gray-500 text-center pt-2">
+              Continue with Google or login using your email & password.
+            </p>
+          </div>
+        )}
+
+        {/* EMAIL LOGIN STEP */}
+        {step === "email" && (
+          <form
+            className="space-y-5"
+            onSubmit={handleSubmit(handleEmailSignup)}
+            aria-label="Email login form"
+          >
+            {/* Email Field */}
+            <div>
               <Input
                 label="Email address"
+                id="email"
                 type="email"
                 placeholder="Enter your email"
                 error={errors.email?.message}
@@ -260,76 +277,102 @@ const LoginPage = () => {
                   },
                 })}
                 leftElement={
-                  <Mail
-                    size={20}
-                    className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                  <Mail 
+                    size={18} 
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" 
                   />
                 }
                 className="pl-10"
+                aria-invalid={!!errors.email}
               />
+            </div>
 
-              <div>
+            {/* Password Field */}
+            <div>
+              <div className="relative">
                 <Input
                   label="Password"
+                  id="password"
                   type={showPassword ? "text" : "password"}
                   placeholder="Enter your password"
                   error={errors.password?.message}
                   {...register("password", {
                     required: "Password is required",
-                    minLength: {
-                      value: 6,
-                      message: "Password must be at least 6 characters",
+                    minLength: { 
+                      value: 6, 
+                      message: "Password must be at least 6 characters" 
                     },
                   })}
                   className="pr-10"
-
-                  rightElement={
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700 cursor-pointer focus:outline-none"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                    </button>
-                  }
-
+                  aria-invalid={!!errors.password}
                 />
-
-                <div className="text-right mt-1">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/forgot-password")}
-                    className="text-sm text-blue-600 hover:underline focus:outline-none"
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
+                
+                {/* Password Toggle - positioned relative to input */}
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-9 text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-primary-200 rounded"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
               </div>
 
-              <Button
-                type="submit"
-                className="w-full flex items-center justify-center"
-                disabled={isLoading}
-                size="lg"
-              >
-                {isLoading ? "Logging in..." : "Login"}
-              </Button>
-            </form>
-          )}
-
-          <div className="mt-5 sm:mt-6 p-3 bg-gray-50 rounded-lg text-center">
-            <div className="flex items-center justify-center space-x-2">
-              <Shield size={14} className="text-gray-500" />
-              <span className="text-xs sm:text-sm text-gray-600">
-                Your data is protected with enterprise-grade security
-              </span>
+              {/* Forgot Password Link */}
+              <div className="text-right mt-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/forgot-password")}
+                  className="text-sm text-primary-600 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-200 rounded px-2 py-1"
+                >
+                  Forgot Password?
+                </button>
+              </div>
             </div>
+
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              className="w-full flex items-center justify-center gap-2"
+              disabled={isLoading}
+              size="lg"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>Logging in...</span>
+                </>
+              ) : (
+                <span>Login</span>
+              )}
+            </Button>
+
+            {/* Back Button */}
+            <Button
+              type="button"
+              onClick={() => setStep("choice")}
+              variant="ghost"
+              className="w-full"
+              aria-label="Go back to login options"
+            >
+              ← Back
+            </Button>
+          </form>
+        )}
+
+        {/* Security Note */}
+        <div className="mt-6 p-3 bg-gray-50 rounded-lg">
+          <div className="flex items-center justify-center gap-2">
+            <Shield size={14} className="text-gray-500 flex-shrink-0" />
+            <span className="text-xs sm:text-sm text-gray-600">
+              Your data is protected with enterprise-grade security
+            </span>
           </div>
         </div>
       </div>
 
-      <div className="mt-6 sm:mt-8 text-center">
+      {/* Footer */}
+      <footer className="mt-8 text-center">
         <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500">
           <Link to="/help" className="hover:text-gray-700 transition-colors">
             Help Center
@@ -341,12 +384,12 @@ const LoginPage = () => {
             Terms
           </Link>
         </div>
-        <p className="mt-2 text-xs text-gray-400">
-          © 2025 Pugarch. All rights reserved.
-        </p>
-      </div>
+        <p className="mt-3 text-xs text-gray-400">© 2025 Pugarch. All rights reserved.</p>
+      </footer>
     </div>
-  );
+  </div>
+);
+
 };
 
 export default LoginPage;

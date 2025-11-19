@@ -440,6 +440,6 @@ export const departmentAPI = {
   getCollegeDepartments: (collegeId) =>
     api.get(`/auth/colleges/${collegeId}/departments`),
   addDepartmentToCatalog: (data) =>
-    api.post("/admin/departments-catalog/add", data),
+    api.post("/auth/admin/departments-catalog/add", data),
 };
 export default api;

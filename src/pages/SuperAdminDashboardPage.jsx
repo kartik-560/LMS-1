@@ -220,6 +220,7 @@ const [loadingDepartments, setLoadingDepartments] = useState(false);
 
   async function saveAdminToggle(userId, patch) {
     try {
+<<<<<<< HEAD
       await collegesAPI.updateAdminPermissions(
         collegeDetailVM.college.id,
         userId,
@@ -229,13 +230,72 @@ const [loadingDepartments, setLoadingDepartments] = useState(false);
         prev.map((a) =>
           a.id === userId
             ? { ...a, permissions: { ...a.permissions, ...patch } }
+=======
+      // Find current admin
+      const admin = permAdmins.find(a => a.id === userId);
+
+      // Merge existing permissions with the patch
+      const mergedPermissions = {
+        ...(admin?.permissions || {}),
+        ...patch
+      };
+
+      // Send merged permissions to backend
+      await collegesAPI.updateAdminPermissions(
+        collegeDetailVM.college.id,
+        userId,
+        mergedPermissions
+      );
+
+      // Update local state
+      setPermAdmins(prev =>
+        prev.map(a =>
+          a.id === userId
+            ? { ...a, permissions: mergedPermissions }
+>>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
             : a
         )
       );
+
+      toast.success("Permission updated successfully");
     } catch (e) {
+      console.error("Error updating permission:", e);
       toast.error(e?.response?.data?.error || e.message || "Failed to update");
     }
   }
+
+  const fetchCollegePermissions = async () => {
+    try {
+      setPermLoading(true);
+
+      const permResponse = await collegesAPI.getPermissions(collegeDetailVM.college.id);
+      const { limits, adminPermissions } = permResponse.data;
+
+      setPermLimits(limits);
+      setPermAdmins(adminPermissions);
+
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Failed to load permissions");
+    } finally {
+      setPermLoading(false);
+    }
+  };
+
+
+  useEffect(() => {
+    console.log('🔥 useEffect triggered', {
+      tab: collegeDetailTab,
+      collegeId: collegeDetailVM?.college?.id
+    });
+
+    if (collegeDetailTab === "permissions" && collegeDetailVM?.college?.id) {
+      console.log('🔥 Calling fetchCollegePermissions');
+      fetchCollegePermissions();
+    } else {
+      console.log('❌ Conditions not met');
+    }
+  }, [collegeDetailTab, collegeDetailVM?.college?.id]);
+
 
   const handleApiError = (err, fallback) => {
     const msg =
@@ -529,7 +589,12 @@ const fetchDepartments = async () => {
   const collegesWithCounts = useMemo(() => {
     if (!colleges) return [];
 
+<<<<<<< HEAD
     return colleges.map((college) => {
+=======
+    return colleges.map(college => {
+
+>>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
       const instructorCount = college.instructorCount || 0;
       const studentCount = college.studentCount || 0;
       const courseCount = college.courseCount || 0;
@@ -544,7 +609,12 @@ const fetchDepartments = async () => {
         certificatesGenerated: certificatesCount,
       };
     });
+<<<<<<< HEAD
   }, [colleges]);
+=======
+  },
+    [colleges]);
+>>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
 
   const filteredColleges = useMemo(() => {
     const q = (collegesSearch || "").toLowerCase();
@@ -1018,11 +1088,15 @@ useEffect(() => {
                   <span className="sm:hidden">User</span>
                 </Button>
               </Link>
+<<<<<<< HEAD
               <Link
                 to="/add_department"
                 state={{ allowWhenLoggedIn: true }}
                 className="col-span-1"
               >
+=======
+              <Link to="/add_department" state={{ allowWhenLoggedIn: true }} className="col-span-1">
+>>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
                 <Button size="sm" className="w-full">
                   <Plus size={16} className="mr-2" />
                   <span className="hidden sm:inline">Add Department</span>
@@ -1228,7 +1302,6 @@ useEffect(() => {
                     const collegeInstructors = lists?.instructors ?? [];
                     const collegeStudents = lists?.students ?? [];
 
-                    // 👇 THE FIX IS HERE: This object now matches the display cards.
                     const stats = {
                       instructors: counts?.instructors ?? 0,
                       courses: counts?.courses ?? 0,
@@ -2046,6 +2119,7 @@ useEffect(() => {
                                   )}
 
                                   {permAdmins.map((admin) => (
+<<<<<<< HEAD
                                     <div
                                       key={admin.id}
                                       className="border border-gray-200 rounded-lg p-4"
@@ -2062,17 +2136,29 @@ useEffect(() => {
                                             alt={admin.name || "Admin"}
                                             className="w-full h-full object-cover"
                                           />
+=======
+                                    <div key={admin.id} className="border border-gray-200 rounded-lg p-4">
+                                      <div className="flex items-start gap-4">
+                                        {/* Avatar */}
+                                        <div className="w-12 h-12 rounded-full overflow-hidden bg-cyan-400 flex-none flex items-center justify-center">
+                                          <span className="text-white font-semibold text-lg">
+                                            {admin.name?.charAt(0)?.toUpperCase() || "A"}
+                                          </span>
+>>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
                                         </div>
 
+                                        {/* Info and Permissions */}
                                         <div className="min-w-0 flex-1">
-                                          <div className="font-medium text-gray-900 truncate">
+                                          {/* Name and Email */}
+                                          <div className="font-medium text-gray-900">
                                             {admin.name}
                                           </div>
-                                          <div className="text-sm text-gray-600 truncate">
+                                          <div className="text-sm text-gray-600">
                                             {admin.email}
                                           </div>
 
-                                          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                          {/* Permissions Row */}
+                                          <div className="mt-3 flex flex-wrap gap-3">
                                             {[
                                               {
                                                 key: "canCreateCourses",
@@ -2087,19 +2173,28 @@ useEffect(() => {
                                                 label: "Manage Tests",
                                               },
                                             ].map(({ key, label }) => {
+<<<<<<< HEAD
                                               const checked =
                                                 !!admin.permissions?.[key];
+=======
+                                              const checked = admin.permissions?.[key] || false;
+
+>>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
                                               return (
                                                 <label
                                                   key={key}
-                                                  className="flex items-center justify-between border rounded-lg px-3 py-2"
+                                                  className="flex items-center justify-between gap-3 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 cursor-pointer transition"
                                                 >
+<<<<<<< HEAD
                                                   <span className="text-sm text-gray-700">
+=======
+                                                  <span className="text-sm text-gray-700 whitespace-nowrap">
+>>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
                                                     {label}
                                                   </span>
                                                   <input
                                                     type="checkbox"
-                                                    className="h-4 w-4"
+                                                    className="h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
                                                     checked={checked}
                                                     disabled={permLoading}
                                                     onChange={(e) =>
@@ -2123,6 +2218,11 @@ useEffect(() => {
                                   ))}
                                 </div>
                               </Card>
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
                             </div>
                           )}
                         </Card>

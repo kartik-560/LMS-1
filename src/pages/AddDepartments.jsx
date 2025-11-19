@@ -19,12 +19,9 @@ const AddDepartments = () => {
   }));
 
   const collegeId = college?.id || user?.collegeId;
-  const isSuperAdmin = user?.role?.toUpperCase() === 'SUPERADMIN'
-
-    || user?.isSuperAdmin === true
-    || user?.isSuperAdmin === 'true'
-    || user?.is_superadmin === true
-    || user?.type === 'superadmin';
+  const isSuperAdmin = useAuthStore((state) => state.isSuperAdmin?.())
+    || user?.role?.toUpperCase() === 'SUPERADMIN'
+    || user?.role === 'SUPERADMIN';
 
   const adminName = user?.name || user?.email || 'Admin';
 
@@ -240,10 +237,10 @@ IsSuperAdmin: ${isSuperAdmin}`}
           {isSuperAdmin ? 'Department Management' : 'Add Departments'}
         </h2>
         <div className="text-sm text-gray-600 mt-2">
-          <p>Admin: <span className="font-semibold">{adminName}</span></p>
-          {collegeId && (
+          {/* <p>Admin: <span className="font-semibold">{adminName}</span></p> */}
+          {/* {collegeId && (
             <p>College ID: <span className="font-semibold">{collegeId}</span></p>
-          )}
+          )} */}
           {isSuperAdmin && (
             <p className="mt-1 inline-block px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">
               🔐 Superadmin Access
@@ -431,7 +428,5 @@ IsSuperAdmin: ${isSuperAdmin}`}
     </div>
   );
 };
-
-
 
 export default AddDepartments;

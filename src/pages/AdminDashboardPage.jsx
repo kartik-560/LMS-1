@@ -18,16 +18,15 @@ import {
   Download,
   X,
   Check,
+  Building2
 } from "lucide-react";
 import toast from "react-hot-toast";
 import {
   superAdminAPI,
   coursesAPI,
   adminScopedAPI,
-  authAPI,
   FALLBACK_THUMB,
-  enrollmentsAPI,
-  assessmentsAPI,
+  collegesAPI
 } from "../services/api";
 import useAuthStore from "../store/useAuthStore";
 
@@ -196,6 +195,7 @@ export default function AdminDashboardPage() {
   const [studentStats, setStudentStats] = useState({});
   const [loadingStats, setLoadingStats] = useState(false);
   const [loadedTabs, setLoadedTabs] = useState(new Set(["overview"]));
+  const [departments, setDepartments] = useState([]);
 
   const [loadingStates, setLoadingStates] = useState({
     overview: false,
@@ -390,6 +390,84 @@ export default function AdminDashboardPage() {
   }, []);
 
 
+  // const handleTabChange = async (tabName) => {
+  //   // Skip if already loaded
+  //   if (loadedTabs.has(tabName)) {
+  //     return;
+  //   }
+
+  //   try {
+  //     // Set loading for this specific tab
+  //     setLoadingStates(prev => ({ ...prev, [tabName]: true }));
+  //     const api = await makeAdminAdapter();
+
+  //     if (tabName === "instructors") {
+  //       const ins = await api.instructors();
+  //       const normInstructors = (ins?.data || []).map((i) => ({
+  //         id: i.id,
+  //         fullName: i.fullName || i.name || "Instructor",
+  //         email: i.email,
+  //         isActive: !!i.isActive,
+  //         lastLogin: i.lastLogin,
+  //         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(i.fullName || i.name || "I")}&background=random`,
+  //         assignedCourses: i.assignedCourses || null,
+  //       }));
+  //       setInstructors(normInstructors);
+  //     }
+
+  //     if (tabName === "students") {
+  //       const stu = await api.students();
+  //       const normStudents = (stu?.data || []).map((s) => ({
+  //         id: s.id,
+  //         fullName: s.fullName || s.name || "Student",
+  //         email: s.email,
+  //         isActive: !!s.isActive,
+  //         lastLogin: s.lastLogin,
+  //         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(s.fullName || s.name || "S")}&background=random`,
+  //         assignedCourses: s.assignedCourses || [],
+  //         progress: {},
+  //       }));
+  //       setStudents(normStudents);
+
+  //       const statsMap = (stu?.data || []).reduce((acc, s) => {
+  //         acc[s.id] = {
+  //           finalTests: s.finalTests || 0,
+  //           interviews: s.interviews || 0,
+  //           certifications: s.certifications || 0,
+  //         };
+  //         return acc;
+  //       }, {});
+  //       setStudentStats(statsMap);
+  //     }
+
+  //     if (tabName === "courses") {
+  //       const cr = await api.courses();
+  //       const normCourses = (cr?.data || []).map((c) => ({
+  //         id: c.id,
+  //         title: c.title,
+  //         description: c.description || "",
+  //         thumbnail: c.thumbnail || FALLBACK_THUMB,
+  //         status: c.status || "draft",
+  //         level: c.level ?? null,
+  //         totalModules: c.totalModules ?? 0,
+  //         totalChapters: c.totalChapters ?? 0,
+  //         studentCount: c.studentCount || 0,
+  //         instructorNames: c.instructorNames || [],
+  //         instructorIds: c.instructorIds || (Array.isArray(c.instructors) ? c.instructors.map((x) => x.id) : []),
+  //       }));
+  //       setCourses(normCourses);
+  //     }
+
+  //     setLoadedTabs(prev => new Set([...prev, tabName]));
+  //   } catch (e) {
+  //     console.error(`Error loading ${tabName}:`, e);
+  //     toast.error(`Failed to load ${tabName}.`);
+  //   } finally {
+  //     // Clear loading for this specific tab
+  //     setLoadingStates(prev => ({ ...prev, [tabName]: false }));
+  //   }
+  // };
+
   const handleTabChange = async (tabName) => {
     // Skip if already loaded
     if (loadedTabs.has(tabName)) {
@@ -456,6 +534,72 @@ export default function AdminDashboardPage() {
           instructorIds: c.instructorIds || (Array.isArray(c.instructors) ? c.instructors.map((x) => x.id) : []),
         }));
         setCourses(normCourses);
+      }
+
+      // ✅ ADD DEPARTMENTS SECTION
+      // if (tabName === "departments") {
+      //   const user = useAuthStore.getState().user;
+      //   const collegeId = user?.collegeId;
+
+      //   if (!collegeId) {
+      //     toast.error('College ID not found');
+      //     return;
+      //   }
+
+      //   const response = await collegesAPI.getDepartmentsForCollege(collegeId);
+
+      //   // ✅ FIXED: Add items path
+      //   const rawData = response?.data?.data?.items      // ← Add this first
+      //     || response?.data?.data
+      //     || response?.data?.items             // ← Add this too
+      //     || response?.data?.departments
+      //     || response?.data
+      //     || [];
+
+      //   const departmentsArray = Array.isArray(rawData) ? rawData : [];
+
+      //   const normDepartments = departmentsArray.map((d) => ({
+      //     id: d.id,
+      //     name: d.name,
+      //     description: d.description || "",
+      //     instructorCount: d.instructorCount || d._count?.instructors || 0,
+      //     studentCount: d.studentCount || d._count?.students || 0,
+      //     courseCount: d.courseCount || d._count?.courses || 0,
+      //   }));
+
+      //   setDepartments(normDepartments);
+      // }
+      if (tabName === "departments") {
+        const user = useAuthStore.getState().user;
+        const collegeId = user?.collegeId;
+
+        if (!collegeId) {
+          toast.error('College ID not found');
+          return;
+        }
+
+        const response = await collegesAPI.getDepartmentsForCollege(collegeId);
+
+        const rawData = response?.data?.data?.items
+          || response?.data?.data
+          || response?.data?.items
+          || response?.data?.departments
+          || response?.data
+          || [];
+
+        const departmentsArray = Array.isArray(rawData) ? rawData : [];
+
+        // ✅ FIXED: Use counts directly from API, don't calculate
+        const normDepartments = departmentsArray.map((d) => ({
+          id: d.id,
+          name: d.name,
+          description: d.description || "",
+          instructorCount: d.instructorCount || 0,  // ✅ From API
+          studentCount: d.studentCount || 0,        // ✅ From API
+          courseCount: d.courseCount || 0,          // ✅ From API
+        }));
+
+        setDepartments(normDepartments);
       }
 
       setLoadedTabs(prev => new Set([...prev, tabName]));
@@ -560,7 +704,6 @@ export default function AdminDashboardPage() {
       </div>
     </div>
   );
-
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -726,6 +869,7 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Tabs */}
+
         {/* <div className="mb-6">
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-4 sm:space-x-6 lg:space-x-8 overflow-x-auto">
@@ -740,6 +884,7 @@ export default function AdminDashboardPage() {
                   onClick={() => {
                     setActiveTab(tab.id);
                     setSelectedUsers([]);
+                    handleTabChange(tab.id); 
                   }}
                   className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${activeTab === tab.id
                     ? "border-primary-500 text-primary-600"
@@ -763,13 +908,14 @@ export default function AdminDashboardPage() {
                 { id: "instructors", name: "Instructors", icon: Users },
                 { id: "students", name: "Students", icon: GraduationCap },
                 { id: "courses", name: "Courses", icon: BookOpen },
+                { id: "departments", name: "Departments", icon: Building2 }, // ✅ Add this
               ].map((tab) => (
                 <button
                   key={tab.id}
                   onClick={() => {
                     setActiveTab(tab.id);
                     setSelectedUsers([]);
-                    handleTabChange(tab.id); // Add this line
+                    handleTabChange(tab.id);
                   }}
                   className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${activeTab === tab.id
                     ? "border-primary-500 text-primary-600"
@@ -784,6 +930,7 @@ export default function AdminDashboardPage() {
             </nav>
           </div>
         </div>
+
 
         {/* Overview */}
         {activeTab === "overview" && (
@@ -1062,41 +1209,40 @@ export default function AdminDashboardPage() {
                     </select>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                    {selectedUsers.length > 0 && (
-                      <>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            selectedUsers.forEach((id) =>
-                              handleUserAction(id, "activate")
-                            )
-                          }
-                          className="w-full sm:w-auto"
-                        >
-                          <UserCheck size={16} className="mr-1" />
-                          <span className="hidden sm:inline">
-                            Activate ({selectedUsers.length})
-                          </span>
-                          <span className="sm:hidden">Activate</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            selectedUsers.forEach((id) =>
-                              handleUserAction(id, "deactivate")
-                            )
-                          }
-                          className="w-full sm:w-auto"
-                        >
-                          <UserX size={16} className="mr-1" />
-                          Deactivate
-                        </Button>
-                      </>
-                    )}
-                  </div>
+                  {/* ✅ FIXED: Removed extra <div> wrapper */}
+                  {selectedUsers.length > 0 && (
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          selectedUsers.forEach((id) =>
+                            handleUserAction(id, "activate")
+                          )
+                        }
+                        className="w-full sm:w-auto"
+                      >
+                        <UserCheck size={16} className="mr-1" />
+                        <span className="hidden sm:inline">
+                          Activate ({selectedUsers.length})
+                        </span>
+                        <span className="sm:hidden">Activate</span>
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          selectedUsers.forEach((id) =>
+                            handleUserAction(id, "deactivate")
+                          )
+                        }
+                        className="w-full sm:w-auto"
+                      >
+                        <UserX size={16} className="mr-1" />
+                        Deactivate
+                      </Button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -1107,9 +1253,6 @@ export default function AdminDashboardPage() {
                           <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
                             Student
                           </th>
-                          {/* <th className="px-6 py-3 pl-4 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                        Course
-                      </th> */}
                           <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
                             Enrolled
                           </th>
@@ -1125,55 +1268,6 @@ export default function AdminDashboardPage() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {/* {filteredStudents.map((s) => {
-                      const finalTests = Math.floor(Math.random() * 5);
-                      const interviews = Math.floor(Math.random() * 5);
-                      const certifications = Math.floor(Math.random() * 5);
-
-                      return (
-                        <tr key={s.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <img
-                                src={s.avatar}
-                                alt={s.fullName}
-                                className="w-9 h-9 rounded-full mr-3"
-                              />
-                              <div>
-                                <div className="font-medium text-gray-900">
-                                  {s.fullName}
-                                </div>
-                                <div className="text-sm text-gray-500">
-                                  {s.email}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-blue-700 text-sm font-medium">
-                              {s.assignedCourses?.length || 0}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="text-blue-700 font-medium">
-                              {finalTests}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="text-green-600 font-medium">
-                              {interviews}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-center">
-                            <span className="text-purple-600 font-medium">
-                              {certifications}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })} */}
-
                         {filteredStudents.map((s) => {
                           const stats = studentStats[s.id] || {
                             finalTests: 0,
@@ -1223,7 +1317,6 @@ export default function AdminDashboardPage() {
                             </tr>
                           );
                         })}
-
                       </tbody>
                     </table>
                   </div>
@@ -1367,6 +1460,86 @@ export default function AdminDashboardPage() {
             )}
           </div>
         )}
+
+        {activeTab === "departments" && (
+          <div>
+            {loadingStates[activeTab] ? (
+              <SimpleLoader />
+            ) : (
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                          Department
+                        </th>
+                        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                          Instructors
+                        </th>
+                        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                          Students
+                        </th>
+                        <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                          Courses
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {departments.length === 0 ? (
+                        <tr>
+                          <td colSpan="4" className="px-6 py-12 text-center">
+                            <Building2 size={48} className="mx-auto text-gray-400 mb-2" />
+                            <p className="text-gray-600 font-medium">No departments found</p>
+                            <p className="text-gray-500 text-sm mt-1">
+                              This college hasn't added any departments yet.
+                            </p>
+                          </td>
+                        </tr>
+                      ) : (
+                        departments.map((dept) => (
+                          <tr key={dept.id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4">
+                              <div className="flex items-center">
+                                <Building2 size={20} className="text-gray-400 mr-3 flex-shrink-0" />
+                                <div>
+                                  <div className="font-medium text-gray-900">
+                                    {dept.name}
+                                  </div>
+                                  {dept.description && (
+                                    <div className="text-sm text-gray-500 mt-0.5">
+                                      {dept.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-50 text-blue-700 text-sm font-medium">
+                                {dept.instructorCount || 0}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-50 text-green-700 text-sm font-medium">
+                                {dept.studentCount || 0}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                              <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-purple-50 text-purple-700 text-sm font-medium">
+                                {dept.courseCount || 0}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
       </div>
 
       {/* User Modal */}

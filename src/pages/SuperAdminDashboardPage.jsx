@@ -203,7 +203,7 @@ export default function SuperAdminDashboardPage() {
     }
   }
 
-async function saveAdminToggle(userId, patch) {
+  async function saveAdminToggle(userId, patch) {
     try {
       // Find current admin
       const admin = permAdmins.find(a => a.id === userId);
@@ -235,24 +235,24 @@ async function saveAdminToggle(userId, patch) {
       console.error("Error updating permission:", e);
       toast.error(e?.response?.data?.error || e.message || "Failed to update");
     }
-}
-
-const fetchCollegePermissions = async () => {
-  try {
-    setPermLoading(true);
-    
-    const permResponse = await collegesAPI.getPermissions(collegeDetailVM.college.id);
-    const { limits, adminPermissions } = permResponse.data;
-    
-    setPermLimits(limits);
-    setPermAdmins(adminPermissions);
-    
-  } catch (err) {
-    toast.error(err?.response?.data?.error || "Failed to load permissions");
-  } finally {
-    setPermLoading(false);
   }
-};
+
+  const fetchCollegePermissions = async () => {
+    try {
+      setPermLoading(true);
+
+      const permResponse = await collegesAPI.getPermissions(collegeDetailVM.college.id);
+      const { limits, adminPermissions } = permResponse.data;
+
+      setPermLimits(limits);
+      setPermAdmins(adminPermissions);
+
+    } catch (err) {
+      toast.error(err?.response?.data?.error || "Failed to load permissions");
+    } finally {
+      setPermLoading(false);
+    }
+  };
 
 
   useEffect(() => {
@@ -1054,7 +1054,6 @@ const fetchCollegePermissions = async () => {
                     const collegeInstructors = lists?.instructors ?? [];
                     const collegeStudents = lists?.students ?? [];
 
-                    // 👇 THE FIX IS HERE: This object now matches the display cards.
                     const stats = {
                       instructors: counts?.instructors ?? 0,
                       courses: counts?.courses ?? 0,
@@ -1674,68 +1673,54 @@ const fetchCollegePermissions = async () => {
 
                                   {permAdmins.map((admin) => (
                                     <div key={admin.id} className="border border-gray-200 rounded-lg p-4">
-                                      <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex-none">
-                                          <img
-                                            src={
-                                              admin.avatar ||
-                                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                                admin.name || "Admin"
-                                              )}&background=random`
-                                            }
-                                            alt={admin.name || "Admin"}
-                                            className="w-full h-full object-cover"
-                                          />
+                                      <div className="flex items-start gap-4">
+                                        {/* Avatar */}
+                                        <div className="w-12 h-12 rounded-full overflow-hidden bg-cyan-400 flex-none flex items-center justify-center">
+                                          <span className="text-white font-semibold text-lg">
+                                            {admin.name?.charAt(0)?.toUpperCase() || "A"}
+                                          </span>
                                         </div>
 
+                                        {/* Info and Permissions */}
                                         <div className="min-w-0 flex-1">
-                                          <div className="font-medium text-gray-900 truncate">
+                                          {/* Name and Email */}
+                                          <div className="font-medium text-gray-900">
                                             {admin.name}
                                           </div>
-                                          <div className="text-sm text-gray-600 truncate">
+                                          <div className="text-sm text-gray-600">
                                             {admin.email}
                                           </div>
 
-                                          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                            {permAdmins.map((admin) => {
-                                              console.log('Admin:', admin.id, 'Permissions:', admin.permissions);
+                                          {/* Permissions Row */}
+                                          <div className="mt-3 flex flex-wrap gap-3">
+                                            {[
+                                              { key: "canCreateCourses", label: "Create Courses" },
+                                              { key: "canCreateTests", label: "Create Tests" },
+                                              { key: "canManageTests", label: "Manage Tests" },
+                                            ].map(({ key, label }) => {
+                                              const checked = admin.permissions?.[key] || false;
+
                                               return (
-                                                <div key={admin.id} className="border border-gray-200 rounded-lg p-4">
-                                                  {/* ... rest of your code ... */}
-
-                                                  {[
-                                                    { key: "canCreateCourses", label: "Create Courses" },
-                                                    { key: "canCreateTests", label: "Create Tests" },
-                                                    { key: "canManageTests", label: "Manage Tests" },
-                                                  ].map(({ key, label }) => {
-                                                    const checked = admin.permissions?.[key] || false;
-
-                                                    console.log(`${label}:`, checked); // DEBUG
-
-                                                    return (
-                                                      <label
-                                                        key={key}
-                                                        className="flex items-center justify-between border rounded-lg px-3 py-2"
-                                                      >
-                                                        <span className="text-sm text-gray-700">{label}</span>
-                                                        <input
-                                                          type="checkbox"
-                                                          className="h-4 w-4"
-                                                          checked={checked}
-                                                          disabled={permLoading}
-                                                          onChange={(e) =>
-                                                            saveAdminToggle(admin.id, { [key]: e.target.checked })
-                                                          }
-                                                          aria-label={label}
-                                                        />
-                                                      </label>
-                                                    );
-                                                  })}
-                                                </div>
+                                                <label
+                                                  key={key}
+                                                  className="flex items-center justify-between gap-3 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 cursor-pointer transition"
+                                                >
+                                                  <span className="text-sm text-gray-700 whitespace-nowrap">
+                                                    {label}
+                                                  </span>
+                                                  <input
+                                                    type="checkbox"
+                                                    className="h-5 w-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                                                    checked={checked}
+                                                    disabled={permLoading}
+                                                    onChange={(e) =>
+                                                      saveAdminToggle(admin.id, { [key]: e.target.checked })
+                                                    }
+                                                    aria-label={label}
+                                                  />
+                                                </label>
                                               );
                                             })}
-
-
                                           </div>
                                         </div>
                                       </div>
@@ -1743,6 +1728,7 @@ const fetchCollegePermissions = async () => {
                                   ))}
                                 </div>
                               </Card>
+
 
                             </div>
                           )}

@@ -220,7 +220,7 @@ const [loadingDepartments, setLoadingDepartments] = useState(false);
 
   async function saveAdminToggle(userId, patch) {
     try {
-<<<<<<< HEAD
+
       await collegesAPI.updateAdminPermissions(
         collegeDetailVM.college.id,
         userId,
@@ -230,29 +230,6 @@ const [loadingDepartments, setLoadingDepartments] = useState(false);
         prev.map((a) =>
           a.id === userId
             ? { ...a, permissions: { ...a.permissions, ...patch } }
-=======
-      // Find current admin
-      const admin = permAdmins.find(a => a.id === userId);
-
-      // Merge existing permissions with the patch
-      const mergedPermissions = {
-        ...(admin?.permissions || {}),
-        ...patch
-      };
-
-      // Send merged permissions to backend
-      await collegesAPI.updateAdminPermissions(
-        collegeDetailVM.college.id,
-        userId,
-        mergedPermissions
-      );
-
-      // Update local state
-      setPermAdmins(prev =>
-        prev.map(a =>
-          a.id === userId
-            ? { ...a, permissions: mergedPermissions }
->>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
             : a
         )
       );
@@ -589,12 +566,12 @@ const fetchDepartments = async () => {
   const collegesWithCounts = useMemo(() => {
     if (!colleges) return [];
 
-<<<<<<< HEAD
+
     return colleges.map((college) => {
-=======
+
     return colleges.map(college => {
 
->>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
+
       const instructorCount = college.instructorCount || 0;
       const studentCount = college.studentCount || 0;
       const courseCount = college.courseCount || 0;
@@ -609,12 +586,12 @@ const fetchDepartments = async () => {
         certificatesGenerated: certificatesCount,
       };
     });
-<<<<<<< HEAD
+
   }, [colleges]);
-=======
+
   },
     [colleges]);
->>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
+
 
   const filteredColleges = useMemo(() => {
     const q = (collegesSearch || "").toLowerCase();
@@ -1088,15 +1065,8 @@ useEffect(() => {
                   <span className="sm:hidden">User</span>
                 </Button>
               </Link>
-<<<<<<< HEAD
-              <Link
-                to="/add_department"
-                state={{ allowWhenLoggedIn: true }}
-                className="col-span-1"
-              >
-=======
+
               <Link to="/add_department" state={{ allowWhenLoggedIn: true }} className="col-span-1">
->>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
                 <Button size="sm" className="w-full">
                   <Plus size={16} className="mr-2" />
                   <span className="hidden sm:inline">Add Department</span>
@@ -2119,32 +2089,16 @@ useEffect(() => {
                                   )}
 
                                   {permAdmins.map((admin) => (
-<<<<<<< HEAD
                                     <div
                                       key={admin.id}
                                       className="border border-gray-200 rounded-lg p-4"
                                     >
-                                      <div className="flex items-center gap-4">
-                                        <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-100 flex-none">
-                                          <img
-                                            src={
-                                              admin.avatar ||
-                                              `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                                                admin.name || "Admin"
-                                              )}&background=random`
-                                            }
-                                            alt={admin.name || "Admin"}
-                                            className="w-full h-full object-cover"
-                                          />
-=======
-                                    <div key={admin.id} className="border border-gray-200 rounded-lg p-4">
                                       <div className="flex items-start gap-4">
                                         {/* Avatar */}
                                         <div className="w-12 h-12 rounded-full overflow-hidden bg-cyan-400 flex-none flex items-center justify-center">
                                           <span className="text-white font-semibold text-lg">
                                             {admin.name?.charAt(0)?.toUpperCase() || "A"}
                                           </span>
->>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
                                         </div>
 
                                         {/* Info and Permissions */}
@@ -2173,23 +2127,13 @@ useEffect(() => {
                                                 label: "Manage Tests",
                                               },
                                             ].map(({ key, label }) => {
-<<<<<<< HEAD
-                                              const checked =
-                                                !!admin.permissions?.[key];
-=======
-                                              const checked = admin.permissions?.[key] || false;
-
->>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
+                                              const checked = !!admin.permissions?.[key];
                                               return (
                                                 <label
                                                   key={key}
                                                   className="flex items-center justify-between gap-3 border border-gray-200 rounded-lg px-4 py-2 hover:bg-gray-50 cursor-pointer transition"
                                                 >
-<<<<<<< HEAD
-                                                  <span className="text-sm text-gray-700">
-=======
                                                   <span className="text-sm text-gray-700 whitespace-nowrap">
->>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
                                                     {label}
                                                   </span>
                                                   <input
@@ -2201,8 +2145,7 @@ useEffect(() => {
                                                       saveAdminToggle(
                                                         admin.id,
                                                         {
-                                                          [key]:
-                                                            e.target.checked,
+                                                          [key]: e.target.checked,
                                                         }
                                                       )
                                                     }
@@ -2218,11 +2161,6 @@ useEffect(() => {
                                   ))}
                                 </div>
                               </Card>
-<<<<<<< HEAD
-=======
-
-
->>>>>>> e66690f30568b56aa86156fc0ddad584c0d0bf8b
                             </div>
                           )}
                         </Card>
@@ -2817,9 +2755,6 @@ useEffect(() => {
     </Card>
   )}
 </TabsContent>
-
-
-
 
         </Tabs>
 

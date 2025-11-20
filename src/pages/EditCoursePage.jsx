@@ -324,12 +324,13 @@ export default function EditCoursePage() {
         let chapters = unwrap(chaptersRes) || [];
         chapters.sort((a, b) => (a?.order || 0) - (b?.order || 0));
 
-    
-
         const assessmentPromises = chapters.map(ch =>
           assessmentsAPI.listByChapter(ch.id)
-            .then(res => unwrap(res))
-            .then(assessments => ({ chapterId: ch.id, assessments: assessments || [] }))
+            .then(res => {
+              const unwrapped = unwrap(res);
+      
+              return { chapterId: ch.id, assessments: unwrapped || [] };
+            })
             .catch(err => {
               console.error(`Could not load assessments for chapter ${ch.id}`, err);
               return { chapterId: ch.id, assessments: [] };
@@ -346,9 +347,10 @@ export default function EditCoursePage() {
           const assessment = assessmentMap.get(ch.id);
 
           if (assessment) {
+            
             const durationMin = assessment.timeLimitSeconds ? Math.round(Number(assessment.timeLimitSeconds) / 60) : "";
             const uiQuestions = (assessment.questions || []).map(mapAPIQuestionToUI);
-
+        
             return {
               id: crypto.randomUUID(),
               type: "test",
@@ -734,34 +736,34 @@ export default function EditCoursePage() {
                         </div>
                       </div>
 
-
-                      <div className="mt-4 space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Chapter Content</label>
-                          <textarea
-                            rows={3}
-                            value={lesson.content}
-                            onChange={(e) => updateLesson(lesson.id, "content", e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                            placeholder="Describe what this lesson covers..."
-                          />
+                      {lesson.type === 'text' && (
+                        <div className="mt-4 space-y-4">
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Chapter Content</label>
+                            <textarea
+                              rows={3}
+                              value={lesson.content}
+                              onChange={(e) => updateLesson(lesson.id, "content", e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                              placeholder="Describe what this lesson covers..."
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                              Upload PDF (Optional)
+                            </label>
+                            <input
+                              type="file"
+                              accept="application/pdf"
+                              onChange={(e) => updateLesson(lesson.id, "pdfFile", e.target.files[0])}
+                              className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                            />
+                            {lesson.pdfFile && (
+                              <p className="mt-2 text-sm text-gray-600">Selected: {lesson.pdfFile.name}</p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Upload PDF (Optional)
-                          </label>
-                          <input
-                            type="file"
-                            accept="application/pdf"
-                            onChange={(e) => updateLesson(lesson.id, "pdfFile", e.target.files[0])}
-                            className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
-                          />
-                          {lesson.pdfFile && (
-                            <p className="mt-2 text-sm text-gray-600">Selected: {lesson.pdfFile.name}</p>
-                          )}
-                        </div>
-                      </div>
-
+                      )}
 
                       {lesson.type === 'test' && (
                         <div className="mt-4 space-y-6">

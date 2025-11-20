@@ -78,8 +78,8 @@ export default function SuperAdminDashboardPage() {
   const [collegeError, setCollegeError] = useState("");
   const [permRaw, setPermRaw] = useState([]);
   const [permLoading, setPermLoading] = useState(false);
- const [allDepartments, setAllDepartments] = useState([]);
-const [loadingDepartments, setLoadingDepartments] = useState(false);
+  const [allDepartments, setAllDepartments] = useState([]);
+  const [loadingDepartments, setLoadingDepartments] = useState(false);
 
   const [permLimits, setPermLimits] = useState({
     studentLimit: 0,
@@ -242,17 +242,18 @@ const [loadingDepartments, setLoadingDepartments] = useState(false);
   }
 
   const fetchCollegePermissions = async () => {
+    const collegeId = selectedCollegeId || collegeDetailVM?.college?.id;
+
+    if (!collegeId) return;
+
+    setPermLoading(true);
+
     try {
-      setPermLoading(true);
-
-      const permResponse = await collegesAPI.getPermissions(collegeDetailVM.college.id);
-      const { limits, adminPermissions } = permResponse.data;
-
-      setPermLimits(limits);
-      setPermAdmins(adminPermissions);
-
+      const res = await collegesAPI.getPermissions(collegeId);
+      const admins = res?.data?.data?.admins || [];
+      setPermAdmins(admins);
     } catch (err) {
-      toast.error(err?.response?.data?.error || "Failed to load permissions");
+      setPermAdmins([]);
     } finally {
       setPermLoading(false);
     }
@@ -260,18 +261,10 @@ const [loadingDepartments, setLoadingDepartments] = useState(false);
 
 
   useEffect(() => {
-    console.log('🔥 useEffect triggered', {
-      tab: collegeDetailTab,
-      collegeId: collegeDetailVM?.college?.id
-    });
-
-    if (collegeDetailTab === "permissions" && collegeDetailVM?.college?.id) {
-      console.log('🔥 Calling fetchCollegePermissions');
+    if (collegeDetailTab === "permissions" && selectedCollegeId) {
       fetchCollegePermissions();
-    } else {
-      console.log('❌ Conditions not met');
     }
-  }, [collegeDetailTab, collegeDetailVM?.college?.id]);
+  }, [collegeDetailTab, selectedCollegeId]);
 
 
   const handleApiError = (err, fallback) => {
@@ -496,44 +489,42 @@ const [loadingDepartments, setLoadingDepartments] = useState(false);
     }
   };
 
-const fetchDepartments = async () => {
-  if (loadedTabs.has("departments")) return;
+  const fetchDepartments = async () => {
+    if (loadedTabs.has("departments")) return;
 
-  try {
-    setLoadingDepartments(true);
-    const response = await departmentAPI.getDepartments();
-    
-    // Try different possible structures
-    let departments = [];
-      
-    if (response?.data?.data?.items) {
-      departments = response.data.data.items;
-      
-    } else if (response?.data?.items) {
-      departments = response.data.items;
-      console.log("Found at: response.data.items");
-    } else if (Array.isArray(response?.data?.data)) {
-      departments = response.data.data;
-  
-    } else if (Array.isArray(response?.data)) {
-      departments = response.data;
-   
+    try {
+      setLoadingDepartments(true);
+      const response = await departmentAPI.getDepartments();
+
+      // Try different possible structures
+      let departments = [];
+
+      if (response?.data?.data?.items) {
+        departments = response.data.data.items;
+
+      } else if (response?.data?.items) {
+        departments = response.data.items;
+
+      } else if (Array.isArray(response?.data?.data)) {
+        departments = response.data.data;
+
+      } else if (Array.isArray(response?.data)) {
+        departments = response.data;
+
+      }
+
+
+
+      setAllDepartments(departments);
+      setLoadedTabs((prev) => new Set([...prev, "departments"]));
+    } catch (error) {
+      console.error("Error fetching departments:", error);
+      toast.error("Failed to load departments");
+      setAllDepartments([]);
+    } finally {
+      setLoadingDepartments(false);
     }
-    
-   
-    
-    setAllDepartments(departments);
-    setLoadedTabs((prev) => new Set([...prev, "departments"]));
-  } catch (error) {
-    console.error("Error fetching departments:", error);
-    toast.error("Failed to load departments");
-    setAllDepartments([]);
-  } finally {
-    setLoadingDepartments(false);
-  }
-};
-
-
+  };
 
   const handleTabChange = async (tabValue) => {
     setActiveTab(tabValue);
@@ -552,9 +543,9 @@ const fetchDepartments = async () => {
       case "assignments":
         await fetchCourses();
         break;
-        case "departments":  // 👈 ADD THIS CASE
-      await fetchDepartments();
-      break;
+      case "departments":  // 👈 ADD THIS CASE
+        await fetchDepartments();
+        break;
       case "colleges":
         // Already loaded on initial mount
         break;
@@ -569,29 +560,28 @@ const fetchDepartments = async () => {
 
     return colleges.map((college) => {
 
-    return colleges.map(college => {
+      return colleges.map(college => {
 
 
-      const instructorCount = college.instructorCount || 0;
-      const studentCount = college.studentCount || 0;
-      const courseCount = college.courseCount || 0;
-      const certificatesCount = college.certificatesGenerated || 0;
+        const instructorCount = college.instructorCount || 0;
+        const studentCount = college.studentCount || 0;
+        const courseCount = college.courseCount || 0;
+        const certificatesCount = college.certificatesGenerated || 0;
 
-      return {
-        ...college,
-        instructorCount,
-        studentCount,
-        enrolledStudents: studentCount,
-        courseCount,
-        certificatesGenerated: certificatesCount,
-      };
-    });
+        return {
+          ...college,
+          instructorCount,
+          studentCount,
+          enrolledStudents: studentCount,
+          courseCount,
+          certificatesGenerated: certificatesCount,
+        };
+      });
 
-  }, [colleges]);
+    }, [colleges]);
 
   },
     [colleges]);
-
 
   const filteredColleges = useMemo(() => {
     const q = (collegesSearch || "").toLowerCase();
@@ -604,221 +594,107 @@ const fetchDepartments = async () => {
     );
   }, [colleges, collegesSearch]);
 
-  // useEffect(() => {
-  //   if (!selectedCollegeId) return;
+  useEffect(() => {
+    if (!selectedCollegeId) return;
 
-  //   const run = async () => {
-  //     setCollegeLoading(true);
-  //     setCollegeError("");
-  //     try {
-  //       const [collegeRes, deptRes] = await Promise.all([
-  //         collegesAPI.getCollege(selectedCollegeId),
-  //         collegesAPI
-  //           .getDepartmentsForCollege(selectedCollegeId)
-  //           .catch((err) => {
-  //             console.warn("Departments fetch failed:", err);
-  //             return { data: [] };
-  //           }),
-  //       ]);
+    const run = async () => {
+      setCollegeLoading(true);
+      setCollegeError("");
+      try {
+        const [collegeRes, deptRes] = await Promise.all([
+          collegesAPI.getCollege(selectedCollegeId),
+          collegesAPI.getDepartmentsForCollege(selectedCollegeId).catch(err => {
+            console.warn("Departments fetch failed:", err);
+            return { data: [] };
+          })
+        ]);
 
-  //       const { data: raw } = collegeRes;
-  //       const payload = raw?.data ?? raw ?? {};
+        const { data: raw } = collegeRes;
+        const payload = raw?.data ?? raw ?? {};
 
-  //       const co = payload?.college ?? {};
-  //       const lists = payload?.lists ?? {};
-  //       const counts = payload?.counts ?? {};
+        const co = payload?.college ?? {};
+        const lists = payload?.lists ?? {};
+        const counts = payload?.counts ?? {};
 
-  //       const courses = lists?.courses ?? [];
-  //       const instructors = lists?.instructors ?? [];
-  //       const students = lists?.students ?? [];
-  //       const admins = lists?.admins ?? [];
+        const courses = lists?.courses ?? [];
+        const instructors = lists?.instructors ?? [];
+        const students = lists?.students ?? [];
+        const admins = lists?.admins ?? [];
 
-  //       // Handle departments response - could be { data: [...] } or just [...]
-  //       let departments = [];
-  //       if (deptRes) {
-  //         if (Array.isArray(deptRes)) {
-  //           departments = deptRes;
-  //         } else if (deptRes.data && Array.isArray(deptRes.data)) {
-  //           departments = deptRes.data;
-  //         } else if (deptRes.data && Array.isArray(deptRes.data.data)) {
-  //           departments = deptRes.data.data;
-  //         }
-  //       }
+        // ✅ Handle departments response with counts
+        let departments = [];
+        if (deptRes) {
+          // Extract the array from various response structures
+          const rawDepts = deptRes?.data?.data?.items
+            || deptRes?.data?.data
+            || deptRes?.data?.items
+            || deptRes?.data
+            || deptRes;
 
-  //       console.log("Departments fetched:", departments);
-
-  //       const idToTitle = new Map(
-  //         courses.map((c) => [c.id, c.title || c.name || "Untitled Course"])
-  //       );
-
-  //       const normInstructors = instructors.map((i) => {
-  //         const assigned = i.assignedCourseIds || i.assignedCourses || [];
-  //         return {
-  //           ...i,
-  //           role: String(i.role || "").toUpperCase(),
-  //           collegeName: co?.name || "",
-  //           assignedCourseIds: assigned,
-  //           assignedCourseNames: assigned
-  //             .map((cid) => idToTitle.get(cid))
-  //             .filter(Boolean),
-  //         };
-  //       });
-
-  //       const normStudents = students.map((s) => {
-  //         const enrolled = s.enrolledCoursesCount || 0;
-  //         return {
-  //           ...s,
-  //           role: String(s.role || "").toUpperCase(),
-  //           enrolledCourses: enrolled || 0,
-  //           finalTestsTaken: s.finalTestAttemptsCount || 0,
-  //           interviewsAttempted: s.assessmentAttempts || 0,
-  //           certificationsCompleted: s.certificatesCount || 0,
-  //         };
-  //       });
-
-  //       const normAdmins = admins.map((a) => {
-  //         const assigned = a.assignedCourseIds || a.assignedCourses || [];
-  //         return {
-  //           ...a,
-  //           role: String(a.role || "").toUpperCase(), // ✅ if UI filters by "ADMIN"
-  //           collegeName: co?.name || "",
-  //           assignedCourseIds: assigned,
-  //           assignedCourseNames: assigned
-  //             .map((cid) => idToTitle.get(cid))
-  //             .filter(Boolean),
-  //         };
-  //       });
-
-  //       setCollegeDetailVM({
-  //         college: co,
-  //         lists: {
-  //           courses,
-  //           instructors: normInstructors,
-  //           students: normStudents,
-  //           admins: normAdmins,
-  //         },
-  //         counts,
-  //       });
-
-  //       setCollegeDepartments(departments);
-
-  //       console.log("payload:", payload);
-  //     } catch (e) {
-  //       setCollegeError(e?.message || "Failed to load college");
-  //     } finally {
-  //       setCollegeLoading(false);
-  //     }
-  //   };
-
-  //   run();
-  // }, [selectedCollegeId]);
-
-useEffect(() => {
-  if (!selectedCollegeId) return;
-
-  const run = async () => {
-    setCollegeLoading(true);
-    setCollegeError("");
-    try {
-      const [collegeRes, deptRes] = await Promise.all([
-        collegesAPI.getCollege(selectedCollegeId),
-        collegesAPI.getDepartmentsForCollege(selectedCollegeId).catch(err => {
-          console.warn("Departments fetch failed:", err);
-          return { data: [] };
-        })
-      ]);
-
-      const { data: raw } = collegeRes;
-      const payload = raw?.data ?? raw ?? {};
-
-      const co = payload?.college ?? {};
-      const lists = payload?.lists ?? {};
-      const counts = payload?.counts ?? {};
-
-      const courses = lists?.courses ?? [];
-      const instructors = lists?.instructors ?? [];
-      const students = lists?.students ?? [];
-      const admins = lists?.admins ?? [];
-
-      // ✅ Handle departments response with counts
-      let departments = [];
-      if (deptRes) {
-        // Extract the array from various response structures
-        const rawDepts = deptRes?.data?.data?.items 
-                      || deptRes?.data?.data 
-                      || deptRes?.data?.items
-                      || deptRes?.data 
-                      || deptRes;
-        
-        if (Array.isArray(rawDepts)) {
-          departments = rawDepts;
+          if (Array.isArray(rawDepts)) {
+            departments = rawDepts;
+          }
         }
+
+        const idToTitle = new Map(
+          courses.map((c) => [c.id, c.title || c.name || "Untitled Course"])
+        );
+
+        const normInstructors = instructors.map((i) => {
+          const assigned = i.assignedCourseIds || i.assignedCourses || [];
+          return {
+            ...i,
+            role: String(i.role || "").toUpperCase(),
+            collegeName: co?.name || "",
+            assignedCourseIds: assigned,
+            assignedCourseNames: assigned.map((cid) => idToTitle.get(cid)).filter(Boolean),
+          };
+        });
+
+        const normStudents = students.map((s) => {
+          const enrolled = s.enrolledCoursesCount || 0;
+          return {
+            ...s,
+            role: String(s.role || "").toUpperCase(),
+            enrolledCourses: enrolled || 0,
+            finalTestsTaken: s.finalTestAttemptsCount || 0,
+            interviewsAttempted: s.assessmentAttempts || 0,
+            certificationsCompleted: s.certificatesCount || 0,
+          };
+        });
+
+        const normAdmins = admins.map((a) => {
+          const assigned = a.assignedCourseIds || a.assignedCourses || [];
+          return {
+            ...a,
+            role: String(a.role || "").toUpperCase(),
+            collegeName: co?.name || "",
+            assignedCourseIds: assigned,
+            assignedCourseNames: assigned.map((cid) => idToTitle.get(cid)).filter(Boolean),
+          };
+        });
+
+        setCollegeDetailVM({
+          college: co,
+          lists: {
+            courses,
+            instructors: normInstructors,
+            students: normStudents,
+            admins: normAdmins,
+          },
+          counts,
+        });
+
+        setCollegeDepartments(departments);
+      } catch (e) {
+        setCollegeError(e?.message || "Failed to load college");
+      } finally {
+        setCollegeLoading(false);
       }
-      
-      console.log("Departments fetched:", departments);
+    };
 
-      const idToTitle = new Map(
-        courses.map((c) => [c.id, c.title || c.name || "Untitled Course"])
-      );
-
-      const normInstructors = instructors.map((i) => {
-        const assigned = i.assignedCourseIds || i.assignedCourses || [];
-        return {
-          ...i,
-          role: String(i.role || "").toUpperCase(),
-          collegeName: co?.name || "",
-          assignedCourseIds: assigned,
-          assignedCourseNames: assigned.map((cid) => idToTitle.get(cid)).filter(Boolean),
-        };
-      });
-
-      const normStudents = students.map((s) => {
-        const enrolled = s.enrolledCoursesCount || 0;
-        return {
-          ...s,
-          role: String(s.role || "").toUpperCase(),
-          enrolledCourses: enrolled || 0,
-          finalTestsTaken: s.finalTestAttemptsCount || 0,
-          interviewsAttempted: s.assessmentAttempts || 0,
-          certificationsCompleted: s.certificatesCount || 0,
-        };
-      });
-
-      const normAdmins = admins.map((a) => {
-        const assigned = a.assignedCourseIds || a.assignedCourses || [];
-        return {
-          ...a,
-          role: String(a.role || "").toUpperCase(),
-          collegeName: co?.name || "",
-          assignedCourseIds: assigned,
-          assignedCourseNames: assigned.map((cid) => idToTitle.get(cid)).filter(Boolean),
-        };
-      });
-
-      setCollegeDetailVM({
-        college: co,
-        lists: {
-          courses,
-          instructors: normInstructors,
-          students: normStudents,
-          admins: normAdmins,
-        },
-        counts,
-      });
-
-      setCollegeDepartments(departments);
-
-      console.log("payload:", payload);
-
-    } catch (e) {
-      setCollegeError(e?.message || "Failed to load college");
-    } finally {
-      setCollegeLoading(false);
-    }
-  };
-
-  run();
-}, [selectedCollegeId]);
+    run();
+  }, [selectedCollegeId]);
 
   const handleOpenAssignModal = (course) => {
     setCourseToAssign(course);
@@ -895,8 +771,6 @@ useEffect(() => {
 
     if (studentFilter !== "all" && selectedFilterValue) {
       filtered = filtered.filter((student) => {
-        // No need to filter by courses since backend handles enrollment count
-        // Simply return students and filter by college if needed
 
         if (studentFilter === "college") {
           return (
@@ -1079,9 +953,8 @@ useEffect(() => {
 
         <div className="grid grid-cols-1 xs:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-6 lg:mb-8">
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${
-              activeTab === "colleges" ? "ring-2 ring-red-500 bg-red-50" : ""
-            }`}
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === "colleges" ? "ring-2 ring-red-500 bg-red-50" : ""
+              }`}
             onClick={() => setActiveTab("colleges")}
           >
             <div className="flex items-center">
@@ -1100,9 +973,8 @@ useEffect(() => {
           </Card>
 
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${
-              activeTab === "permissions" ? "ring-2 ring-red-500 bg-red-50" : ""
-            }`}
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === "permissions" ? "ring-2 ring-red-500 bg-red-50" : ""
+              }`}
             onClick={() => setActiveTab("admins")}
           >
             <div className="flex items-center">
@@ -1121,11 +993,10 @@ useEffect(() => {
           </Card>
 
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${
-              activeTab === "permissions"
-                ? "ring-2 ring-green-500 bg-green-50"
-                : ""
-            }`}
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === "permissions"
+              ? "ring-2 ring-green-500 bg-green-50"
+              : ""
+              }`}
             onClick={() => setActiveTab("instructors")}
           >
             <div className="flex items-center">
@@ -1144,11 +1015,10 @@ useEffect(() => {
           </Card>
 
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${
-              activeTab === "students"
-                ? "ring-2 ring-purple-500 bg-purple-50"
-                : ""
-            }`}
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === "students"
+              ? "ring-2 ring-purple-500 bg-purple-50"
+              : ""
+              }`}
             onClick={() => setActiveTab("students")}
           >
             <div className="flex items-center">
@@ -1167,12 +1037,11 @@ useEffect(() => {
           </Card>
 
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${
-              activeTab === "assignments"
-                ? "ring-2 ring-yellow-500 bg-yellow-50"
-                : ""
-            }`}
-            onClick={() => setActiveTab("assignments")}
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === "assignments"
+              ? "ring-2 ring-yellow-500 bg-yellow-50"
+              : ""
+              }`}
+            onClick={() => handleTabChange("assignments")}
           >
             <div className="flex items-center">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-100 rounded-lg flex items-center justify-center flex-none">
@@ -1335,11 +1204,10 @@ useEffect(() => {
                             {/* Permissions Button */}
                             <button
                               onClick={() => setCollegeDetailTab("permissions")}
-                              className={`px-5 py-2 rounded-lg text-sm font-medium border transition shadow-sm whitespace-nowrap w-full md:w-auto ${
-                                collegeDetailTab === "permissions"
-                                  ? "border-primary-500 bg-primary-50 text-primary-600"
-                                  : "border-gray-300 bg-white text-gray-600 hover:text-gray-800 hover:border-gray-400"
-                              }`}
+                              className={`px-5 py-2 rounded-lg text-sm font-medium border transition shadow-sm whitespace-nowrap w-full md:w-auto ${collegeDetailTab === "permissions"
+                                ? "border-primary-500 bg-primary-50 text-primary-600"
+                                : "border-gray-300 bg-white text-gray-600 hover:text-gray-800 hover:border-gray-400"
+                                }`}
                             >
                               Permissions
                             </button>
@@ -1396,11 +1264,10 @@ useEffect(() => {
                             <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
                               <button
                                 onClick={() => setCollegeDetailTab("admin")}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-                                  collegeDetailTab === "admin"
-                                    ? "border-primary-500 text-primary-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700"
-                                }`}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${collegeDetailTab === "admin"
+                                  ? "border-primary-500 text-primary-600"
+                                  : "border-transparent text-gray-500 hover:text-gray-700"
+                                  }`}
                               >
                                 Admins (
                                 {(collegeDetailVM?.lists?.admins ?? []).length})
@@ -1410,22 +1277,20 @@ useEffect(() => {
                                 onClick={() =>
                                   setCollegeDetailTab("instructors")
                                 }
-                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-                                  collegeDetailTab === "instructors"
-                                    ? "border-primary-500 text-primary-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700"
-                                }`}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${collegeDetailTab === "instructors"
+                                  ? "border-primary-500 text-primary-600"
+                                  : "border-transparent text-gray-500 hover:text-gray-700"
+                                  }`}
                               >
                                 Instructors ({collegeInstructors.length})
                               </button>
 
                               <button
                                 onClick={() => setCollegeDetailTab("students")}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-                                  collegeDetailTab === "students"
-                                    ? "border-primary-500 text-primary-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700"
-                                }`}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${collegeDetailTab === "students"
+                                  ? "border-primary-500 text-primary-600"
+                                  : "border-transparent text-gray-500 hover:text-gray-700"
+                                  }`}
                               >
                                 Students ({collegeStudents.length})
                               </button>
@@ -1434,22 +1299,20 @@ useEffect(() => {
                                 onClick={() =>
                                   setCollegeDetailTab("departments")
                                 }
-                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-                                  collegeDetailTab === "departments"
-                                    ? "border-primary-500 text-primary-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700"
-                                }`}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${collegeDetailTab === "departments"
+                                  ? "border-primary-500 text-primary-600"
+                                  : "border-transparent text-gray-500 hover:text-gray-700"
+                                  }`}
                               >
                                 Departments ({collegeDepartments?.length ?? 0})
                               </button>
 
                               <button
                                 onClick={() => setCollegeDetailTab("courses")}
-                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${
-                                  collegeDetailTab === "courses"
-                                    ? "border-primary-500 text-primary-600"
-                                    : "border-transparent text-gray-500 hover:text-gray-700"
-                                }`}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 transition whitespace-nowrap ${collegeDetailTab === "courses"
+                                  ? "border-primary-500 text-primary-600"
+                                  : "border-transparent text-gray-500 hover:text-gray-700"
+                                  }`}
                               >
                                 Courses ({collegeCourses.length})
                               </button>
@@ -1500,7 +1363,7 @@ useEffect(() => {
                                                   instructor.avatar ||
                                                   `https://ui-avatars.com/api/?name=${encodeURIComponent(
                                                     instructor.name ||
-                                                      "Instructor"
+                                                    "Instructor"
                                                   )}&background=random`
                                                 }
                                                 alt={
@@ -2220,11 +2083,10 @@ useEffect(() => {
                           return (
                             <tr
                               key={college.id}
-                              className={`border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer ${
-                                selectedCollegeId === college.id
-                                  ? "bg-primary-50"
-                                  : ""
-                              }`}
+                              className={`border-b border-gray-100 hover:bg-gray-50 transition cursor-pointer ${selectedCollegeId === college.id
+                                ? "bg-primary-50"
+                                : ""
+                                }`}
                               onClick={() => setSelectedCollegeId(college.id)}
                             >
                               <td className="py-4 px-4">
@@ -2401,8 +2263,8 @@ useEffect(() => {
                             studentFilter === "all"
                               ? "college"
                               : studentFilter === "college"
-                              ? "course"
-                              : "all"
+                                ? "course"
+                                : "all"
                           );
                           setSelectedFilterValue("");
                         }}
@@ -2412,8 +2274,8 @@ useEffect(() => {
                         {studentFilter === "all"
                           ? "Filter"
                           : studentFilter === "college"
-                          ? "College"
-                          : "Course"}
+                            ? "College"
+                            : "Course"}
                       </Button>
 
                       {studentFilter !== "all" && (
@@ -2499,7 +2361,7 @@ useEffect(() => {
                                   <Badge
                                     variant={
                                       String(student.status).toLowerCase() ===
-                                      "active"
+                                        "active"
                                         ? "success"
                                         : "secondary"
                                     }
@@ -2687,74 +2549,74 @@ useEffect(() => {
             )}
           </TabsContent>
 
-        <TabsContent value="departments">
-  {loadingDepartments ? (
-    <div className="text-center py-8">
-      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-      <p>Loading departments...</p>
-    </div>
-  ) : (
-    <Card>
-      <Card.Header>
-        <div className="flex items-center justify-between">
-          <Card.Title>Departments List</Card.Title>
-          <Badge variant="info">
-            {allDepartments.length} Total
-          </Badge>
-        </div>
-      </Card.Header>
-      <Card.Content>
-        {allDepartments.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <School size={48} className="mx-auto mb-4 opacity-50" />
-            <p>No departments found</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Department Code
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Department Name
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {allDepartments.map((department, index) => (
-                  <tr
-                    key={department.key || index}
-                    className="hover:bg-gray-50 transition"
-                  >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {department.key}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div className="flex-shrink-0 h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center">
-                          <School size={20} className="text-purple-600" />
-                        </div>
-                        <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {department.name}
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card.Content>
-    </Card>
-  )}
-</TabsContent>
+          <TabsContent value="departments">
+            {loadingDepartments ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                <p>Loading departments...</p>
+              </div>
+            ) : (
+              <Card>
+                <Card.Header>
+                  <div className="flex items-center justify-between">
+                    <Card.Title>Departments List</Card.Title>
+                    <Badge variant="info">
+                      {allDepartments.length} Total
+                    </Badge>
+                  </div>
+                </Card.Header>
+                <Card.Content>
+                  {allDepartments.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <School size={48} className="mx-auto mb-4 opacity-50" />
+                      <p>No departments found</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Department Code
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Department Name
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {allDepartments.map((department, index) => (
+                            <tr
+                              key={department.key || index}
+                              className="hover:bg-gray-50 transition"
+                            >
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                                  {department.key}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex items-center">
+                                  <div className="flex-shrink-0 h-10 w-10 bg-purple-100 rounded-full flex items-center justify-center">
+                                    <School size={20} className="text-purple-600" />
+                                  </div>
+                                  <div className="ml-4">
+                                    <div className="text-sm font-medium text-gray-900">
+                                      {department.name}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Card.Content>
+              </Card>
+            )}
+          </TabsContent>
 
         </Tabs>
 
@@ -2788,7 +2650,7 @@ useEffect(() => {
                   <Badge
                     variant={
                       String(selectedUser.role).toLowerCase() === "admin" ||
-                      String(selectedUser.role).toUpperCase() === "SUPERADMIN"
+                        String(selectedUser.role).toUpperCase() === "SUPERADMIN"
                         ? "danger"
                         : "warning"
                     }
@@ -2856,60 +2718,58 @@ useEffect(() => {
                 <div className="space-y-4">
                   {(String(selectedUser.role).toLowerCase() === "admin" ||
                     String(selectedUser.role).toUpperCase() ===
-                      "SUPERADMIN") && (
-                    <>
-                      {[
-                        {
-                          key: "canCreateCourses",
-                          title: "Create Courses",
-                          desc: "Allow user to create new courses",
-                        },
-                        {
-                          key: "canCreateTests",
-                          title: "Create Tests",
-                          desc: "Allow user to create and manage tests",
-                        },
-                        {
-                          key: "canManageTests",
-                          title: "Manage Tests",
-                          desc: "Allow user to edit and delete tests",
-                        },
-                      ].map((item) => (
-                        <div
-                          key={item.key}
-                          className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-                        >
-                          <div className="pr-4">
-                            <h5 className="font-medium text-gray-900">
-                              {item.title}
-                            </h5>
-                            <p className="text-sm text-gray-600">{item.desc}</p>
-                          </div>
-                          <button
-                            onClick={() =>
-                              setEditingPermissions((p) => ({
-                                ...p,
-                                [item.key]: !p[item.key],
-                              }))
-                            }
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                              editingPermissions[item.key]
+                    "SUPERADMIN") && (
+                      <>
+                        {[
+                          {
+                            key: "canCreateCourses",
+                            title: "Create Courses",
+                            desc: "Allow user to create new courses",
+                          },
+                          {
+                            key: "canCreateTests",
+                            title: "Create Tests",
+                            desc: "Allow user to create and manage tests",
+                          },
+                          {
+                            key: "canManageTests",
+                            title: "Manage Tests",
+                            desc: "Allow user to edit and delete tests",
+                          },
+                        ].map((item) => (
+                          <div
+                            key={item.key}
+                            className="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+                          >
+                            <div className="pr-4">
+                              <h5 className="font-medium text-gray-900">
+                                {item.title}
+                              </h5>
+                              <p className="text-sm text-gray-600">{item.desc}</p>
+                            </div>
+                            <button
+                              onClick={() =>
+                                setEditingPermissions((p) => ({
+                                  ...p,
+                                  [item.key]: !p[item.key],
+                                }))
+                              }
+                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editingPermissions[item.key]
                                 ? "bg-primary-600"
                                 : "bg-gray-200"
-                            }`}
-                          >
-                            <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                editingPermissions[item.key]
+                                }`}
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editingPermissions[item.key]
                                   ? "translate-x-6"
                                   : "translate-x-1"
-                              }`}
-                            />
-                          </button>
-                        </div>
-                      ))}
-                    </>
-                  )}
+                                  }`}
+                              />
+                            </button>
+                          </div>
+                        ))}
+                      </>
+                    )}
 
                   {String(selectedUser.role).toLowerCase() === "instructor" && (
                     <>
@@ -2957,18 +2817,16 @@ useEffect(() => {
                                 [item.key]: !p[item.key],
                               }))
                             }
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                              editingPermissions[item.key]
-                                ? "bg-primary-600"
-                                : "bg-gray-200"
-                            }`}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${editingPermissions[item.key]
+                              ? "bg-primary-600"
+                              : "bg-gray-200"
+                              }`}
                           >
                             <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                                editingPermissions[item.key]
-                                  ? "translate-x-6"
-                                  : "translate-x-1"
-                              }`}
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${editingPermissions[item.key]
+                                ? "translate-x-6"
+                                : "translate-x-1"
+                                }`}
                             />
                           </button>
                         </div>

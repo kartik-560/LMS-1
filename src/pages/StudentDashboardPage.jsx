@@ -66,242 +66,6 @@ const StudentDashboardPage = () => {
 
   }, [hasHydrated, isAuthenticated]);
 
-  // const fetchStudentData = async () => {
-  //   const abort = new AbortController();
-
-  //   const resetState = () => {
-  //     setAssignedCourses([]);
-  //     setCurrentProgress({});
-  //     setAvailableTests([]);
-  //     setCompletedTests([]);
-  //     setAiInterviewStatus({});
-  //     setStats({
-  //       totalCourses: 0,
-  //       completedChapters: 0,
-  //       averageTestScore: 0,
-  //       totalTimeSpent: 0,
-  //       certificatesEarned: 0,
-  //     });
-  //   };
-
-  //   try {
-  //     setLoading(true);
-
-  //     const meResp = await authAPI.me().catch(() => null);
-  //     const me = (meResp && (meResp.data ?? meResp)) || null;
-
-  //     const roleRaw =
-  //       (me && (me.role ?? (me.user && me.user.role))) ??
-  //       (user && user.role) ??
-  //       "";
-  //     const role = String(roleRaw).toUpperCase();
-  //     const studentId = String(
-  //       (me && (me.id ?? (me.user && me.user.id))) ?? (user && user.id) ?? ""
-  //     ).trim();
-
-  //     if (!studentId) {
-  //       toast.error("Could not identify your student account.");
-  //       resetState();
-  //       return () => abort.abort();
-  //     }
-  //     if (!role.includes("STUDENT")) {
-  //       toast.error(
-  //         "This page is for students. Please log in with a student account."
-  //       );
-  //       resetState();
-  //       return () => abort.abort();
-  //     }
-
-  //     const enrollsResp = await enrollmentsAPI.listSelf().catch(() => null);
-  //     const safeEnrolls = Array.isArray(enrollsResp?.data?.data)
-  //       ? enrollsResp.data.data
-  //       : Array.isArray(enrollsResp?.data)
-  //         ? enrollsResp.data
-  //         : Array.isArray(enrollsResp)
-  //           ? enrollsResp
-  //           : [];
-
-  //     const approvedStatuses = new Set(["APPROVED", "ACCEPTED", "ENROLLED"]);
-  //     const courseIds = Array.from(
-  //       new Set(
-  //         safeEnrolls
-  //           .filter(
-  //             (e) =>
-  //               !e.status ||
-  //               approvedStatuses.has(String(e.status).toUpperCase())
-  //           )
-  //           .map((e) => e.courseId ?? (e.course && e.course.id))
-  //           .filter(Boolean)
-  //       )
-  //     );
-
-  //     if (courseIds.length === 0) {
-  //       resetState();
-  //       return () => abort.abort();
-  //     }
-
-  //     let myCourses = [];
-  //     try {
-  //       const resp = await coursesAPI.getStudentCourses(
-  //         user && user.collegeId,
-  //         studentId,
-  //         "",
-  //         "all",
-  //         "all",
-  //         "assigned",
-  //         1,
-  //         3
-  //       );
-  //       myCourses =
-  //         resp?.data?.data ?? resp?.data ?? (Array.isArray(resp) ? resp : []);
-  //     } catch (e) {
-  //       console.warn("getStudentCourses failed; will try fallback", e);
-  //     }
-
-
-  //     const fetchCoursesByIds = async (ids) => {
-  //       const resp = await coursesAPI
-  //         .getCourseCatalog({
-  //           view: "enrolled",
-  //           collegeId: user && user.collegeId,
-  //           page: 1,
-  //           pageSize: 3,
-  //           sortBy: "createdAt",
-  //           order: "desc",
-  //         })
-  //         .catch(() => null);
-
-  //       const list = Array.isArray(resp?.data?.data)
-  //         ? resp.data.data
-  //         : Array.isArray(resp?.data)
-  //           ? resp.data
-  //           : Array.isArray(resp)
-  //             ? resp
-  //             : [];
-
-  //       return list.filter((c) => ids.includes(c.id || c.courseId));
-  //       console.log("Fetched by IDs", list);
-  //     };
-
-  //     const normalizeCourse = (c) => {
-  //       const cid = c?.id ?? c?.courseId ?? c?.course?.id;
-  //       return { ...c, id: cid };
-  //     };
-
-  //     if (!Array.isArray(myCourses) || myCourses.length === 0) {
-  //       myCourses = await fetchCoursesByIds(courseIds);
-  //     }
-
-  //     myCourses = myCourses.map(normalizeCourse);
-  //     if (!Array.isArray(myCourses) || myCourses.length === 0) {
-  //       resetState();
-  //       return () => abort.abort();
-  //     }
-
-  //     const [chaptersList, completedChaptersList, summaries] = await Promise.all([
-  //       Promise.all(
-  //         myCourses.map((c) =>
-  //           chaptersAPI
-
-  //             .listByCourse(c.courseId ?? c.id)
-  //             .then((r) => r?.data?.data ?? r?.data ?? [])
-  //             .catch(() => [])
-  //         )
-  //       ),
-
-  //       Promise.all(
-  //         myCourses.map((c) =>
-  //           progressAPI
-
-  //             .completedChapters(c.courseId ?? c.id)
-  //             .then((r) => r?.data?.data ?? r?.data ?? [])
-  //             .catch(() => [])
-  //         )
-  //       ),
-
-  //       Promise.all(
-  //         myCourses.map((c) =>
-  //           progressAPI
-  //             // 👇 CORRECTED LINE
-  //             .courseSummary(c.courseId ?? c.id)
-  //             .then((r) => r?.data?.data ?? null)
-  //             .catch(() => [])
-  //         )
-  //       ),
-  //     ]);
-
-  //     const nextProgressData = {};
-  //     const nextAiStatusData = {};
-  //     const nextCourseWithCounts = [];
-
-  //     let totalChaptersDone = 0;
-  //     let weightedScoreSum = 0;
-  //     let totalTestsTaken = 0;
-
-  //     myCourses.forEach((course, i) => {
-  //       const totalCourseChapters = chaptersList[i] || [];
-  //       const completedCourseChapters = completedChaptersList[i] || [];
-  //       const sum = summaries[i] || {}; // Only used for test data
-
-  //       // Use the length of the arrays for an accurate count
-  //       const done = completedCourseChapters.length;
-  //       const total = totalCourseChapters.length;
-  //       const taken = Number(sum.tests?.taken ?? 0);
-  //       const avg = Number(sum.tests?.averagePercent ?? 0);
-
-
-  //       nextProgressData[course.id] = {
-
-  //         completedChapters: completedCourseChapters,
-  //         courseTestResult: { /* ... */ },
-  //         aiInterviewResult: null,
-  //       };
-
-
-  //       nextCourseWithCounts.push({
-  //         ...course,
-  //         totalChapters: total,
-  //       });
-
-  //       totalChaptersDone += done;
-  //       weightedScoreSum += avg * taken;
-  //       totalTestsTaken += taken;
-  //     });
-
-  //     // Single state commit
-  //     setAssignedCourses(nextCourseWithCounts);
-  //     setCurrentProgress(nextProgressData);
-  //     setAiInterviewStatus(nextAiStatusData);
-  //     setCompletedTests([]);
-  //     setAvailableTests([]);
-  //     setStats({
-  //       totalCourses: nextCourseWithCounts.length,
-  //       completedChapters: totalChaptersDone,
-  //       averageTestScore: totalTestsTaken
-  //         ? Math.round(weightedScoreSum / totalTestsTaken)
-  //         : 0,
-  //       totalTimeSpent: 0,
-  //       certificatesEarned: Object.values(nextAiStatusData).filter(
-  //         (x) => x.completed
-  //       ).length,
-  //     });
-  //   } catch (error) {
-  //     console.error("Error fetching student data:", error);
-  //     toast.error(
-  //       (error &&
-  //         error.response &&
-  //         error.response.data &&
-  //         error.response.data.error) ||
-  //       (error && error.message) ||
-  //       "Failed to load dashboard data"
-  //     );
-  //   } finally {
-  //     setLoading(false);
-  //   }
-
-  //   // return cleanup so callers can use it inside useEffect
-  //   return () => abort.abort();
-  // };
 
   const fetchStudentData = async () => {
     const abort = new AbortController();
@@ -368,10 +132,37 @@ const StudentDashboardPage = () => {
           resp?.data?.data ?? resp?.data ?? (Array.isArray(resp) ? resp : []);
       }
 
+      // const normalizeCourse = (c) => {
+      //   const cid = c?.id ?? c?.courseId ?? c?.course?.id;
+      //   return { ...c, id: cid };
+      // };
+
       const normalizeCourse = (c) => {
-        const cid = c?.id ?? c?.courseId ?? c?.course?.id;
-        return { ...c, id: cid };
-      };
+        // ✅ Log to debug
+        console.log("🔍 Raw course data:", c);
+
+        // ✅ If it's an enrollment object with nested course
+        if (c.course && typeof c.course === 'object') {
+          console.log("📦 Extracted from enrollment.course:", c.course.id);
+          return {
+            ...c.course,
+            id: c.course.id,
+            enrollmentId: c.id, // Keep enrollment ID for reference
+            enrollmentStatus: c.status
+          };
+        }
+
+        // ✅ If it has courseId (enrollment structure)
+        if (c.courseId && !c.course) {
+          console.log("📝 Using courseId:", c.courseId);
+          return { ...c, id: c.courseId };
+        }
+
+        // ✅ Otherwise just use the id
+        console.log("✅ Using direct id:", c.id);
+        return { ...c, id: c.id };
+      };  
+
 
       myCourses = myCourses.map(normalizeCourse);
 
@@ -592,8 +383,6 @@ const StudentDashboardPage = () => {
     return () => abort.abort();
   };
 
-
-
   const handleTestSubmit = async (testResults) => {
     if (testResults.passed) {
       // Get courseId from navigation state
@@ -619,33 +408,89 @@ const StudentDashboardPage = () => {
     }
   };
 
+  // const goToCourse = async (courseId) => {
+  //   if (!courseId) {
+  //     toast.error("Missing course id");
+  //     return;
+  //   }
+  //   const id = String(courseId);
+  //   const encodedId = encodeURIComponent(id);
+  //   setShowCourseModal?.(false);
+  //   navigate(`/courses/${encodedId}`);
+
+  //   try {
+  //     const chapters = await chaptersAPI.listByCourse(id);
+  //     const firstChapter = (chapters ?? [])
+  //       .slice()
+  //       .sort((a, b) => (a?.order ?? 0) - (b?.order ?? 0))[0];
+
+  //     const startId = firstChapter?.id ?? null;
+  //     if (startId) {
+  //       navigate(`/courses/${encodedId}?start=${encodeURIComponent(startId)}`, {
+  //         state: { startChapterId: startId },
+  //         replace: true,
+  //       });
+  //     }
+  //   } catch (e) {
+  //     console.error("Failed to prefetch chapters:", e);
+  //   }
+  // };
+
   const goToCourse = async (courseId) => {
     if (!courseId) {
       toast.error("Missing course id");
       return;
     }
+
     const id = String(courseId);
     const encodedId = encodeURIComponent(id);
-    setShowCourseModal?.(false);
-    navigate(`/courses/${encodedId}`);
 
     try {
-      const chapters = await chaptersAPI.listByCourse(id);
-      const firstChapter = (chapters ?? [])
-        .slice()
-        .sort((a, b) => (a?.order ?? 0) - (b?.order ?? 0))[0];
+      // Fetch chapters FIRST before navigating
+      const response = await chaptersAPI.listByCourse(id);
 
-      const startId = firstChapter?.id ?? null;
-      if (startId) {
-        navigate(`/courses/${encodedId}?start=${encodeURIComponent(startId)}`, {
-          state: { startChapterId: startId },
-          replace: true,
-        });
+      // Unwrap the response properly
+      const chapters = response?.data?.data ?? response?.data ?? response ?? [];
+
+      if (!Array.isArray(chapters) || chapters.length === 0) {
+        // ✅ Change toast.info to toast (default) or toast.success
+        toast("This course has no chapters yet"); // Option 1: neutral
+        // OR
+        // toast.success("Loading course..."); // Option 2: success variant
+
+        setShowCourseModal?.(false);
+        navigate(`/courses/${encodedId}`);
+        return;
       }
-    } catch (e) {
-      console.error("Failed to prefetch chapters:", e);
+
+      // Sort and get first chapter
+      const sortedChapters = chapters.slice().sort((a, b) => (a?.order ?? 0) - (b?.order ?? 0));
+      const firstChapter = sortedChapters[0];
+
+      setShowCourseModal?.(false);
+
+      if (firstChapter?.id) {
+        navigate(`/courses/${encodedId}?start=${encodeURIComponent(firstChapter.id)}`, {
+          state: { startChapterId: firstChapter.id },
+        });
+      } else {
+        navigate(`/courses/${encodedId}`);
+      }
+
+    } catch (error) {
+      console.error("Failed to load course:", error);
+
+      if (error?.response?.status === 404) {
+        toast.error("This course is not available or has been removed");
+      } else {
+        toast.error("Failed to load course. Please try again.");
+      }
+
+      setShowCourseModal?.(false);
     }
   };
+
+
 
   const goToFinalTest = async (courseId) => {
     try {

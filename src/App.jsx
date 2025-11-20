@@ -25,6 +25,7 @@ import CourseListPage from "./pages/CourseListPage";
 import CertificatePreviewPage from "./pages/CertificatePreviewPage";
 import ViewFinalTest from "./pages/ViewFinalTest";
 import AddDepartments from "./pages/AddDepartments";
+import DepartmentAnalyticsDashboard from "./pages/DepartmentAnalyticsDashboard";
 const ROLE = {
   SUPERADMIN: "SUPERADMIN",
   ADMIN: "ADMIN",
@@ -324,6 +325,14 @@ const App = () => {
             <ProtectedRoute allowedRoles={[ROLE.ADMIN]}>
               <AdminDashboardPage />
             </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/department-analytics"
+          element={
+            // <ProtectedRoute allowedRoles={[ROLE.ADMIN, ROLE.SUPERADMIN]}>
+              <DepartmentAnalyticsDashboard />
+            // </ProtectedRoute>
           }
         />
 

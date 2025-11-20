@@ -9,6 +9,8 @@ import {
   ChevronDown,
   FileText,
   Lock,
+  Menu,
+  X,
 } from "lucide-react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "react-hot-toast";
@@ -46,6 +48,10 @@ const CourseViewerPage = () => {
   const preferredStartChapterId =
     startChapterIdFromState ?? startChapterIdFromQuery ?? null;
 
+  // PAGE-LEVEL UI STATE (pagination for chapter content)
+  const [contentPages, setContentPages] = useState([]);
+  const [pageIndex, setPageIndex] = useState(0);
+
   const chapterIndexMap = useMemo(() => {
     const map = new Map();
     chapters.forEach((c, i) => map.set(c.id, i));
@@ -79,10 +85,8 @@ const CourseViewerPage = () => {
         status: c.status,
       });
 
-      // FIXED: Handle different response structures properly
       const listRaw = await chaptersAPI.listByCourse(courseId);
 
-      // Handle nested response structures
       let list = [];
       if (Array.isArray(listRaw)) {
         list = listRaw;
@@ -92,17 +96,6 @@ const CourseViewerPage = () => {
         list = listRaw.data;
       } else if (listRaw?.chapters && Array.isArray(listRaw.chapters)) {
         list = listRaw.chapters;
-      }
-
-      console.log("Raw chapters response:", listRaw);
-      console.log("Processed chapters list:", list);
-
-      if (!list || list.length === 0) {
-        console.warn("No chapters found for course:", courseId);
-        toast.error("No chapters available for this course");
-        setChapters([]);
-        setLoading(false);
-        return;
       }
 
       const mapped = list
@@ -123,7 +116,6 @@ const CourseViewerPage = () => {
           hasQuiz: Array.isArray(ch.assessments) && ch.assessments.length > 0,
         }));
 
-      console.log("Mapped chapters:", mapped);
       setChapters(mapped);
 
       if (mapped.length) {
@@ -134,16 +126,12 @@ const CourseViewerPage = () => {
           );
           if (found) {
             initial = found;
-            console.log("Using preferred start chapter:", initial);
-          } else {
-            console.warn("Preferred chapter not found, using first:", initial);
           }
         }
         setCurrentChapter(initial);
         hydrateChapter(initial.id);
       }
 
-      // Fetch completed chapters
       const completedResponse = await progressAPI.completedChapters(courseId);
       let ids = [];
 
@@ -155,12 +143,11 @@ const CourseViewerPage = () => {
         ids = completedResponse.data;
       }
 
-      console.log("Completed chapter IDs:", ids);
       setCompletedChapterIds(Array.isArray(ids) ? ids : []);
     } catch (err) {
       console.error("Course load failed:", err);
       toast.error("Failed to load course");
-      navigate("/courses");
+      navigate("/dashboard");
     } finally {
       setLoading(false);
     }
@@ -191,7 +178,6 @@ const CourseViewerPage = () => {
     completedChapterIds.join("|"),
   ]);
 
-
   useEffect(() => {
     if (!chapters.length || !chapterId) return;
 
@@ -199,7 +185,6 @@ const CourseViewerPage = () => {
 
     if (activeChapter) {
       setCurrentChapter(activeChapter);
-      // Hydrate if content is missing
       if (!activeChapter.content) {
         hydrateChapter(activeChapter.id);
       }
@@ -257,6 +242,26 @@ const CourseViewerPage = () => {
     }
   }
 
+  // Create paginated content pages from chapter.content
+  useEffect(() => {
+    setPageIndex(0);
+    if (!currentChapter?.content) {
+      setContentPages([]);
+      return;
+    }
+
+    const paras = String(currentChapter.content || "").split(/\n\n+/).map(p => p.trim()).filter(Boolean);
+    const paragraphsPerPage = 3;
+    const pages = [];
+    for (let i = 0; i < paras.length; i += paragraphsPerPage) {
+      pages.push(paras.slice(i, i + paragraphsPerPage).join('\n\n'));
+    }
+
+    if (pages.length === 0) pages.push(String(currentChapter.content || ""));
+
+    setContentPages(pages);
+  }, [currentChapter?.content, currentChapter?.id]);
+
   const getCourseProgress = () => {
     if (!chapters.length) return 0;
     const completed = chapters.filter((ch) =>
@@ -272,27 +277,48 @@ const CourseViewerPage = () => {
     const idx = chapterIndexMap.get(currentChapter.id);
     if (idx == null) return;
     const next = chapters[idx + 1];
-    if (next) setCurrentChapter(next);
-  };
-
-  const markChapterComplete = async ({ advance = true } = {}) => {
-    // Now, `currentChapter.id` will be the correct, fresh ID
-    if (!currentChapter || isChapterCompleted(currentChapter.id)) return;
-
-    try {
-      await progressAPI.completeChapter(currentChapter.id);
-      setCompletedChapterIds((prev) => [...new Set([...prev, currentChapter.id])]);
-      toast.success("Chapter completed!");
-
-      if (advance) {
-        goToNextChapter();
-      }
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to save progress");
+    if (next) {
+      setCurrentChapter(next);
+      setPageIndex(0);
     }
   };
 
+  const markChapterComplete = async ({ advance = true } = {}) => {
+    if (!currentChapter) {
+      console.warn("No current chapter to mark complete");
+      return;
+    }
+
+    if (isChapterCompleted(currentChapter.id)) {
+      console.log("Chapter already completed");
+      toast.info("Chapter already completed!");
+      if (advance) {
+        goToNextChapter();
+      }
+      return;
+    }
+
+    try {
+      console.log("Marking chapter complete:", currentChapter.id);
+      await progressAPI.completeChapter(currentChapter.id);
+      
+      setCompletedChapterIds((prev) => {
+        const newSet = new Set([...prev, currentChapter.id]);
+        return Array.from(newSet);
+      });
+      
+      toast.success("Chapter completed!");
+
+      if (advance) {
+        setTimeout(() => {
+          goToNextChapter();
+        }, 300);
+      }
+    } catch (e) {
+      console.error("Failed to mark chapter complete:", e);
+      toast.error("Failed to save progress");
+    }
+  };
 
   async function hydrateChapter(chapterId) {
     try {
@@ -313,7 +339,6 @@ const CourseViewerPage = () => {
         hasQuiz: Array.isArray(full.assessments) && full.assessments.length > 0,
       };
 
-      // update list and current chapter
       setChapters(prev =>
         prev.map(ch => (ch.id === chapterId ? { ...ch, ...enriched } : ch))
       );
@@ -325,7 +350,6 @@ const CourseViewerPage = () => {
       toast.error("Failed to load chapter content");
     }
   }
-
 
   const handleAnswerChange = (qid, value) => {
     setQuizAnswers((prev) => ({ ...prev, [qid]: value }));
@@ -365,13 +389,17 @@ const CourseViewerPage = () => {
       const { score, max } = scoreLocally(quiz, quizAnswers);
       setQuizScore({ score, max });
       toast.success("Quiz submitted!");
-      // After quiz submission: mark chapter complete and advance
       markChapterComplete({ advance: true });
     } catch (e) {
       console.error(e);
       toast.error("Failed to submit quiz");
       setQuizSubmitted(false);
     }
+  };
+
+  // UPDATED: Handle back navigation to dashboard
+  const handleBackNavigation = () => {
+    navigate("/dashboard");
   };
 
   if (loading) {
@@ -390,10 +418,8 @@ const CourseViewerPage = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <BookOpen size={48} className="mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Course not found
-          </h3>
-          <Button onClick={() => navigate("/courses")}>Browse Courses</Button>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Course not found</h3>
+          <Button onClick={handleBackNavigation}>Back to Dashboard</Button>
         </div>
       </div>
     );
@@ -404,195 +430,288 @@ const CourseViewerPage = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <BookOpen size={48} className="mx-auto text-gray-400 mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            No chapters available
-          </h3>
-          <p className="text-gray-600 mb-4">
-            This course doesn't have any chapters yet.
-          </p>
-          <Button onClick={() => navigate("/courses")}>
-            Back to Courses
-          </Button>
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No chapters available</h3>
+          <p className="text-gray-600 mb-4">This course doesn't have any chapters yet.</p>
+          <Button onClick={handleBackNavigation}>Back to Dashboard</Button>
         </div>
       </div>
     );
   }
+
   return (
-    <div className="min-h-screen bg-gray-900 flex">
-      {/* Sidebar */}
-      <div
-        className={`${sidebarOpen ? "w-80" : "w-0"
-          } transition-all duration-300 bg-white border-r border-gray-200 overflow-hidden flex flex-col`}
-      >
-        <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate("/courses")}
-            >
-              <ArrowLeft size={16} className="mr-2" />
-              Back to Courses
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarOpen(false)}
-            >
-              ×
-            </Button>
-          </div>
-          <div className="mb-4">
-            <h1 className="text-lg font-semibold text-gray-900 mb-2">
-              {course.title}
-            </h1>
-            <div className="flex items-center space-x-2 text-sm text-gray-600 mb-3">
-              <span>by {course.instructorName}</span>
-              <Badge variant="info" size="sm">
-                {course.level}
-              </Badge>
-            </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Progress</span>
-                <span className="font-medium">{getCourseProgress()}%</span>
-              </div>
-              <Progress value={getCourseProgress()} size="sm" />
-              <div className="text-xs text-gray-500">
-                {completedChapterIds.length} of {chapters.length} chapters
-                completed
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-4 space-y-2">
-            <div className="border border-gray-200 rounded-lg">
-              <button
-                onClick={() => setExpanded((x) => !x)}
-                className="w-full p-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between"
-              >
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">Course Content</h3>
-                  <div className="flex items-center space-x-4 mt-1 text-sm text-gray-500">
-                    <span>{chapters.length} chapters</span>
-                    <span>{getCourseProgress()}% complete</span>
+    <div className="min-h-screen bg-gray-100 flex">
+      {/* Sidebar - FIXED */}
+      <aside className={`transition-all duration-300 bg-white border-r border-gray-200 flex-shrink-0 ${sidebarOpen ? 'w-80' : 'w-0'} overflow-hidden`}>
+        {sidebarOpen && (
+          <>
+            <div className="p-4 border-b">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                  <img src={course.thumbnail} alt="thumb" className="w-10 h-10 rounded-md object-cover flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold truncate">{course.title}</div>
+                    <div className="text-xs text-gray-500 truncate">by {course.instructorName}</div>
                   </div>
                 </div>
-                {expanded ? (
-                  <ChevronDown size={16} />
-                ) : (
-                  <ChevronRight size={16} />
-                )}
-              </button>
-              {expanded && (
-                <div className="border-t border-gray-200">
-                  {chapters.map((chapter) => (
-                    <button
-                      key={chapter.id}
-                      onClick={() => {
-                        setCurrentChapter(chapter);
-                        if (!chapter.content) hydrateChapter(chapter.id);
-                      }}
-                      className={`w-full p-3 text-left hover:bg-gray-50 transition-colors flex items-center space-x-3 ${currentChapter?.id === chapter.id
-                        ? "bg-primary-50 border-r-2 border-primary-500"
-                        : ""
-                        }`}
-                    >
-                      <div className="flex-shrink-0">
-                        {isChapterCompleted(chapter.id) ? (
-                          <CheckCircle size={16} className="text-green-500" />
-                        ) : (
-                          <div className="w-4 h-4 border-2 border-gray-300 rounded-full" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-medium text-gray-900 truncate">
-                          {chapter.title} {chapter.hasQuiz ? "(Quiz)" : ""}
-                        </h4>
-                        <div className="flex items-center space-x-2 text-xs text-gray-500">
-                          <Clock size={12} />
-                          <span>{chapter.duration}</span>
-                          <span>•</span>
-                          <span>{chapter.type}</span>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="ml-2 p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+                  title="Hide sidebar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <Badge variant="info" size="sm" className="mb-3">{course.level}</Badge>
+
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-xs text-gray-600">
+                  <span>Progress</span>
+                  <span className="font-medium">{getCourseProgress()}%</span>
+                </div>
+                <Progress value={getCourseProgress()} size="sm" />
+                <div className="text-xs text-gray-500 mt-1">{completedChapterIds.length} / {chapters.length} chapters</div>
+              </div>
+            </div>
+
+            <div className="overflow-y-auto h-[calc(100vh-200px)] p-3">
+              <div className="space-y-2">
+                <div className="text-xs text-gray-500 font-medium px-2">Course Content</div>
+                <div className="border rounded-lg bg-white">
+                  <button
+                    onClick={() => setExpanded(x => !x)}
+                    className="w-full p-3 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="text-sm font-medium">Chapters</div>
+                    {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+
+                  {expanded && (
+                    <div className="divide-y">
+                      {chapters.map((chapter) => (
+                        <button
+                          key={chapter.id}
+                          onClick={() => {
+                            setCurrentChapter(chapter);
+                            setPageIndex(0);
+                            if (!chapter.content) hydrateChapter(chapter.id);
+                          }}
+                          className={`w-full p-3 text-left flex items-start space-x-3 hover:bg-gray-50 transition-colors ${
+                            currentChapter?.id === chapter.id ? 'bg-primary-50 ring-1 ring-primary-200' : ''
+                          }`}
+                        >
+                          <div className="mt-1 flex-shrink-0">
+                            {isChapterCompleted(chapter.id) ? (
+                              <CheckCircle size={16} className="text-green-500" />
+                            ) : (
+                              <div className="w-3 h-3 border border-gray-300 rounded-full" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium truncate">{chapter.title}</div>
+                            <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
+                              <Clock size={12} />
+                              <span>{chapter.duration}</span>
+                              <span>•</span>
+                              <span>{chapter.type}</span>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 border-t text-xs text-gray-500">
+              <div>Course status: <span className="font-medium text-gray-900">{course.status || 'Published'}</span></div>
+            </div>
+          </>
+        )}
+      </aside>
+
+      {/* Main panel */}
+      <main className="flex-1 p-6 min-w-0">
+        {/* Sticky header */}
+        <div className="sticky top-6 bg-transparent z-10 mb-6">
+          <div className="flex items-center justify-between bg-white border rounded-lg p-4 shadow-sm">
+            <div className="flex items-center space-x-4 flex-1 min-w-0">
+              {/* Show sidebar button when hidden */}
+              {!sidebarOpen && (
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-shrink-0"
+                  title="Show sidebar"
+                >
+                  <Menu size={18} />
+                  <span className="text-sm font-medium">Course Content</span>
+                </button>
+              )}
+
+              {/* UPDATED: Back button navigates to dashboard */}
+              <Button variant="ghost" size="sm" onClick={handleBackNavigation} className="flex-shrink-0">
+                <ArrowLeft size={14} className="mr-2" /> Back to Dashboard
+              </Button>
+
+              {currentChapter && (
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg font-semibold truncate">{currentChapter.title}</h2>
+                  <div className="text-sm text-gray-500 truncate">{course.title} • {currentChapter.duration}</div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
+              <div className="text-sm text-gray-600 hidden sm:block">{getCourseProgress()}% complete</div>
+              {currentChapter && !isChapterCompleted(currentChapter.id) && (
+                <Button onClick={() => markChapterComplete({ advance: false })} variant="outline" size="sm">
+                  Mark Complete
+                </Button>
+              )}
+              {currentChapter && isChapterCompleted(currentChapter.id) && (
+                <div className="flex items-center space-x-2 text-green-600 text-sm font-medium">
+                  <CheckCircle size={16} />
+                  <span className="hidden sm:inline">Completed</span>
                 </div>
               )}
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Main panel */}
-      <div className="flex-1 flex flex-col">
-        <div className="bg-white border-b border-gray-200 p-4 flex items-center justify-between">
-          {!sidebarOpen && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setSidebarOpen(true)}
-            >
-              <BookOpen size={16} className="mr-2" />
-              Course Content
-            </Button>
-          )}
-          {currentChapter && (
-            <div className="flex-1 text-center">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {currentChapter.title}
-              </h2>
-              <p className="text-sm text-gray-600">{course.title}</p>
-            </div>
-          )}
-          <div className="w-16" />
-        </div>
-
-        <div className="flex-1 bg-white">
-          {!currentChapter ? (
-            <EmptyPrompt />
-          ) : currentChapter.hasQuiz ? (
-            isQuizUnlocked(currentChapter) ? (
-              <QuizView
-                quiz={quiz}
-                quizLoading={quizLoading}
-                quizSubmitted={quizSubmitted}
-                quizScore={quizScore}
-                quizAnswers={quizAnswers}
-                onAnswerChange={handleAnswerChange}
-                onSubmit={submitQuiz}
-                completed={isChapterCompleted(currentChapter.id)}
-                onMarkComplete={() => markChapterComplete()}
-              />
+        {/* Content card (fixed area) */}
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white border rounded-2xl shadow p-6">
+            {!currentChapter ? (
+              <EmptyPrompt />
+            ) : currentChapter.hasQuiz ? (
+              isQuizUnlocked(currentChapter) ? (
+                <QuizView
+                  quiz={quiz}
+                  quizLoading={quizLoading}
+                  quizSubmitted={quizSubmitted}
+                  quizScore={quizScore}
+                  quizAnswers={quizAnswers}
+                  onAnswerChange={handleAnswerChange}
+                  onSubmit={submitQuiz}
+                  completed={isChapterCompleted(currentChapter.id)}
+                  onMarkComplete={() => markChapterComplete({ advance: false })}
+                />
+              ) : (
+                <LockedQuizNote />
+              )
             ) : (
-              <LockedQuizNote />
-            )
-          ) : (
-            <TextChapterView
-              chapter={currentChapter}
-              completed={isChapterCompleted(currentChapter.id)}
-              onMarkComplete={() => markChapterComplete()}
-            />
-          )}
+              <div>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-2xl font-bold">{currentChapter.title}</h3>
+                    <div className="text-sm text-gray-500 mt-1">{currentChapter.type} • {currentChapter.duration}</div>
+                  </div>
+                  <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
+                    {isChapterCompleted(currentChapter.id) ? (
+                      <div className="flex items-center space-x-2 text-green-600 text-sm font-medium">
+                        <CheckCircle size={16} />
+                        <span>Completed</span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-amber-600 font-medium">In progress</span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="prose max-w-none mb-4">
+                  <div className="h-72 overflow-y-auto border rounded-lg p-4 bg-gray-50">
+                    {contentPages.length > 0 ? (
+                      <div className="whitespace-pre-line">
+                        {contentPages[pageIndex]}
+                      </div>
+                    ) : (
+                      <div className="text-gray-600">{currentChapter.content || 'Chapter content goes here.'}</div>
+                    )}
+                  </div>
+                </div>
+
+                {contentPages.length > 1 && (
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-6">
+                    <div className="flex items-center space-x-2">
+                      <Button 
+                        onClick={() => setPageIndex(i => Math.max(0, i-1))} 
+                        disabled={pageIndex === 0} 
+                        variant="outline"
+                        size="sm"
+                      >
+                        Prev Page
+                      </Button>
+                      <Button 
+                        onClick={() => setPageIndex(i => Math.min(contentPages.length-1, i+1))} 
+                        disabled={pageIndex === contentPages.length-1}
+                        size="sm"
+                      >
+                        Next Page
+                      </Button>
+                      <div className="text-sm text-gray-500">Page {pageIndex+1} of {contentPages.length}</div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!isChapterCompleted(currentChapter.id) && (
+                        <Button onClick={() => markChapterComplete({ advance: true })} size="sm">
+                          <CheckCircle size={16} className="mr-2" />
+                          Complete & Continue
+                        </Button>
+                      )}
+
+                      {currentChapter.attachments && currentChapter.attachments.length > 0 && (
+                        <a 
+                          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50" 
+                          href={currentChapter.attachments[0]} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                        >
+                          <FileText size={16} className="mr-2" /> Download
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {contentPages.length <= 1 && (
+                  <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div />
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!isChapterCompleted(currentChapter.id) && (
+                        <Button onClick={() => markChapterComplete({ advance: true })} size="sm">
+                          <CheckCircle size={16} className="mr-2" /> Mark as Complete
+                        </Button>
+                      )}
+                      {currentChapter.attachments && currentChapter.attachments.length > 0 && (
+                        <a 
+                          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50" 
+                          href={currentChapter.attachments[0]} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                        >
+                          <FileText size={16} className="mr-2" /> Download
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 };
 
 function EmptyPrompt() {
   return (
-    <div className="h-full flex items-center justify-center text-gray-600">
+    <div className="h-full flex items-center justify-center text-gray-600 py-12">
       <div className="text-center">
         <BookOpen size={64} className="mx-auto mb-4 opacity-50" />
-        <h3 className="text-xl font-semibold mb-2">
-          Select a chapter to begin
-        </h3>
-        <p className="text-gray-500">
-          Choose a chapter from the sidebar to start learning
-        </p>
+        <h3 className="text-xl font-semibold mb-2">Select a chapter to begin</h3>
+        <p className="text-gray-500">Choose a chapter from the sidebar to start learning</p>
       </div>
     </div>
   );
@@ -603,56 +722,9 @@ function LockedQuizNote() {
     <div className="max-w-3xl mx-auto p-6">
       <div className="border rounded-lg p-6 bg-gray-50 text-center">
         <Lock size={28} className="mx-auto mb-3 text-gray-600" />
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          Quiz locked
-        </h3>
-        <p className="text-sm text-gray-600">
-          Complete the required previous chapter(s) to unlock this quiz.
-        </p>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">Quiz locked</h3>
+        <p className="text-sm text-gray-600">Complete the required previous chapter(s) to unlock this quiz.</p>
       </div>
-    </div>
-  );
-}
-
-function TextChapterView({ chapter, completed, onMarkComplete }) {
-  return (
-    <div className="max-w-3xl mx-auto p-6">
-      <h3 className="text-2xl font-bold mb-4">{chapter.title}</h3>
-      <div className="prose max-w-none">
-        <p className="whitespace-pre-line">
-          {chapter.content || "Chapter content goes here."}
-        </p>
-      </div>
-
-      {chapter.attachments && chapter.attachments.length > 0 && (
-        <div className="mt-8 pt-6 border-t">
-          <h4 className="text-lg font-semibold mb-3">Attachments</h4>
-          <div className="space-y-3">
-            {chapter.attachments.map((url, index) => (
-              <a
-                key={index}
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
-              >
-                <FileText size={16} className="mr-2" />
-                View PDF Attachment{" "}
-                {chapter.attachments.length > 1 ? index + 1 : ""}
-              </a>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {!completed && (
-        <div className="mt-8">
-          <Button onClick={onMarkComplete}>
-            <CheckCircle size={16} className="mr-2" />
-            Mark as Complete
-          </Button>
-        </div>
-      )}
     </div>
   );
 }
@@ -666,6 +738,7 @@ function QuizView({
   onAnswerChange,
   onSubmit,
   onMarkComplete,
+  completed,
 }) {
   return (
     <div className="max-w-3xl mx-auto p-6">
@@ -700,10 +773,18 @@ function QuizView({
                   : ""}
               </div>
             )}
-            <Button variant="outline" onClick={onMarkComplete}>
-              <CheckCircle size={16} className="mr-2" />
-              Mark Chapter Complete
-            </Button>
+            {!completed && (
+              <Button variant="outline" onClick={onMarkComplete}>
+                <CheckCircle size={16} className="mr-2" />
+                Mark Chapter Complete
+              </Button>
+            )}
+            {completed && (
+              <div className="flex items-center space-x-2 text-green-600 font-medium">
+                <CheckCircle size={16} />
+                <span>Chapter Completed</span>
+              </div>
+            )}
           </div>
         </>
       )}
@@ -720,9 +801,7 @@ function QuestionBlock({ index, q, value, onChange, disabled }) {
   if (isSingle) {
     return (
       <div className="border rounded-lg p-4">
-        <div className="font-medium mb-3">
-          Q{index + 1}. {q.prompt}
-        </div>
+        <div className="font-medium mb-3">Q{index + 1}. {q.prompt}</div>
         <div className="space-y-2">
           {q.options.map((opt, i) => (
             <label key={i} className="flex items-center space-x-2">
@@ -749,10 +828,7 @@ function QuestionBlock({ index, q, value, onChange, disabled }) {
     };
     return (
       <div className="border rounded-lg p-4">
-        <div className="font-medium mb-3">
-          Q{index + 1}. {q.prompt}{" "}
-          <span className="text-xs text-gray-500">(Select all that apply)</span>
-        </div>
+        <div className="font-medium mb-3">Q{index + 1}. {q.prompt} <span className="text-xs text-gray-500">(Select all that apply)</span></div>
         <div className="space-y-2">
           {q.options.map((opt, i) => (
             <label key={i} className="flex items-center space-x-2">
@@ -770,12 +846,9 @@ function QuestionBlock({ index, q, value, onChange, disabled }) {
     );
   }
 
-  // subjective / other
   return (
     <div className="border rounded-lg p-4">
-      <div className="font-medium mb-3">
-        Q{index + 1}. {q.prompt}
-      </div>
+      <div className="font-medium mb-3">Q{index + 1}. {q.prompt}</div>
       <textarea
         rows={4}
         className="w-full border rounded-lg p-2"

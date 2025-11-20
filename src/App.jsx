@@ -328,13 +328,14 @@ const App = () => {
           }
         />
         <Route
-          path="/department-analytics"
+          path="/departments/:departmentId/analytics"
           element={
-            // <ProtectedRoute allowedRoles={[ROLE.ADMIN, ROLE.SUPERADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLE.ADMIN, ROLE.SUPERADMIN]}>
               <DepartmentAnalyticsDashboard />
-            // </ProtectedRoute>
+            </ProtectedRoute>
           }
         />
+
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

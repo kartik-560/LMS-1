@@ -51,7 +51,7 @@ export default function CreateFinaltest({ initialLesson }) {
   const fetchCourses = async () => {
     try {
       setLoadingCourses(true);
-      const response = await coursesAPI.list(); 
+      const response = await coursesAPI.list();
 
       const courseData = response?.data?.data || response?.data || response || [];
       setCourses(Array.isArray(courseData) ? courseData : []);
@@ -403,15 +403,6 @@ export default function CreateFinaltest({ initialLesson }) {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="text-lg font-semibold text-gray-900">Questions</h3>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={addQuestion}
-              className="flex items-center gap-2"
-            >
-              <Plus size={18} />
-              Add Question
-            </Button>
           </div>
 
           {lesson.questions.map((q, qIdx) => (
@@ -421,6 +412,17 @@ export default function CreateFinaltest({ initialLesson }) {
                   Question {qIdx + 1}
                 </h4>
                 <div className="flex gap-2">
+
+                  {qIdx === lesson.questions.length - 1 && (
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={addQuestion}
+                      className="flex items-center gap-2"
+                    >
+                      <Plus size={18} />
+                    </Button>
+                  )}
                   <Button
                     type="button"
                     variant="outline"

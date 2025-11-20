@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
-import { BookOpen, Shield, Mail, Eye, EyeOff } from "lucide-react";
+import { BookOpen, Shield, Mail, Eye, EyeOff,Loader2 } from "lucide-react";
 import { toast } from "react-hot-toast";
 import { authAPI } from "../services/api";
 import Button from "../components/ui/Button";

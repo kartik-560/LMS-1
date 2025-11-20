@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen,
@@ -58,7 +58,174 @@ const CourseListPage = () => {
   }, [hasHydrated, isAuthenticated, currentPage]); // Refetch when currentPage changes
   // --- END OF CHANGE ---
 
-const fetchStudentData = async () => {
+  // const fetchStudentData = async () => {
+  //     const abort = new AbortController();
+
+  //     const resetState = () => {
+  //       setAssignedCourses([]);
+  //       setCurrentProgress({});
+  //       setAvailableTests([]);
+  //       setAiInterviewStatus({});
+  //       setCurrentPage(1);
+  //       setTotalPages(1);
+  //     };
+
+  //     try {
+  //       setLoading(true);
+
+  //       const roleRaw = (user && user.role) ?? "";
+  //       const role = String(roleRaw).toUpperCase();
+  //       const studentId = String((user && user.id) ?? "").trim();
+
+  //       if (!studentId) {
+  //         toast.error("Could not identify your student account.");
+  //         resetState();
+  //         setLoading(false); // Stop loading
+  //         return () => abort.abort();
+  //       }
+  //       if (!role.includes("STUDENT")) {
+  //         toast.error(
+  //           "This page is for students. Please log in with a student account."
+  //         );
+  //         resetState();
+  //         setLoading(false); // Stop loading
+  //         return () => abort.abort();
+  //       }
+
+  //       // --- START OF SIMPLIFIED LOGIC ---
+  //       // We no longer need the enrollmentsAPI call.
+  //       // We will rely directly on getStudentCourses.
+  //       let myCourses = [];
+  //       let totalCount = null;
+
+  //       try {
+  //         const resp = await coursesAPI.getStudentCourses(
+  //           user && user.collegeId,
+  //           studentId,
+  //           "",
+  //           "all",
+  //           "all",
+  //           "assigned",
+  //           currentPage,
+  //           PAGE_SIZE
+  //         );
+  //         myCourses =
+  //           resp?.data?.data ?? resp?.data ?? (Array.isArray(resp) ? resp : []);
+  //         totalCount =
+  //           resp?.data?.total ??
+  //           resp?.data?.pagination?.total ??
+  //           resp?.data?.meta?.total ??
+  //           null;
+  //       } catch (e) {
+  //         console.warn("getStudentCourses failed", e);
+  //         toast.error("Failed to load your courses.");
+  //         // If the API itself fails, reset and stop.
+  //         resetState();
+  //         setLoading(false);
+  //         return () => abort.abort();
+  //       }
+
+  //       // API call succeeded, now check if it returned anything
+  //       if (!Array.isArray(myCourses) || myCourses.length === 0) {
+  //         // This is not an error, just an empty state.
+  //         // resetState() will clear the courses and reset pagination.
+  //         resetState();
+  //         setLoading(false);
+  //         return () => abort.abort();
+  //       }
+
+  //       // We have courses, so set total pages
+  //       if (totalCount !== null) {
+  //         setTotalPages(Math.ceil(totalCount / PAGE_SIZE));
+  //       } else {
+  //         // Succeeded but no total count, assume 1 page for the results we got
+  //         setTotalPages(1);
+  //       }
+
+  //       const normalizeCourse = (c) => {
+  //         const cid = c?.id ?? c?.courseId ?? c?.course?.id;
+  //         return { ...c, id: cid };
+  //       };
+
+  //       myCourses = myCourses.map(normalizeCourse);
+  //       // --- END OF SIMPLIFIED LOGIC ---
+
+  //       // Fetch chapter and progress data for the courses on the current page
+  //       const [chaptersList, completedChaptersList, summaries] = await Promise.all(
+  //         [
+  //           Promise.all(
+  //             myCourses.map((c) =>
+  //               chaptersAPI
+  //                 .listByCourse(c.courseId ?? c.id)
+  //                 .then((r) => r?.data?.data ?? r?.data ?? [])
+  //                 .catch(() => [])
+  //             )
+  //           ),
+
+  //           Promise.all(
+  //             myCourses.map((c) =>
+  //               progressAPI
+  //                 .completedChapters(c.courseId ?? c.id)
+  //                 .then((r) => r?.data?.data ?? r?.data ?? [])
+  //                 .catch(() => [])
+  //             )
+  //           ),
+
+  //           Promise.all(
+  //             myCourses.map((c) =>
+  //               progressAPI
+  //                 .courseSummary(c.courseId ?? c.id)
+  //                 .then((r) => r?.data?.data ?? null)
+  //                 .catch(() => [])
+  //             )
+  //           ),
+  //         ]
+  //       );
+
+  //       const nextProgressData = {};
+  //       const nextAiStatusData = {};
+  //       const nextCourseWithCounts = [];
+
+  //       myCourses.forEach((course, i) => {
+  //         const totalCourseChapters = chaptersList[i] || [];
+  //         const completedCourseChapters = completedChaptersList[i] || [];
+
+  //         nextProgressData[course.id] = {
+  //           completedChapters: completedCourseChapters,
+  //           courseTestResult: {}, // You might fetch this from summaries[i] if available
+  //           aiInterviewResult: null, // You might fetch this from summaries[i] if available
+  //         };
+
+  //         nextCourseWithCounts.push({
+  //           ...course,
+  //           totalChapters: totalCourseChapters.length,
+  //         });
+  //       });
+
+  //       setAssignedCourses(nextCourseWithCounts);
+  //       setCurrentProgress(nextProgressData);
+  //       setAiInterviewStatus(nextAiStatusData);
+  //       setAvailableTests([]);
+
+  //     } catch (error) {
+  //       console.error("Error fetching student data:", error);
+  //       toast.error(
+  //         (error &&
+  //           error.response &&
+  //           error.response.data &&
+  //           error.response.data.error) ||
+  //           (error && error.message) ||
+  //           "Failed to load dashboard data"
+  //       );
+  //       resetState(); // Reset on final catch-all
+  //     } finally {
+  //       setLoading(false);
+  //     }
+
+  //     return () => abort.abort();
+  //   };
+
+  const fetchStudentData = async () => {
     const abort = new AbortController();
 
     const resetState = () => {
@@ -77,24 +244,21 @@ const fetchStudentData = async () => {
       const role = String(roleRaw).toUpperCase();
       const studentId = String((user && user.id) ?? "").trim();
 
+
       if (!studentId) {
         toast.error("Could not identify your student account.");
         resetState();
-        setLoading(false); // Stop loading
-        return () => abort.abort();
-      }
-      if (!role.includes("STUDENT")) {
-        toast.error(
-          "This page is for students. Please log in with a student account."
-        );
-        resetState();
-        setLoading(false); // Stop loading
+        setLoading(false);
         return () => abort.abort();
       }
 
-      // --- START OF SIMPLIFIED LOGIC ---
-      // We no longer need the enrollmentsAPI call.
-      // We will rely directly on getStudentCourses.
+      if (!role.includes("STUDENT")) {
+        toast.error("This page is for students. Please log in with a student account.");
+        resetState();
+        setLoading(false);
+        return () => abort.abort();
+      }
+
       let myCourses = [];
       let totalCount = null;
 
@@ -109,78 +273,139 @@ const fetchStudentData = async () => {
           currentPage,
           PAGE_SIZE
         );
-        myCourses =
-          resp?.data?.data ?? resp?.data ?? (Array.isArray(resp) ? resp : []);
+
+        if (!resp || resp.status === 204 || resp.data === '' || resp.data === null) {
+
+          resetState();
+          setLoading(false);
+          return () => abort.abort();
+        }
+
+        myCourses = resp?.data?.data ?? resp?.data ?? (Array.isArray(resp) ? resp : []);
         totalCount =
           resp?.data?.total ??
           resp?.data?.pagination?.total ??
           resp?.data?.meta?.total ??
           null;
+
       } catch (e) {
-        console.warn("getStudentCourses failed", e);
+        console.error("[Error] getStudentCourses error:", e);
+
+        if (e.response && e.response.status === 204) {
+          resetState();
+          setLoading(false);
+          return () => abort.abort();
+        }
+
         toast.error("Failed to load your courses.");
-        // If the API itself fails, reset and stop.
         resetState();
         setLoading(false);
         return () => abort.abort();
       }
 
-      // API call succeeded, now check if it returned anything
       if (!Array.isArray(myCourses) || myCourses.length === 0) {
-        // This is not an error, just an empty state.
-        // resetState() will clear the courses and reset pagination.
+
         resetState();
         setLoading(false);
         return () => abort.abort();
       }
 
-      // We have courses, so set total pages
       if (totalCount !== null) {
         setTotalPages(Math.ceil(totalCount / PAGE_SIZE));
       } else {
-        // Succeeded but no total count, assume 1 page for the results we got
         setTotalPages(1);
       }
-      
+
+      // Debug the normalization step
       const normalizeCourse = (c) => {
-        const cid = c?.id ?? c?.courseId ?? c?.course?.id;
-        return { ...c, id: cid };
+        // ✅ Log to debug
+
+
+        // ✅ If it's an enrollment object with nested course
+        if (c.course && typeof c.course === 'object') {
+
+          return {
+            ...c.course,
+            id: c.course.id,
+            enrollmentId: c.id, // Keep enrollment ID for reference
+            enrollmentStatus: c.status
+          };
+        }
+
+        // ✅ If it has courseId (enrollment structure)
+        if (c.courseId && !c.course) {
+
+          return { ...c, id: c.courseId };
+        }
+
+        return { ...c, id: c.id };
       };
 
       myCourses = myCourses.map(normalizeCourse);
-      // --- END OF SIMPLIFIED LOGIC ---
 
-      // Fetch chapter and progress data for the courses on the current page
-      const [chaptersList, completedChaptersList, summaries] = await Promise.all(
-        [
-          Promise.all(
-            myCourses.map((c) =>
-              chaptersAPI
-                .listByCourse(c.courseId ?? c.id)
-                .then((r) => r?.data?.data ?? r?.data ?? [])
-                .catch(() => [])
-            )
-          ),
 
-          Promise.all(
-            myCourses.map((c) =>
-              progressAPI
-                .completedChapters(c.courseId ?? c.id)
-                .then((r) => r?.data?.data ?? r?.data ?? [])
-                .catch(() => [])
-            )
-          ),
+      // Fetch chapters/progress/debug their structure
+      const [chaptersList, completedChaptersList, summaries] = await Promise.all([
+        Promise.all(
+          myCourses.map((c) =>
+            chaptersAPI
+              .listByCourse(c.id)
+              .then((r) => {
 
-          Promise.all(
-            myCourses.map((c) =>
-              progressAPI
-                .courseSummary(c.courseId ?? c.id)
-                .then((r) => r?.data?.data ?? null)
-                .catch(() => [])
-            )
-          ),
-        ]
-      );
+                if (!r || r.status === 204 || r.data === '' || r.data === null) {
+                  return [];
+                }
+                if (Array.isArray(r)) return r;
+                if (r?.data?.data && Array.isArray(r.data.data)) return r.data.data;
+                if (r?.data && Array.isArray(r.data)) return r.data;
+                return [];
+              })
+              .catch((err) => {
+                console.warn(`[Error] fetching chapters for course ${c.id}:`, err);
+                return [];
+              })
+          )
+        ),
+
+        Promise.all(
+          myCourses.map((c) =>
+            progressAPI
+              .completedChapters(c.id)
+              .then((r) => {
+               
+                if (!r || r.status === 204 || r.data === '' || r.data === null) {
+                  return [];
+                }
+                if (Array.isArray(r)) return r;
+                if (r?.data?.data && Array.isArray(r.data.data)) return r.data.data;
+                if (r?.data && Array.isArray(r.data)) return r.data;
+                return [];
+              })
+              .catch((err) => {
+                console.warn(`[Error] fetching completed chapters for course ${c.id}:`, err);
+                return [];
+              })
+          )
+        ),
+
+        Promise.all(
+          myCourses.map((c) =>
+            progressAPI
+              .courseSummary(c.id)
+              .then((r) => {
+              
+                if (!r || r.status === 204 || r.data === '' || r.data === null) {
+                  return null;
+                }
+                return r?.data?.data ?? r?.data ?? null;
+              })
+              .catch((err) => {
+                console.warn(`[Error] fetching summary for course ${c.id}:`, err);
+                return null;
+              })
+          )
+        ),
+      ]);
 
       const nextProgressData = {};
       const nextAiStatusData = {};
@@ -189,16 +414,17 @@ const fetchStudentData = async () => {
       myCourses.forEach((course, i) => {
         const totalCourseChapters = chaptersList[i] || [];
         const completedCourseChapters = completedChaptersList[i] || [];
-        
+
         nextProgressData[course.id] = {
           completedChapters: completedCourseChapters,
-          courseTestResult: {}, // You might fetch this from summaries[i] if available
-          aiInterviewResult: null, // You might fetch this from summaries[i] if available
+          courseTestResult: {},
+          aiInterviewResult: null,
         };
 
         nextCourseWithCounts.push({
           ...course,
           totalChapters: totalCourseChapters.length,
+          completedChaptersCount: completedCourseChapters.length,
         });
       });
 
@@ -206,20 +432,21 @@ const fetchStudentData = async () => {
       setCurrentProgress(nextProgressData);
       setAiInterviewStatus(nextAiStatusData);
       setAvailableTests([]);
-      
+
     } catch (error) {
-      console.error("Error fetching student data:", error);
+      console.error("[Error] In fetchStudentData:", error);
       toast.error(
         (error &&
           error.response &&
           error.response.data &&
           error.response.data.error) ||
-          (error && error.message) ||
-          "Failed to load dashboard data"
+        (error && error.message) ||
+        "Failed to load dashboard data"
       );
-      resetState(); // Reset on final catch-all
+      resetState();
     } finally {
       setLoading(false);
+      // console.log("[Done] fetchStudentData finished - loading state set to false.");
     }
 
     return () => abort.abort();
@@ -273,6 +500,67 @@ const fetchStudentData = async () => {
     return { type: "certificate", text: "View Certificate", icon: Trophy };
   };
 
+  // const goToCourse = async (courseId) => {
+  //   if (!courseId) {
+  //     toast.error("Missing course id");
+  //     return;
+  //   }
+
+  //   const id = String(courseId);
+  //   const encodedId = encodeURIComponent(id);
+
+  //   try {
+  //     const response = await chaptersAPI.listByCourse(id);
+  //     let chapters = [];
+  //     if (Array.isArray(response)) {
+  //       chapters = response;
+  //     } else if (response?.data?.data && Array.isArray(response.data.data)) {
+  //       chapters = response.data.data;
+  //     } else if (response?.data && Array.isArray(response.data)) {
+  //       chapters = response.data;
+  //     } else if (response?.chapters && Array.isArray(response.chapters)) {
+  //       chapters = response.chapters;
+  //     }
+
+  //     console.log("Chapters for navigation:", chapters);
+
+  //     if (!chapters || chapters.length === 0) {
+  //       toast.error("No chapters found for this course");
+  //       navigate(`/courses/${encodedId}`);
+  //       return;
+  //     }
+
+  //     const sortedChapters = chapters
+  //       .slice()
+  //       .sort((a, b) => (a?.order ?? 0) - (b?.order ?? 0));
+
+  //     const firstChapter = sortedChapters[0];
+  //     const startId = firstChapter?.id ?? null;
+
+  //     console.log("Navigating with startId:", startId);
+
+  //     if (startId) {
+  //       navigate(`/courses/${encodedId}?start=${encodeURIComponent(startId)}`, {
+  //         state: {
+  //           startChapterId: startId,
+  //           courseId: id,
+  //         },
+  //         replace: false,
+  //       });
+  //     } else {
+  //       navigate(`/courses/${encodedId}`, {
+  //         state: { courseId: id },
+  //       });
+  //     }
+  //   } catch (e) {
+  //     console.error("Failed to fetch chapters:", e);
+  //     toast.error("Failed to load course chapters");
+  //     navigate(`/courses/${encodedId}`, {
+  //       state: { courseId: id },
+  //     });
+  //   }
+  // };
+
   const goToCourse = async (courseId) => {
     if (!courseId) {
       toast.error("Missing course id");
@@ -284,7 +572,9 @@ const fetchStudentData = async () => {
 
     try {
       const response = await chaptersAPI.listByCourse(id);
+
       let chapters = [];
+
       if (Array.isArray(response)) {
         chapters = response;
       } else if (response?.data?.data && Array.isArray(response.data.data)) {
@@ -295,22 +585,21 @@ const fetchStudentData = async () => {
         chapters = response.chapters;
       }
 
-      console.log("Chapters for navigation:", chapters);
+
 
       if (!chapters || chapters.length === 0) {
-        toast.error("No chapters found for this course");
-        navigate(`/courses/${encodedId}`);
+        navigate(`/courses/${encodedId}`, {
+          state: { courseId: id },
+        });
         return;
       }
 
-      const sortedChapters = chapters
-        .slice()
-        .sort((a, b) => (a?.order ?? 0) - (b?.order ?? 0));
+      const sortedChapters = [...chapters].sort((a, b) =>
+        (a?.order ?? 0) - (b?.order ?? 0)
+      );
 
       const firstChapter = sortedChapters[0];
       const startId = firstChapter?.id ?? null;
-
-      console.log("Navigating with startId:", startId);
 
       if (startId) {
         navigate(`/courses/${encodedId}?start=${encodeURIComponent(startId)}`, {
@@ -333,6 +622,7 @@ const fetchStudentData = async () => {
       });
     }
   };
+
 
   const startTest = (test) => {
     toast("Test functionality to be implemented");
@@ -439,11 +729,15 @@ const fetchStudentData = async () => {
                               nextAction.type === "course-test" ||
                               nextAction.type === "module-test"
                             ) {
-                              const test = availableTests.find(
-                                (t) => t.courseId === course.id
-                              );
-                              if (test) startTest(test);
-                              else toast("No test available yet");
+                              if (nextAction.type === "course-test") {
+                                startTest(course.id);
+                              } else if (nextAction.type === "module-test") {
+                                const test = availableTests.find(
+                                  (t) => t.courseId === course.id
+                                );
+                                if (test) startTest(course.id);
+                                else toast("No module test available yet");
+                              }
                             } else {
                               goToCourse(course.id);
                             }

@@ -308,6 +308,45 @@ export default function AdminDashboardPage() {
     };
   }, [overview, instructors, students, courses,]);
 
+  // Around line 330 - After existing stats useMemo
+const overviewStats = useMemo(() => {
+  const activeInstructors = instructors.filter(i => i.isActive).length;
+  const activeStudents = students.filter(s => s.isActive).length;
+  const publishedCourses = courses.filter(c => c.status === 'published').length;
+  const draftCourses = courses.filter(c => c.status === 'draft').length;
+  
+  // Calculate engagement metrics
+  const totalEnrollments = students.reduce((sum, s) => 
+    sum + (s.assignedCourses?.length || 0), 0
+  );
+  
+  const avgEnrollmentsPerCourse = courses.length > 0 
+    ? Math.round(totalEnrollments / courses.length) 
+    : 0;
+  
+  // Recent activity (last 7 days simulation)
+  const recentLogins = [...instructors, ...students]
+    .filter(u => {
+      if (!u.lastLogin) return false;
+      const loginDate = new Date(u.lastLogin);
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      return loginDate >= weekAgo;
+    })
+    .length;
+  
+  return {
+    activeInstructors,
+    activeStudents,
+    publishedCourses,
+    draftCourses,
+    totalEnrollments,
+    avgEnrollmentsPerCourse,
+    recentLogins,
+    inactiveUsers: instructors.length + students.length - activeInstructors - activeStudents,
+  };
+}, [instructors, students, courses]);
+
   // useEffect(() => {
   //   (async () => {
   //     try {
@@ -752,121 +791,153 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Top stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
-          <Card className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center">
-              <div className="w-8 ea-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Users
-                  size={16}
-                  className="text-blue-600 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
-                />
-              </div>
-              <div className="ml-2 sm:ml-3 lg:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Instructors
-                </p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                  {overview.instructors}
-                </p>
-              </div>
-            </div>
-          </Card>
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+  {/* Instructors Card */}
+  <Card 
+    className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-blue-300 bg-white"
+    onClick={() => {
+      setActiveTab("instructors");
+      handleTabChange("instructors");
+    }}
+  >
+    <div className="flex items-center">
+      <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+        <Users
+          className="text-blue-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
+        />
+      </div>
+      <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+        <p className="text-xs sm:text-sm font-medium text-gray-600">
+          Instructors
+        </p>
+        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+          {overview?.instructors || 0}
+        </p>
+      </div>
+    </div>
+  </Card>
 
-          <Card className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <GraduationCap
-                  size={16}
-                  className="text-green-600 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
-                />
-              </div>
-              <div className="ml-2 sm:ml-3 lg:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Students
-                </p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                  {overview.students}
-                </p>
-              </div>
-            </div>
-          </Card>
+  {/* Students Card */}
+  <Card 
+    className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-green-300 bg-white"
+    onClick={() => {
+      setActiveTab("students");
+      handleTabChange("students");
+    }}
+  >
+    <div className="flex items-center">
+      <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+        <GraduationCap
+          className="text-green-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
+        />
+      </div>
+      <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+        <p className="text-xs sm:text-sm font-medium text-gray-600">
+          Students
+        </p>
+        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+          {overview?.students || 0}
+        </p>
+      </div>
+    </div>
+  </Card>
 
-          <Card className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <BookOpen
-                  size={16}
-                  className="text-purple-600 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
-                />
-              </div>
-              <div className="ml-2 sm:ml-3 lg:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Courses
-                </p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                  {overview.courses}
-                </p>
-              </div>
-            </div>
-          </Card>
+  {/* Courses Card */}
+  <Card 
+    className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-purple-300 bg-white"
+    onClick={() => {
+      setActiveTab("courses");
+      handleTabChange("courses");
+    }}
+  >
+    <div className="flex items-center">
+      <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
+        <BookOpen
+          className="text-purple-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
+        />
+      </div>
+      <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+        <p className="text-xs sm:text-sm font-medium text-gray-600">
+          Courses
+        </p>
+        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+          {overview?.courses || 0}
+        </p>
+      </div>
+    </div>
+  </Card>
 
-          <Card className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                <Activity
-                  size={16}
-                  className="text-yellow-600 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
-                />
-              </div>
-              <div className="ml-2 sm:ml-3 lg:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Active Users
-                </p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                  {overview.users}
-                </p>
-              </div>
-            </div>
-          </Card>
+  {/* Departments Card */}
+  <Card 
+    className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-yellow-300 bg-white"
+    onClick={() => {
+      setActiveTab("departments");
+      handleTabChange("departments");
+    }}
+  >
+    <div className="flex items-center">
+      <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
+        <Building2
+          className="text-yellow-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
+        />
+      </div>
+      <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+        <p className="text-xs sm:text-sm font-medium text-gray-600">
+          Departments
+        </p>
+        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+          {overview?.departments || 0}
+        </p>
+      </div>
+    </div>
+  </Card>
 
-          <Card className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
-                <Target
-                  size={16}
-                  className="text-indigo-600 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
-                />
-              </div>
-              <div className="ml-2 sm:ml-3 lg:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Completion
-                </p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                  {stats.completionRate}%
-                </p>
-              </div>
-            </div>
-          </Card>
+  {/* Completion Card */}
+  <Card 
+    className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-indigo-300 bg-white"
+    onClick={() => setActiveTab("overview")}
+  >
+    <div className="flex items-center">
+      <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+        <Target
+          className="text-indigo-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
+        />
+      </div>
+      <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+        <p className="text-xs sm:text-sm font-medium text-gray-600">
+          Completion
+        </p>
+        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+          {stats?.completionRate || 0}%
+        </p>
+      </div>
+    </div>
+  </Card>
 
-          <Card className="p-3 sm:p-4 lg:p-6">
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-red-100 rounded-lg flex items-center justify-center">
-                <Award
-                  size={16}
-                  className="text-red-600 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
-                />
-              </div>
-              <div className="ml-2 sm:ml-3 lg:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Avg Grade
-                </p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                  {stats.averageGrade}%
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
+  {/* Average Grade Card */}
+  <Card 
+    className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-red-300 bg-white"
+    onClick={() => setActiveTab("overview")}
+  >
+    <div className="flex items-center">
+      <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+        <Award
+          className="text-red-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
+        />
+      </div>
+      <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+        <p className="text-xs sm:text-sm font-medium text-gray-600">
+          Avg Grade
+        </p>
+        <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+          {stats?.averageGrade || 0}%
+        </p>
+      </div>
+    </div>
+  </Card>
+</div>
+
+
 
         {/* Tabs */}
 
@@ -904,11 +975,12 @@ export default function AdminDashboardPage() {
           <div className="border-b border-gray-200">
             <nav className="-mb-px flex space-x-4 sm:space-x-6 lg:space-x-8 overflow-x-auto">
               {[
-                { id: "overview", name: "Overview", icon: BarChart3 },
+                 { id: "overview", name: "Overview", icon: BarChart3 },
+                { id: "departments", name: "Departments", icon: Building2 },
                 { id: "instructors", name: "Instructors", icon: Users },
                 { id: "students", name: "Students", icon: GraduationCap },
                 { id: "courses", name: "Courses", icon: BookOpen },
-                { id: "departments", name: "Departments", icon: Building2 }, // ✅ Add this
+                
               ].map((tab) => (
                 <button
                   key={tab.id}
@@ -932,7 +1004,7 @@ export default function AdminDashboardPage() {
         </div>
 
 
-        {/* Overview */}
+        {/* Overview
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
@@ -976,9 +1048,9 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
               </Card.Content>
-            </Card>
+            </Card> */}
 
-            <Card>
+            {/* <Card>
               <Card.Header>
                 <Card.Title>Performance Metrics</Card.Title>
               </Card.Header>
@@ -1015,7 +1087,304 @@ export default function AdminDashboardPage() {
               </Card.Content>
             </Card>
           </div>
-        )}
+        )} */}
+
+{/* Overview Tab */}
+{activeTab === "overview" && (
+  <div className="space-y-6">
+    {/* Quick Stats Grid */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <Card className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-600">Total Users</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">
+              {overview.instructors + overview.students}
+            </p>
+            <p className="text-xs text-green-600 mt-1">
+              ↑ {overviewStats.activeInstructors + overviewStats.activeStudents} active
+            </p>
+          </div>
+          <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+            <Users className="text-blue-600" size={24} />
+          </div>
+        </div>
+      </Card>
+
+      {/* <Card className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-600">Published Courses</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">
+              {overviewStats.publishedCourses}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              {overviewStats.draftCourses} in draft
+            </p>
+          </div>
+          <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+            <BookOpen className="text-green-600" size={24} />
+          </div>
+        </div>
+      </Card> */}
+
+      <Card className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-600">Total Enrollments</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">
+              {overviewStats.totalEnrollments}
+            </p>
+            <p className="text-xs text-gray-500 mt-1">
+              Avg {overviewStats.avgEnrollmentsPerCourse} per course
+            </p>
+          </div>
+          <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+            <Target className="text-purple-600" size={24} />
+          </div>
+        </div>
+      </Card>
+
+      <Card className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-600">Active This Week</p>
+            <p className="text-3xl font-bold text-gray-900 mt-2">
+              {overviewStats.recentLogins}
+            </p>
+            <p className="text-xs text-green-600 mt-1">
+              Recent logins
+            </p>
+          </div>
+          <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
+            <Activity className="text-yellow-600" size={24} />
+          </div>
+        </div>
+      </Card>
+    </div>
+
+    {/* Two Column Layout */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Department Breakdown */}
+      <Card>
+        <Card.Header>
+          <Card.Title>Department Distribution</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          {departments.length > 0 ? (
+            <div className="space-y-4">
+              {departments.slice(0, 5).map((dept) => (
+                <div key={dept.id} className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <Building2 size={16} className="text-gray-400" />
+                    <span className="text-sm font-medium text-gray-900">
+                      {dept.name}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <span className="text-xs text-gray-500">
+                      {dept.instructorCount}I / {dept.studentCount}S
+                    </span>
+                    <Badge variant="info" size="sm">
+                      {dept.courseCount} courses
+                    </Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Building2 size={32} className="mx-auto text-gray-400 mb-2" />
+              <p className="text-sm text-gray-500">No departments yet</p>
+            </div>
+          )}
+        </Card.Content>
+      </Card>
+
+      {/* Performance Metrics */}
+      {/* <Card>
+        <Card.Header>
+          <Card.Title>System Health</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-600">User Activation Rate</span>
+                <span className="font-medium">
+                  {Math.round(((overviewStats.activeInstructors + overviewStats.activeStudents) / 
+                    (overview.instructors + overview.students || 1)) * 100)}%
+                </span>
+              </div>
+              <Progress 
+                value={Math.round(((overviewStats.activeInstructors + overviewStats.activeStudents) / 
+                  (overview.instructors + overview.students || 1)) * 100)} 
+                variant="primary" 
+              />
+            </div>
+
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-600">Course Completion Rate</span>
+                <span className="font-medium">{stats.completionRate}%</span>
+              </div>
+              <Progress value={stats.completionRate} variant="success" />
+            </div>
+
+            <div>
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-600">Content Published</span>
+                <span className="font-medium">
+                  {courses.length > 0 ? Math.round((overviewStats.publishedCourses / courses.length) * 100) : 0}%
+                </span>
+              </div>
+              <Progress 
+                value={courses.length > 0 ? Math.round((overviewStats.publishedCourses / courses.length) * 100) : 0} 
+                variant="accent" 
+              />
+            </div>
+          </div>
+        </Card.Content>
+      </Card> */}
+
+      {/* Recent Courses */}
+      <Card>
+        <Card.Header>
+          <div className="flex items-center justify-between">
+            <Card.Title>Recent Courses</Card.Title>
+            <Link to="/courses">
+              <Button variant="ghost" size="sm">View All</Button>
+            </Link>
+          </div>
+        </Card.Header>
+        <Card.Content>
+          {courses.length > 0 ? (
+            <div className="space-y-3">
+              {courses.slice(0, 5).map((course) => (
+                <div key={course.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg">
+                  <img 
+                    src={course.thumbnail || FALLBACK_THUMB} 
+                    alt={course.title}
+                    className="w-12 h-12 rounded object-cover"
+                    onError={(e) => (e.currentTarget.src = FALLBACK_THUMB)}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {course.title}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      {course.studentCount} students
+                    </p>
+                  </div>
+                  <Badge 
+                    variant={course.status === 'published' ? 'success' : 'warning'}
+                    size="sm"
+                  >
+                    {course.status}
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <BookOpen size={32} className="mx-auto text-gray-400 mb-2" />
+              <p className="text-sm text-gray-500">No courses available</p>
+            </div>
+          )}
+        </Card.Content>
+      </Card>
+
+      {/* Top Instructors */}
+      <Card>
+        <Card.Header>
+          <Card.Title>Top Instructors</Card.Title>
+        </Card.Header>
+        <Card.Content>
+          {instructors.length > 0 ? (
+            <div className="space-y-3">
+              {instructors
+                .sort((a, b) => {
+                  const countA = instructorCourseIndex[a.id]?.count || 0;
+                  const countB = instructorCourseIndex[b.id]?.count || 0;
+                  return countB - countA;
+                })
+                .slice(0, 5)
+                .map((instructor) => (
+                  <div key={instructor.id} className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <img 
+                        src={instructor.avatar} 
+                        alt={instructor.fullName}
+                        className="w-10 h-10 rounded-full"
+                      />
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {instructor.fullName}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {instructorCourseIndex[instructor.id]?.count || 0} courses
+                        </p>
+                      </div>
+                    </div>
+                    <Badge 
+                      variant={instructor.isActive ? 'success' : 'danger'}
+                      size="sm"
+                    >
+                      {instructor.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                ))}
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Users size={32} className="mx-auto text-gray-400 mb-2" />
+              <p className="text-sm text-gray-500">No instructors yet</p>
+            </div>
+          )}
+        </Card.Content>
+      </Card>
+    </div>
+
+    {/* Action Cards */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* <Link to="/courses/create">
+        <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer border-2 border-blue-100">
+          <div className="text-center">
+            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+              <Plus className="text-blue-600" size={24} />
+            </div>
+            <h4 className="font-semibold text-gray-900 mb-1">Create Course</h4>
+            <p className="text-sm text-gray-600">Add new learning content</p>
+          </div>
+        </Card>
+      </Link> */}
+
+      {/* <Link to="/register" state={{ allowWhenLoggedIn: true }}>
+        <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer border-2 border-green-100">
+          <div className="text-center">
+            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+              <Users className="text-green-600" size={24} />
+            </div>
+            <h4 className="font-semibold text-gray-900 mb-1">Add User</h4>
+            <p className="text-sm text-gray-600">Register new members</p>
+          </div>
+        </Card>
+      </Link> */}
+
+      {/* <Link to="/add_department" state={{ allowWhenLoggedIn: true }}>
+        <Card className="p-6 hover:shadow-lg transition-shadow cursor-pointer border-2 border-purple-100">
+          <div className="text-center">
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
+              <Building2 className="text-purple-600" size={24} />
+            </div>
+            <h4 className="font-semibold text-gray-900 mb-1">Add Department</h4>
+            <p className="text-sm text-gray-600">Organize your institution</p>
+          </div>
+        </Card>
+      </Link> */}
+    </div>
+  </div>
+)}
 
         {/* Instructors */}
         {activeTab === "instructors" && (

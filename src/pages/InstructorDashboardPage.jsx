@@ -9,9 +9,6 @@ import {
   FileText,
   Clock,
   BookMarked,
-  Activity,
-  Plus,
-  Edit,
   Eye,
   Download,
   AlertCircle,
@@ -43,7 +40,7 @@ const InstructorDashboardPage = () => {
   const [myStudents, setMyStudents] = useState([]);
   const [courseModules, setCourseModules] = useState({});
   const [studentProgress, setStudentProgress] = useState({});
-  const [testResults, setTestResults] = useState([]); // no endpoint provided – stays empty for now
+  const [testResults, setTestResults] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [enrollmentRequests, setEnrollmentRequests] = useState([]);
@@ -54,8 +51,13 @@ const InstructorDashboardPage = () => {
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [showStudentModal, setShowStudentModal] = useState(false);
-  const [showCreateCourseModal, setShowCreateCourseModal] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
+
+  // NEW: chapters for selected course
+  const [selectedCourseChapters, setSelectedCourseChapters] = useState([]);
+  const [loadingChapters, setLoadingChapters] = useState(false);
+  const [openChapterId, setOpenChapterId] = useState(null);
+
   const [studentSearchTerm, setStudentSearchTerm] = useState("");
   const [courseFilter, setCourseFilter] = useState("all");
 
@@ -70,9 +72,23 @@ const InstructorDashboardPage = () => {
     averageTestScore: 0,
   });
 
-
-  const pickId = (v) => v?.id ?? v?.userId ?? v?.studentId ?? v;
-  const pickEmail = (v) => v?.email ?? v?.user?.email ?? v?.student?.email ?? "";
+  // -----------------------
+  // Helpers - robust & normalized
+  // -----------------------
+  const pickId = (v) => {
+    if (v == null) return undefined;
+    if (typeof v === "string" || typeof v === "number") return String(v);
+    if (typeof v === "object") {
+      if (v.id != null) return String(v.id);
+      if (v.studentId != null) return String(v.studentId);
+      if (v.userId != null) return String(v.userId);
+      if (v.student && v.student.id != null) return String(v.student.id);
+      if (v.user && v.user.id != null) return String(v.user.id);
+    }
+    return undefined;
+  };
+  const pickEmail = (v) =>
+    v?.email ?? v?.user?.email ?? v?.student?.email ?? "";
   const pickName = (v) =>
     v?.name ??
     v?.fullName ??
@@ -85,11 +101,10 @@ const InstructorDashboardPage = () => {
     v?.photoUrl ??
     v?.user?.avatar ??
     v?.student?.avatar ??
-    "https://api.dicebear.com/7.x/initials/svg?seed=" + encodeURIComponent(pickName(v));
-
+    "https://api.dicebear.com/7.x/initials/svg?seed=" +
+      encodeURIComponent(pickName(v));
 
   const fetchInstructorRequests = async (courses = []) => {
-    // Try instructor-wide endpoint first
     try {
       const arr = await enrollmentsAPI.listInstructorRequests();
       if (Array.isArray(arr) && arr.length > 0) return arr;
@@ -97,7 +112,6 @@ const InstructorDashboardPage = () => {
       // ignore and fall back
     }
 
-    // Fallback: aggregate requests per course and annotate with course title
     const perCourse = await Promise.all(
       (courses || []).map(async (c) => {
         try {
@@ -119,142 +133,8 @@ const InstructorDashboardPage = () => {
   useEffect(() => {
     if (!user?.id) return;
     fetchAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
-
-  // const fetchAll = async () => {
-  //   try {
-  //     setLoading(true);
-  //     const params = { pageSize: 100 };
-  //     if (user.collegeId) {
-  //       params.collegeId = user.collegeId;
-  //     }
-  //     if (user.departmentId) {
-  //       params.departmentId = user.departmentId;
-  //     }
-
-  //     const rawCatalog = await coursesAPI.getCourseCatalog(params).catch(() => []);
-  //     const assigned = Array.isArray(rawCatalog?.items)
-  //       ? rawCatalog.items
-  //       : Array.isArray(rawCatalog)
-  //         ? rawCatalog
-  //         : [];
-
-  //     const normalized = assigned.map((c) => ({
-  //       ...c,
-  //       thumbnail: c.thumbnail || FALLBACK_THUMB,
-  //       status: String(c.status || "draft").toLowerCase(),
-  //     }));
-  //     setAssignedCourses(normalized);
-
-  //     const chapterLists = await Promise.all(
-  //       normalized.map((course) =>
-  //         chaptersAPI.listByCourse(course.id).catch((e) => {
-  //           if (e?.response?.status !== 403) console.warn("chapters error", e);
-  //           return [];
-  //         })
-  //       )
-  //     );
-
-  //     console.log("Fetched Chapter Lists:", chapterLists);
-
-  //     const modulesData = {};
-  //     let totalChapters = 0;
-
-  //     normalized.forEach((course, idx) => {
-
-  //       const chapters = Array.isArray(chapterLists[idx]?.data)
-  //         ? chapterLists[idx].data
-  //         : [];
-
-  //       modulesData[course.id] = chapters.map((ch, i) => ({
-  //         id: ch.id,
-  //         title: ch.title || `Chapter ${i + 1}`,
-  //         totalChapters: 1,
-  //         estimatedDuration: ch.estimatedDuration || "—",
-  //       }));
-  //       totalChapters += chapters.length;
-  //     });
-  //     setCourseModules(modulesData);
-
-
-  //     const instrReqs = await fetchInstructorRequests(normalized);
-  //     setEnrollmentRequests(instrReqs);
-
-
-  //     const enrollmentLists = await Promise.all(
-  //       normalized.map((course) =>
-  //         enrollmentsAPI.list({ courseId: course.id }).catch(() => [])
-  //       )
-  //     );
-
-  //     console.log("Fetched Enrollment Lists:", enrollmentLists);
-
-  //     const studentMap = new Map();
-  //     const progressByStudent = {};
-
-  //     normalized.forEach((course, idx) => {
-  //       const enrollments = enrollmentLists[idx] || [];
-  //       for (const e of enrollments) {
-  //         const sid = e.studentId;
-  //         if (!sid) continue;
-
-  //         const existing = studentMap.get(sid) || {
-  //           id: sid,
-  //           name: e.studentName || "Student",
-  //           email: e.studentEmail || "",
-  //           avatar:
-  //             "https://api.dicebear.com/7.x/initials/svg?seed=" +
-  //             encodeURIComponent(e.studentName || "Student"),
-  //           assignedCourses: [],
-  //           lastLogin: null,
-  //         };
-
-  //         if (!existing.assignedCourses.includes(course.id)) {
-  //           existing.assignedCourses.push(course.id);
-  //         }
-  //         studentMap.set(sid, existing);
-
-  //         if (!progressByStudent[sid]) progressByStudent[sid] = {};
-  //         progressByStudent[sid][course.id] = Number(e.progress || 0);
-  //       }
-  //     });
-
-  //     const students = Array.from(studentMap.values());
-  //     setMyStudents(students);
-  //     setStudentProgress(progressByStudent);
-
-  //     // Stats
-  //     const totalModules = Object.values(modulesData).flat().length;
-  //     const activeStudents = 0; // set from lastLogin if you start tracking it
-  //     const perStudentAvg = students.map((stu) => {
-  //       const ids = stu.assignedCourses || [];
-  //       if (ids.length === 0) return 0;
-  //       const sum = ids.reduce((acc, cid) => acc + (progressByStudent[stu.id]?.[cid] ?? 0), 0);
-  //       return sum / ids.length;
-  //     });
-  //     const avgProgress =
-  //       perStudentAvg.length > 0
-  //         ? perStudentAvg.reduce((a, b) => a + b, 0) / perStudentAvg.length
-  //         : 0;
-
-  //     setStats({
-  //       totalCourses: normalized.length,
-  //       totalStudents: students.length,
-  //       activeStudents,
-  //       averageProgress: Math.round(avgProgress),
-  //       totalModules,
-  //       totalChapters,
-  //       testsGraded: 0,
-  //       averageTestScore: 0,
-  //     });
-  //   } catch (error) {
-  //     console.error("Error loading instructor dashboard:", error);
-  //     toast.error(error?.response?.data?.error || "Failed to load dashboard data");
-  //   } finally {
-  //     setLoading(false);
-  //   }
-  // };
-
 
   const fetchAll = async () => {
     try {
@@ -263,22 +143,22 @@ const InstructorDashboardPage = () => {
       if (user.collegeId) params.collegeId = user.collegeId;
       if (user.departmentId) params.departmentId = user.departmentId;
 
-      // Step 1: Fetch courses
       const rawCatalog = await coursesAPI.getCourseCatalog(params).catch(() => []);
       const assigned = Array.isArray(rawCatalog?.items)
         ? rawCatalog.items
         : Array.isArray(rawCatalog)
-          ? rawCatalog
-          : [];
+        ? rawCatalog
+        : [];
 
+      // Normalize course ids to string — prevents number/string mismatch in includes/find
       const normalized = assigned.map((c) => ({
         ...c,
+        id: pickId(c) ?? String(c.id ?? ""),
         thumbnail: c.thumbnail || FALLBACK_THUMB,
         status: String(c.status || "draft").toLowerCase(),
       }));
       setAssignedCourses(normalized);
 
-      // Step 2: Batch fetch chapters (max 5 concurrent, not all at once)
       const chapterLists = await batchFetchChapters(normalized);
       const modulesData = {};
       let totalChapters = 0;
@@ -286,7 +166,7 @@ const InstructorDashboardPage = () => {
       normalized.forEach((course, idx) => {
         const chapters = chapterLists[idx] || [];
         modulesData[course.id] = chapters.map((ch, i) => ({
-          id: ch.id,
+          id: pickId(ch) ?? String(ch.id ?? `${course.id}-ch-${i}`),
           title: ch.title || `Chapter ${i + 1}`,
           totalChapters: 1,
           estimatedDuration: ch.estimatedDuration || "—",
@@ -295,36 +175,59 @@ const InstructorDashboardPage = () => {
       });
       setCourseModules(modulesData);
 
-      // Step 3: Batch fetch enrollments (max 5 concurrent)
       const enrollmentLists = await batchFetchEnrollments(normalized);
 
       const studentMap = new Map();
       const progressByStudent = {};
 
+      // Process enrollments and normalize student ids & assigned course ids (strings)
       normalized.forEach((course, idx) => {
         const enrollments = enrollmentLists[idx] || [];
+        const courseIdStr = String(course.id);
         for (const e of enrollments) {
-          const sid = e.studentId;
+          // e can be various shapes; try multiple places
+          const sid =
+            pickId(e) ||
+            pickId(e.student) ||
+            pickId(e.user) ||
+            pickId(e.studentId) ||
+            pickId(e.userId);
           if (!sid) continue;
 
-          const existing = studentMap.get(sid) || {
-            id: sid,
-            name: e.studentName || "Student",
-            email: e.studentEmail || "",
-            avatar:
-              "https://api.dicebear.com/7.x/initials/svg?seed=" +
-              encodeURIComponent(e.studentName || "Student"),
-            assignedCourses: [],
-            lastLogin: null,
-          };
+          const studentName =
+            e.studentName ?? e.name ?? e.student?.name ?? e.user?.name ?? "";
+          const studentEmail =
+            e.studentEmail ?? e.email ?? e.student?.email ?? e.user?.email ?? "";
 
-          if (!existing.assignedCourses.includes(course.id)) {
-            existing.assignedCourses.push(course.id);
+          const existing =
+            studentMap.get(sid) ||
+            ({
+              id: sid,
+              name: studentName || "Student",
+              email: studentEmail || "",
+              avatar:
+                "https://api.dicebear.com/7.x/initials/svg?seed=" +
+                encodeURIComponent(studentName || "Student"),
+              assignedCourses: [],
+              lastLogin:
+                e.lastLogin ??
+                e.lastSeen ??
+                (e.student && e.student.lastLogin) ??
+                null,
+            });
+
+          // store course ids as strings to avoid type mismatch
+          if (!existing.assignedCourses.includes(courseIdStr)) {
+            existing.assignedCourses.push(courseIdStr);
           }
           studentMap.set(sid, existing);
 
           if (!progressByStudent[sid]) progressByStudent[sid] = {};
-          progressByStudent[sid][course.id] = Number(e.progress || 0);
+          const rawProg = e.progress ?? e.studentProgress ?? e.progressPercent ?? 0;
+          const prog = Number(rawProg);
+          progressByStudent[sid][courseIdStr] = Number.isFinite(prog)
+            ? Math.max(0, Math.min(100, prog))
+            : 0;
         }
       });
 
@@ -332,11 +235,9 @@ const InstructorDashboardPage = () => {
       setMyStudents(students);
       setStudentProgress(progressByStudent);
 
-      // Step 4: Fetch enrollment requests
       const instrReqs = await fetchInstructorRequests(normalized);
       setEnrollmentRequests(instrReqs);
 
-      // Step 5: Calculate stats
       const totalModules = Object.values(modulesData).flat().length;
       const perStudentAvg = students.map((stu) => {
         const ids = stu.assignedCourses || [];
@@ -356,7 +257,7 @@ const InstructorDashboardPage = () => {
         totalCourses: normalized.length,
         totalStudents: students.length,
         activeStudents: 0,
-        averageProgress: Math.round(avgProgress),
+        averageProgress: Math.round(avgProgress || 0),
         totalModules,
         totalChapters,
         testsGraded: 0,
@@ -370,16 +271,16 @@ const InstructorDashboardPage = () => {
     }
   };
 
-  // Fetch chapters in batches of 5
   const batchFetchChapters = async (courses) => {
     const results = new Array(courses.length);
     for (let i = 0; i < courses.length; i += 5) {
       const batch = courses.slice(i, i + 5);
       const batchPromises = batch.map((course, idx) =>
+        // chaptersAPI likely accepts a string id — using course.id (already string)
         chaptersAPI
           .listByCourse(course.id)
           .then((res) => {
-            const chapters = Array.isArray(res?.data) ? res.data : [];
+            const chapters = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
             results[i + idx] = chapters;
           })
           .catch(() => {
@@ -391,7 +292,6 @@ const InstructorDashboardPage = () => {
     return results;
   };
 
-  // Fetch enrollments in batches of 5
   const batchFetchEnrollments = async (courses) => {
     const results = new Array(courses.length);
     for (let i = 0; i < courses.length; i += 5) {
@@ -400,7 +300,7 @@ const InstructorDashboardPage = () => {
         enrollmentsAPI
           .list({ courseId: course.id })
           .then((res) => {
-            results[i + idx] = res || [];
+            results[i + idx] = Array.isArray(res) ? res : res?.data ?? res ?? [];
           })
           .catch(() => {
             results[i + idx] = [];
@@ -411,22 +311,10 @@ const InstructorDashboardPage = () => {
     return results;
   };
 
-  // const loadEnrollmentRequests = async () => {
-  //   try {
-  //     setLoadingRequests(true);
-  //     const reqs = await fetchInstructorRequests(assignedCourses);
-  //     setEnrollmentRequests(Array.isArray(reqs) ? reqs : []);
-  //   } finally {
-  //     setLoadingRequests(false);
-  //   }
-  // };
-
   const handleRequestAction = async (requestId, action) => {
     try {
       const next =
-        action === "APPROVE" || action === "APPROVED"
-          ? "APPROVED"
-          : "REJECTED";
+        action === "APPROVE" || action === "APPROVED" ? "APPROVED" : "REJECTED";
       await enrollmentsAPI.updateEnrollmentRequestStatus(requestId, next);
       setEnrollmentRequests((prev) => prev.filter((r) => r.id !== requestId));
       toast.success(next === "APPROVED" ? "Enrollment approved" : "Enrollment rejected");
@@ -436,8 +324,29 @@ const InstructorDashboardPage = () => {
     }
   };
 
-  const viewCourseDetails = (course) => {
+  // NEW: fetch full chapters for a course
+  const fetchCourseChapters = async (courseId) => {
+    try {
+      setLoadingChapters(true);
+      setSelectedCourseChapters([]);
+      const res = await chaptersAPI.listByCourse(courseId);
+      const chapters = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [];
+      setSelectedCourseChapters(chapters);
+    } catch (err) {
+      console.error("Failed to load chapters", err);
+      setSelectedCourseChapters([]);
+      toast.error("Failed to load chapters");
+    } finally {
+      setLoadingChapters(false);
+    }
+  };
+
+  const viewCourseDetails = async (course) => {
+    if (!course) return;
     setSelectedCourse(course);
+    // fetch full chapters (content) BEFORE opening modal
+    await fetchCourseChapters(course.id);
+    setOpenChapterId(null);
     setShowCourseModal(true);
   };
 
@@ -446,26 +355,20 @@ const InstructorDashboardPage = () => {
     setShowStudentModal(true);
   };
 
-  const createNewCourse = () => {
-    navigate("/courses/create");
-  };
-
   const handleCourseAction = async (courseId, action) => {
     try {
       switch (action) {
-        case "edit":
-          navigate(`/courses/${courseId}/edit`);
-          break;
         case "view": {
-          const course = assignedCourses.find((c) => c.id === courseId);
-          viewCourseDetails(course);
+          const course = assignedCourses.find((c) => String(c.id) === String(courseId));
+          await viewCourseDetails(course);
           break;
         }
         case "analytics":
-          setSelectedCourse(assignedCourses.find((c) => c.id === courseId));
+          setSelectedCourse(assignedCourses.find((c) => String(c.id) === String(courseId)));
           setShowAnalyticsModal(true);
           break;
         case "students":
+          setSelectedCourse(assignedCourses.find((c) => String(c.id) === String(courseId)));
           setShowStudentModal(true);
           break;
         default:
@@ -476,23 +379,29 @@ const InstructorDashboardPage = () => {
     }
   };
 
-  // fallbacks when per-student progress is missing
   const getStudentCourseProgress = (studentId, courseId) => {
-    const v = studentProgress?.[studentId]?.[courseId];
-    return typeof v === "number" ? v : 0;
+    const s = String(studentId);
+    const c = String(courseId);
+    const v = studentProgress?.[s]?.[c];
+    const n = typeof v === "number" && Number.isFinite(v) ? v : 0;
+    return Math.max(0, Math.min(100, n));
   };
 
   const getStudentStatus = (student) => {
-    const recentActivity = student?.lastLogin ? new Date(student.lastLogin) : null;
+    const lastLoginRaw = student?.lastLogin;
+    let recentActivity = null;
+    if (lastLoginRaw) {
+      const d = new Date(lastLoginRaw);
+      if (!Number.isNaN(d.getTime())) recentActivity = d;
+    }
     if (!recentActivity) return { status: "inactive", color: "danger" };
-    const daysSinceActivity = Math.floor(
-      (Date.now() - recentActivity.getTime()) / 86400000
-    );
+    const daysSinceActivity = Math.floor((Date.now() - recentActivity.getTime()) / 86400000);
     if (daysSinceActivity === 0) return { status: "online", color: "success" };
     if (daysSinceActivity <= 3) return { status: "recent", color: "warning" };
     return { status: "inactive", color: "danger" };
   };
 
+  // Filtered students (used by export and UI)
   const filteredStudents = myStudents.filter((student) => {
     const name = (student.name || "").toLowerCase();
     const email = (student.email || "").toLowerCase();
@@ -501,9 +410,86 @@ const InstructorDashboardPage = () => {
       email.includes(studentSearchTerm.toLowerCase());
     const matchesCourse =
       courseFilter === "all" ||
-      (student.assignedCourses || []).includes(courseFilter);
+      (student.assignedCourses || []).includes(String(courseFilter));
     return matchesSearch && matchesCourse;
   });
+
+  const handleExportStudents = () => {
+    try {
+      // Prepare CSV data
+      const csvData = [];
+
+      // Add headers
+      csvData.push([
+        "Student Name",
+        "Email",
+        "Status",
+        "Courses Enrolled",
+        "Average Progress (%)",
+        "Last Login",
+      ]);
+
+      // Add student data
+      filteredStudents.forEach((student) => {
+        const studentStatus = getStudentStatus(student);
+        const assigned = student.assignedCourses || [];
+        const avgProgress =
+          Math.round(
+            (assigned.reduce(
+              (sum, courseId) => sum + getStudentCourseProgress(student.id, courseId),
+              0
+            ) /
+              Math.max(1, assigned.length)) || 0
+          ) || 0;
+
+        // Get course names for this student
+        const courseNames = assigned
+          .map((courseId) => {
+            const course = assignedCourses.find((c) => String(c.id) === String(courseId));
+            return course ? course.title : "Unknown";
+          })
+          .join("; ");
+
+        csvData.push([
+          student.name || "N/A",
+          student.email || "N/A",
+          studentStatus.status || "inactive",
+          courseNames || "None",
+          avgProgress,
+          student.lastLogin ? new Date(student.lastLogin).toLocaleDateString() : "Never",
+        ]);
+      });
+
+      // Convert to CSV string
+      const csvContent = csvData
+        .map((row) =>
+          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
+        )
+        .join("\n");
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      const url = URL.createObjectURL(blob);
+
+      link.setAttribute("href", url);
+      link.setAttribute(
+        "download",
+        `students_export_${new Date().toISOString().split("T")[0]}.csv`
+      );
+      link.style.visibility = "hidden";
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success(`Exported ${filteredStudents.length} students to CSV`);
+    } catch (error) {
+      console.error("Export failed:", error);
+      toast.error("Failed to export students. Please try again.");
+    }
+  };
 
   if (loading) {
     return (
@@ -546,11 +532,9 @@ const InstructorDashboardPage = () => {
               </div>
               <div className="ml-2 sm:ml-4">
                 <p className="text-xs sm:text-sm font-medium text-gray-600">My Courses</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">
-                  {stats.totalCourses}
-                </p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.totalCourses}</p>
                 <p className="text-xs text-gray-500 hidden sm:block">
-                  {stats.totalModules} modules, {stats.totalChapters} chapters
+                   {stats.totalChapters} chapters
                 </p>
               </div>
             </div>
@@ -563,9 +547,7 @@ const InstructorDashboardPage = () => {
               </div>
               <div className="ml-2 sm:ml-4">
                 <p className="text-xs sm:text-sm font-medium text-gray-600">My Students</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">
-                  {stats.totalStudents}
-                </p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.totalStudents}</p>
                 <p className="text-xs text-gray-500">{stats.activeStudents} active</p>
               </div>
             </div>
@@ -578,9 +560,7 @@ const InstructorDashboardPage = () => {
               </div>
               <div className="ml-2 sm:ml-4">
                 <p className="text-xs sm:text-sm font-medium text-gray-600">Avg Progress</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">
-                  {stats.averageProgress}%
-                </p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.averageProgress}%</p>
                 <p className="text-xs text-gray-500 hidden sm:block">Across all students</p>
               </div>
             </div>
@@ -593,9 +573,7 @@ const InstructorDashboardPage = () => {
               </div>
               <div className="ml-2 sm:ml-4">
                 <p className="text-xs sm:text-sm font-medium text-gray-600">Test Average</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">
-                  {stats.averageTestScore}%
-                </p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.averageTestScore}%</p>
                 <p className="text-xs text-gray-500">{stats.testsGraded} graded</p>
               </div>
             </div>
@@ -613,33 +591,30 @@ const InstructorDashboardPage = () => {
                 {assignedCourses.length === 0 ? (
                   <div className="text-center py-8">
                     <BookOpen size={48} className="mx-auto text-gray-400 mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      No courses assigned yet
-                    </h3>
-                    <p className="text-gray-600 mb-4">
-                      Contact admin to get courses assigned or create your own.
-                    </p>
-                    <Link to="/courses/create">
-                      <Button onClick={createNewCourse} className="w-full sm:w-auto">
-                        Create Your First Course
-                      </Button>
-                    </Link>
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">No courses assigned yet</h3>
+                    <p className="text-gray-600 mb-4">Contact admin to get courses assigned.</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
                     {assignedCourses.map((course) => {
                       const modules = courseModules[course.id] || [];
                       const enrolledStudents = myStudents.filter((student) =>
-                        (student.assignedCourses || []).includes(course.id)
+                        (student.assignedCourses || []).includes(String(course.id))
                       );
                       const avgProgress =
                         enrolledStudents.length > 0
                           ? enrolledStudents.reduce(
-                            (sum, student) =>
-                              sum + getStudentCourseProgress(student.id, course.id),
-                            0
-                          ) / enrolledStudents.length
+                              (sum, student) => sum + getStudentCourseProgress(student.id, course.id),
+                              0
+                            ) / enrolledStudents.length
                           : 0;
+
+                      const completedStudentsCount = enrolledStudents.filter(
+                        (student) => getStudentCourseProgress(student.id, course.id) >= 100
+                      ).length;
+                      const totalStudentsCount = enrolledStudents.length;
+                      const completionPercent =
+                        totalStudentsCount === 0 ? 0 : (completedStudentsCount / totalStudentsCount) * 100;
 
                       return (
                         <div
@@ -650,23 +625,13 @@ const InstructorDashboardPage = () => {
                             <div className="flex-1">
                               <div className="flex items-center space-x-3 mb-4">
                                 <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                                  <img
-                                    src={course.thumbnail || FALLBACK_THUMB}
-                                    alt={course.title}
-                                    className="w-full h-full object-cover"
-                                  />
+                                  <img src={course.thumbnail || FALLBACK_THUMB} alt={course.title} className="w-full h-full object-cover" />
                                 </div>
                                 <div className="flex-1">
                                   <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-2 mb-1">
-                                    <h3 className="text-base sm:text-lg font-medium text-gray-900">
-                                      {course.title}
-                                    </h3>
+                                    <h3 className="text-base sm:text-lg font-medium text-gray-900">{course.title}</h3>
                                     <Badge
-                                      variant={
-                                        (course.status || "draft") === "published"
-                                          ? "success"
-                                          : "warning"
-                                      }
+                                      variant={(course.status || "draft") === "published" ? "success" : "warning"}
                                       size="sm"
                                     >
                                       {course.status || "draft"}
@@ -691,45 +656,17 @@ const InstructorDashboardPage = () => {
 
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between text-xs sm:text-sm">
-                                  <span className="text-gray-600">Average Student Progress</span>
+                                  <span className="text-gray-600">Course Completion</span>
                                   <span className="font-medium text-gray-900">
-                                    {Math.round(avgProgress)}%
+                                    {completedStudentsCount} of {totalStudentsCount} students
                                   </span>
                                 </div>
-                                <Progress value={avgProgress} size="sm" />
-
-                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-gray-500">
-                                  <div className="flex items-center space-x-1">
-                                    <Activity size={14} />
-                                    <span className="hidden sm:inline">
-                                      Updated{" "}
-                                      {course.updatedAt
-                                        ? new Date(course.updatedAt).toLocaleDateString()
-                                        : "—"}
-                                    </span>
-                                    <span className="sm:hidden">Updated</span>
-                                  </div>
-                                  <div className="flex items-center space-x-1">
-                                    <FileText size={14} />
-                                    <span>
-                                      {course.totalChapters ??
-                                        (courseModules[course.id]?.length || 0)}{" "}
-                                      chapters
-                                    </span>
-                                  </div>
-                                </div>
+                                <Progress value={Math.round(completionPercent)} size="sm" />
                               </div>
                             </div>
 
+                            {/* Action buttons */}
                             <div className="flex flex-wrap gap-2 lg:flex-col lg:space-y-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 lg:flex-none"
-                                onClick={() => handleCourseAction(course.id, "edit")}
-                              >
-                                <Edit size={16} />
-                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -745,14 +682,6 @@ const InstructorDashboardPage = () => {
                                 onClick={() => handleCourseAction(course.id, "students")}
                               >
                                 <Users size={16} />
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="flex-1 lg:flex-none"
-                                onClick={() => handleCourseAction(course.id, "analytics")}
-                              >
-                                <BarChart3 size={16} />
                               </Button>
                             </div>
                           </div>
@@ -774,14 +703,7 @@ const InstructorDashboardPage = () => {
                   <BookMarked size={20} className="mr-2 text-primary-600" />
                   Enrollment Requests
                 </Card.Title>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setShowRequestsModal(true);
-                    loadEnrollmentRequests();
-                  }}
-                >
+                <Button size="sm" variant="outline" onClick={() => setShowRequestsModal(true)}>
                   View All
                 </Button>
               </Card.Header>
@@ -796,26 +718,15 @@ const InstructorDashboardPage = () => {
                       <div key={req.id} className="p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center justify-between">
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {req.studentName || "Student"}
-                            </p>
-                            <p className="text-xs text-gray-600 truncate">
-                              {req.courseTitle || "Course"}
-                            </p>
+                            <p className="text-sm font-medium text-gray-900 truncate">{req.studentName || "Student"}</p>
+                            <p className="text-xs text-gray-600 truncate">{req.courseTitle || "Course"}</p>
                           </div>
                           <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleRequestAction(req.id, "REJECT")}
-                            >
+                            <Button size="sm" variant="outline" onClick={() => handleRequestAction(req.id, "REJECT")}>
                               <AlertCircle size={14} className="mr-1" />
                               Reject
                             </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleRequestAction(req.id, "APPROVE")}
-                            >
+                            <Button size="sm" onClick={() => handleRequestAction(req.id, "APPROVE")}>
                               <UserCheck size={14} className="mr-1" />
                               Approve
                             </Button>
@@ -835,14 +746,15 @@ const InstructorDashboardPage = () => {
                   <Users size={20} className="mr-2 text-green-500" />
                   Student Progress
                 </Card.Title>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="w-full sm:w-auto"
-                  onClick={() => setShowStudentModal(true)}
-                >
-                  View All
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="outline" onClick={() => setShowStudentModal(true)}>
+                    View All
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={handleExportStudents}>
+                    <Download size={16} className="mr-1" />
+                    Export
+                  </Button>
+                </div>
               </Card.Header>
               <Card.Content>
                 {myStudents.length === 0 ? (
@@ -851,13 +763,10 @@ const InstructorDashboardPage = () => {
                   <div className="space-y-3">
                     {myStudents.slice(0, 5).map((student) => {
                       const studentStatus = getStudentStatus(student);
+                      const assigned = student.assignedCourses || [];
                       const avgProgress =
-                        (student.assignedCourses || []).reduce(
-                          (sum, courseId) =>
-                            sum + getStudentCourseProgress(student.id, courseId),
-                          0
-                        ) / Math.max(1, (student.assignedCourses || []).length);
-
+                        (assigned.reduce((sum, courseId) => sum + getStudentCourseProgress(student.id, courseId), 0) /
+                          Math.max(1, assigned.length)) || 0;
                       return (
                         <div
                           key={student.id}
@@ -865,37 +774,25 @@ const InstructorDashboardPage = () => {
                           onClick={() => viewStudentDetails(student)}
                         >
                           <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full overflow-hidden bg-gray-100 relative flex-shrink-0">
-                            <img
-                              src={student.avatar}
-                              alt={student.name}
-                              className="w-full h-full object-cover"
-                            />
+                            <img src={student.avatar} alt={student.name} className="w-full h-full object-cover" />
                             <div
-                              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${studentStatus.color === "success"
-                                ? "bg-green-500"
-                                : studentStatus.color === "warning"
+                              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                                studentStatus.color === "success"
+                                  ? "bg-green-500"
+                                  : studentStatus.color === "warning"
                                   ? "bg-yellow-500"
                                   : "bg-gray-400"
-                                }`}
+                              }`}
                             ></div>
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
-                              {student.name}
-                            </p>
-                            <p className="text-xs text-gray-500 truncate">
-                              {(student.assignedCourses || []).length} courses assigned
-                            </p>
+                            <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{student.name}</p>
+                            <p className="text-xs text-gray-500 truncate">{(student.assignedCourses || []).length} courses assigned</p>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <div className="text-xs sm:text-sm font-medium text-gray-900">
-                              {Math.round(avgProgress)}%
-                            </div>
+                            <div className="text-xs sm:text-sm font-medium text-gray-900">{Math.round(avgProgress)}%</div>
                             <div className="w-12 sm:w-16 bg-gray-200 rounded-full h-1.5 mt-1">
-                              <div
-                                className="bg-primary-600 h-1.5 rounded-full"
-                                style={{ width: `${avgProgress}%` }}
-                              ></div>
+                              <div className="bg-primary-600 h-1.5 rounded-full" style={{ width: `${avgProgress}%` }}></div>
                             </div>
                           </div>
                         </div>
@@ -920,14 +817,12 @@ const InstructorDashboardPage = () => {
                 ) : (
                   <div className="space-y-3">
                     {testResults.slice(0, 5).map((result) => {
-                      const student = myStudents.find((s) => s.id === result.studentId);
-                      const course = assignedCourses.find((c) => c.id === result.courseId);
+                      const student = myStudents.find((s) => String(s.id) === String(result.studentId));
+                      const course = assignedCourses.find((c) => String(c.id) === String(result.courseId));
                       return (
                         <div key={result.id} className="p-3 bg-gray-50 rounded-lg">
                           <div className="flex items-center justify-between mb-1">
-                            <h4 className="text-sm font-medium text-gray-900">
-                              {student?.name}
-                            </h4>
+                            <h4 className="text-sm font-medium text-gray-900">{student?.name}</h4>
                             <Badge variant={result.passed ? "success" : "danger"} size="sm">
                               {result.score}%
                             </Badge>
@@ -948,176 +843,152 @@ const InstructorDashboardPage = () => {
         </div>
       </div>
 
-
       {/* Course Details Modal */}
-      <Modal
-        isOpen={showCourseModal}
-        onClose={() => setShowCourseModal(false)}
-        title={selectedCourse?.title}
-        size="lg"
-      >
-        {selectedCourse && (() => {
-          // ✨ NEW: Calculate progress for the selected course
-          const enrolledStudentsInCourse = myStudents.filter((s) =>
-            (s.assignedCourses || []).includes(selectedCourse.id)
-          );
-          const courseAvgProgress =
-            enrolledStudentsInCourse.length > 0
-              ? enrolledStudentsInCourse.reduce(
-                (sum, student) =>
-                  sum + getStudentCourseProgress(student.id, selectedCourse.id),
-                0
-              ) / enrolledStudentsInCourse.length
-              : 0;
-
-          return (
-            <div className="space-y-6">
-              <div className="flex items-center space-x-4">
-                <img
-                  src={selectedCourse.thumbnail || FALLBACK_THUMB}
-                  alt={selectedCourse.title}
-                  className="w-20 h-20 rounded-lg object-cover"
-                />
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {selectedCourse.title}
-                  </h3>
-                  <p className="text-gray-600">{selectedCourse.description}</p>
-                  <div className="flex items-center space-x-2 mt-2">
-                    <Badge variant="info">{selectedCourse.level || "—"}</Badge>
-                    <Badge variant="default">{selectedCourse.category || "—"}</Badge>
-                    <Badge
-                      variant={
-                        (selectedCourse.status || "draft") === "published"
-                          ? "success"
-                          : "warning"
-                      }
-                    >
-                      {selectedCourse.status || "draft"}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-
-              {/* 🔄 MODIFIED: Changed grid to 4 columns to fit the new stat */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-                <div className="p-3 bg-blue-50 rounded-lg">
-                  <div className="text-xl font-bold text-blue-600">
-                    {(courseModules[selectedCourse.id] || []).length}
-                  </div>
-                  <div className="text-sm text-blue-800">Modules</div>
-                </div>
-                <div className="p-3 bg-green-50 rounded-lg">
-                  <div className="text-xl font-bold text-green-600">
-                    {selectedCourse.totalChapters ??
-                      (courseModules[selectedCourse.id] || []).length}
-                  </div>
-                  <div className="text-sm text-green-800">Chapters</div>
-                </div>
-                <div className="p-3 bg-purple-50 rounded-lg">
-                  <div className="text-xl font-bold text-purple-600">
-                    {enrolledStudentsInCourse.length}
-                  </div>
-                  <div className="text-sm text-purple-800">Students</div>
-                </div>
-                {/* ✨ NEW: Added average progress stat card */}
-                <div className="p-3 bg-yellow-50 rounded-lg">
-                  <div className="text-xl font-bold text-yellow-600">
-                    {Math.round(courseAvgProgress)}%
-                  </div>
-                  <div className="text-sm text-yellow-800">Avg. Progress</div>
-                </div>
-              </div>
-
-              {/* ✨ NEW: Added a visual progress bar */}
+      <Modal isOpen={showCourseModal} onClose={() => setShowCourseModal(false)} title={selectedCourse?.title} size="lg">
+        {selectedCourse && (
+          <div className="space-y-6">
+            <div className="flex items-center space-x-4">
+              <img src={selectedCourse.thumbnail || FALLBACK_THUMB} alt={selectedCourse.title} className="w-20 h-20 rounded-lg object-cover" />
               <div>
-                <div className="flex items-center justify-between text-sm mb-1">
-                  <span className="text-gray-600">Average Student Progress</span>
-                  <span className="font-medium text-gray-900">
-                    {Math.round(courseAvgProgress)}%
-                  </span>
+                <h3 className="text-lg font-semibold text-gray-900">{selectedCourse.title}</h3>
+                <p className="text-gray-600">{selectedCourse.description}</p>
+                <div className="flex items-center space-x-2 mt-2">
+                  <Badge variant="info">{selectedCourse.level || "—"}</Badge>
+                  <Badge variant="default">{selectedCourse.category || "—"}</Badge>
+                  <Badge variant={(selectedCourse.status || "draft") === "published" ? "success" : "warning"}>
+                    {selectedCourse.status || "draft"}
+                  </Badge>
                 </div>
-                <Progress value={courseAvgProgress} />
-              </div>
-
-              <div>
-                <h4 className="font-medium text-gray-900 mb-3">Course Modules</h4>
-                <div className="space-y-2">
-                  {(courseModules[selectedCourse.id] || []).map((module, index) => (
-                    <div
-                      key={module.id}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-primary-600">
-                            {index + 1}
-                          </span>
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-medium text-gray-900">
-                            {module.title}
-                          </h4>
-                          <p className="text-xs text-gray-500">
-                            {module.totalChapters} chapters • {module.estimatedDuration}
-                          </p>
-                        </div>
-                      </div>
-                      <Button variant="outline" size="sm">
-                        <Edit size={14} />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="flex space-x-3">
-                <Button
-                  className="flex-1"
-                  onClick={() => {
-                    setShowCourseModal(false);
-                    navigate(`/courses/${selectedCourse.id}/edit`);
-                  }}
-                >
-                  <Edit size={16} className="mr-2" />
-                  Edit Course
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setShowCourseModal(false);
-                    setSelectedCourse(
-                      assignedCourses.find((c) => c.id === selectedCourse.id)
-                    );
-                    setShowAnalyticsModal(true);
-                  }}
-                >
-                  <BarChart3 size={16} className="mr-2" />
-                  Analytics
-                </Button>
               </div>
             </div>
-          );
-        })()}
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <div className="text-xl font-bold text-blue-600">{(courseModules[selectedCourse.id] || []).length}</div>
+                <div className="text-sm text-blue-800">Modules</div>
+              </div>
+              <div className="p-3 bg-green-50 rounded-lg">
+                <div className="text-xl font-bold text-green-600">{selectedCourse.totalChapters ?? (courseModules[selectedCourse.id] || []).length}</div>
+                <div className="text-sm text-green-800">Chapters</div>
+              </div>
+              <div className="p-3 bg-purple-50 rounded-lg">
+                <div className="text-xl font-bold text-purple-600">{myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length}</div>
+                <div className="text-sm text-purple-800">Students</div>
+              </div>
+              <div className="p-3 bg-yellow-50 rounded-lg">
+                <div className="text-xl font-bold text-yellow-600">
+                  {Math.round(
+                    myStudents
+                      .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
+                      .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
+                      Math.max(
+                        1,
+                        myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                      )
+                  )}
+                  %
+                </div>
+                <div className="text-sm text-yellow-800">Avg. Progress</div>
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between text-sm mb-1">
+                <span className="text-gray-600">Average Student Progress</span>
+                <span className="font-medium text-gray-900">
+                  {Math.round(
+                    myStudents
+                      .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
+                      .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
+                      Math.max(
+                        1,
+                        myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                      )
+                  )}
+                  %
+                </span>
+              </div>
+              <Progress
+                value={
+                  myStudents.length === 0
+                    ? 0
+                    : myStudents
+                        .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
+                        .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
+                      Math.max(
+                        1,
+                        myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                      )
+                }
+              />
+            </div>
+
+            <div>
+              <h4 className="font-medium text-gray-900 mb-3">Course Modules & Chapters</h4>
+
+              {/* Chapters list (with content) */}
+              {loadingChapters ? (
+                <div className="text-center py-6 text-gray-600">Loading chapters…</div>
+              ) : selectedCourseChapters.length === 0 ? (
+                <div className="text-sm text-gray-500">No chapters available for this course.</div>
+              ) : (
+                <div className="space-y-3">
+                  {selectedCourseChapters.map((chapter, idx) => {
+                    const isOpen = openChapterId === chapter.id;
+                    // Try to find safe text content fields
+                    const htmlContent = chapter.contentHtml ?? chapter.html ?? chapter.bodyHtml;
+                    const textContent = chapter.content ?? chapter.text ?? chapter.body ?? chapter.description ?? "";
+                    return (
+                      <div key={chapter.id || `${selectedCourse.id}-ch-${idx}`} className="border border-gray-200 rounded-lg overflow-hidden">
+                        <button
+                          type="button"
+                          onClick={() => setOpenChapterId(isOpen ? null : chapter.id)}
+                          className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100"
+                        >
+                          <div className="flex items-center space-x-3">
+                            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                              <span className="text-sm font-medium text-primary-600">{idx + 1}</span>
+                            </div>
+                            <div className="text-left">
+                              <div className="text-sm font-medium text-gray-900">{chapter.title || `Chapter ${idx + 1}`}</div>
+                              <div className="text-xs text-gray-500">{chapter.estimatedDuration || "—"}</div>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-500">{isOpen ? "Hide" : "View"}</div>
+                        </button>
+
+                        {isOpen && (
+                          <div className="p-4 bg-white text-sm text-gray-800">
+                            {htmlContent ? (
+                              // We render HTML if present. Ensure your backend provides only safe HTML.
+                              <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+                            ) : textContent ? (
+                              <pre className="whitespace-pre-wrap break-words">{textContent}</pre>
+                            ) : (
+                              <div className="text-xs text-gray-500">No content for this chapter.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex space-x-3">
+              {/* analytics button could live here */}
+            </div>
+          </div>
+        )}
       </Modal>
 
       {/* Student Management Modal */}
-      <Modal
-        isOpen={showStudentModal}
-        onClose={() => setShowStudentModal(false)}
-        title="Student Management"
-        size="xl"
-      >
+      <Modal isOpen={showStudentModal} onClose={() => setShowStudentModal(false)} title="Student Management" size="xl">
         <div className="space-y-4">
-          {/* Search and Filters */}
           <div className="flex items-center space-x-4">
             <div className="flex-1">
-              <Input
-                placeholder="Search students..."
-                value={studentSearchTerm}
-                onChange={(e) => setStudentSearchTerm(e.target.value)}
-                className="w-full"
-              />
+              <Input placeholder="Search students..." value={studentSearchTerm} onChange={(e) => setStudentSearchTerm(e.target.value)} className="w-full" />
             </div>
             <select
               value={courseFilter}
@@ -1126,50 +997,32 @@ const InstructorDashboardPage = () => {
             >
               <option value="all">All Courses</option>
               {assignedCourses.map((course) => (
-                <option key={course.id} value={course.id}>
+                <option key={course.id} value={String(course.id)}>
                   {course.title}
                 </option>
               ))}
             </select>
-            <Button
-              variant="outline"
-              onClick={() => toast("Export functionality coming soon!")}
-            >
+            <Button variant="outline" onClick={handleExportStudents}>
               <Download size={16} className="mr-1" />
               Export
             </Button>
           </div>
 
-          {/* Students List */}
           <div className="space-y-3 max-h-96 overflow-y-auto">
             {filteredStudents.map((student) => {
               const studentStatus = getStudentStatus(student);
-              const avgProgress =
-                (student.assignedCourses || []).reduce(
-                  (sum, courseId) =>
-                    sum + getStudentCourseProgress(student.id, courseId),
-                  0
-                ) / Math.max(1, (student.assignedCourses || []).length);
+              const assigned = student.assignedCourses || [];
+              const avgProgress = (assigned.reduce((sum, courseId) => sum + getStudentCourseProgress(student.id, courseId), 0) / Math.max(1, assigned.length)) || 0;
 
               return (
-                <div
-                  key={student.id}
-                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow"
-                >
+                <div key={student.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 relative">
-                      <img
-                        src={student.avatar}
-                        alt={student.name}
-                        className="w-full h-full object-cover"
-                      />
+                      <img src={student.avatar} alt={student.name} className="w-full h-full object-cover" />
                       <div
-                        className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${studentStatus.color === "success"
-                          ? "bg-green-500"
-                          : studentStatus.color === "warning"
-                            ? "bg-yellow-500"
-                            : "bg-gray-400"
-                          }`}
+                        className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
+                          studentStatus.color === "success" ? "bg-green-500" : studentStatus.color === "warning" ? "bg-yellow-500" : "bg-gray-400"
+                        }`}
                       ></div>
                     </div>
                     <div>
@@ -1179,22 +1032,15 @@ const InstructorDashboardPage = () => {
                         <Badge variant={studentStatus.color} size="sm">
                           {studentStatus.status}
                         </Badge>
-                        <span className="text-xs text-gray-500">
-                          {(student.assignedCourses || []).length} courses
-                        </span>
+                        <span className="text-xs text-gray-500">{(student.assignedCourses || []).length} courses</span>
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
-                    <div className="text-sm font-medium text-gray-900">
-                      {Math.round(avgProgress)}%
-                    </div>
+                    <div className="text-sm font-medium text-gray-900">{Math.round(avgProgress)}%</div>
                     <div className="text-xs text-gray-500">Average Progress</div>
                     <div className="w-20 bg-gray-200 rounded-full h-1.5 mt-1">
-                      <div
-                        className="bg-primary-600 h-1.5 rounded-full"
-                        style={{ width: `${avgProgress}%` }}
-                      ></div>
+                      <div className="bg-primary-600 h-1.5 rounded-full" style={{ width: `${avgProgress}%` }}></div>
                     </div>
                   </div>
                 </div>
@@ -1205,12 +1051,7 @@ const InstructorDashboardPage = () => {
       </Modal>
 
       {/* Enrollment Requests Modal */}
-      <Modal
-        isOpen={showRequestsModal}
-        onClose={() => setShowRequestsModal(false)}
-        title="Pending Enrollment Requests"
-        size="lg"
-      >
+      <Modal isOpen={showRequestsModal} onClose={() => setShowRequestsModal(false)} title="Pending Enrollment Requests" size="lg">
         <div className="space-y-3 max-h-[28rem] overflow-y-auto">
           {loadingRequests ? (
             <p className="text-gray-500 text-center py-6">Loading…</p>
@@ -1221,27 +1062,18 @@ const InstructorDashboardPage = () => {
               <div key={req.id} className="p-4 border border-gray-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <div className="min-w-0">
-                    <h4 className="font-medium text-gray-900 truncate">
-                      {req.studentName || "Student"}
-                    </h4>
+                    <h4 className="font-medium text-gray-900 truncate">{req.studentName || "Student"}</h4>
                     <p className="text-sm text-gray-600 truncate">{req.studentEmail || ""}</p>
                     <p className="text-xs text-gray-500 truncate mt-1">
                       Course: <span className="font-medium">{req.courseTitle || req.courseId}</span>
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleRequestAction(req.id, "REJECT")}
-                    >
+                    <Button size="sm" variant="outline" onClick={() => handleRequestAction(req.id, "REJECT")}>
                       <AlertCircle size={14} className="mr-1" />
                       Reject
                     </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => handleRequestAction(req.id, "APPROVE")}
-                    >
+                    <Button size="sm" onClick={() => handleRequestAction(req.id, "APPROVE")}>
                       <UserCheck size={14} className="mr-1" />
                       Approve
                     </Button>
@@ -1254,92 +1086,68 @@ const InstructorDashboardPage = () => {
       </Modal>
 
       {/* Analytics Modal */}
-      <Modal
-        isOpen={showAnalyticsModal}
-        onClose={() => setShowAnalyticsModal(false)}
-        title="Instructor Analytics"
-        size="xl"
-      >
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <div className="text-2xl font-bold text-blue-600">{stats.totalCourses}</div>
-              <div className="text-sm text-blue-800">Total Courses</div>
-            </div>
-            <div className="text-center p-4 bg-green-50 rounded-lg">
-              <div className="text-2xl font-bold text-green-600">{stats.totalStudents}</div>
-              <div className="text-sm text-green-800">Total Students</div>
-            </div>
-            <div className="text-center p-4 bg-purple-50 rounded-lg">
-              <div className="text-2xl font-bold text-purple-600">
-                {stats.averageProgress}%
+      <Modal isOpen={showAnalyticsModal} onClose={() => setShowAnalyticsModal(false)} title="Course Analytics" size="xl">
+        {selectedCourse && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="text-center p-4 bg-blue-50 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">{(courseModules[selectedCourse.id] || []).length}</div>
+                <div className="text-sm text-blue-800">Modules</div>
               </div>
-              <div className="text-sm text-purple-800">Avg Progress</div>
-            </div>
-            <div className="text-center p-4 bg-yellow-50 rounded-lg">
-              <div className="text-2xl font-bold text-yellow-600">
-                {stats.averageTestScore}%
+              <div className="text-center p-4 bg-green-50 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length}
+                </div>
+                <div className="text-sm text-green-800">Enrolled Students</div>
               </div>
-              <div className="text-sm text-yellow-800">Test Average</div>
+              <div className="text-center p-4 bg-purple-50 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {Math.round(
+                    myStudents
+                      .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
+                      .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
+                      Math.max(
+                        1,
+                        myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                      )
+                  )}
+                  %
+                </div>
+                <div className="text-sm text-purple-800">Avg Progress</div>
+              </div>
+              <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                <div className="text-2xl font-bold text-yellow-600">{selectedCourse.totalChapters ?? (courseModules[selectedCourse.id] || []).length}</div>
+                <div className="text-sm text-yellow-800">Total Chapters</div>
+              </div>
+            </div>
+
+            <div>
+              <h4 className="font-medium text-gray-900 mb-3">Student Progress Breakdown</h4>
+              <div className="space-y-3">
+                {myStudents
+                  .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
+                  .map((student) => {
+                    const progress = getStudentCourseProgress(student.id, selectedCourse.id);
+                    return (
+                      <div key={student.id} className="p-3 border border-gray-200 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex items-center space-x-3">
+                            <img src={student.avatar} alt={student.name} className="w-8 h-8 rounded-full" />
+                            <div>
+                              <h4 className="font-medium text-gray-900">{student.name}</h4>
+                              <p className="text-xs text-gray-500">{student.email}</p>
+                            </div>
+                          </div>
+                          <span className="text-sm font-medium">{Math.round(progress)}%</span>
+                        </div>
+                        <Progress value={progress} size="sm" />
+                      </div>
+                    );
+                  })}
+              </div>
             </div>
           </div>
-
-          <div>
-            <h4 className="font-medium text-gray-900 mb-3">Course Performance</h4>
-            <div className="space-y-3">
-              {assignedCourses.map((course) => {
-                const enrolledStudents = myStudents.filter((s) =>
-                  (s.assignedCourses || []).includes(course.id)
-                );
-                const avgProgress =
-                  enrolledStudents.length > 0
-                    ? enrolledStudents.reduce(
-                      (sum, student) =>
-                        sum + getStudentCourseProgress(student.id, course.id),
-                      0
-                    ) / enrolledStudents.length
-                    : 0;
-
-                return (
-                  <div key={course.id} className="p-3 border border-gray-200 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <h4 className="font-medium text-gray-900">{course.title}</h4>
-                      <span className="text-sm text-gray-600">
-                        {enrolledStudents.length} students
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-gray-600">Average Progress</span>
-                      <span className="font-medium">{Math.round(avgProgress)}%</span>
-                    </div>
-                    <Progress value={avgProgress} size="sm" />
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </Modal>
-
-      {/* Create Course Modal */}
-      <Modal
-        isOpen={showCreateCourseModal}
-        onClose={() => setShowCreateCourseModal(false)}
-        title="Create New Course"
-        size="lg"
-      >
-        <div className="space-y-4">
-          <p className="text-gray-600">
-            Create a new course with modules and chapters. You can add content after
-            creation.
-          </p>
-          <div className="text-center py-8">
-            <BookOpen size={48} className="mx-auto text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Course Builder</h3>
-            <p className="text-gray-600 mb-4">Full course creation interface coming soon!</p>
-            <Button onClick={() => navigate("/courses/create")}>Go to Course Builder</Button>
-          </div>
-        </div>
+        )}
       </Modal>
     </div>
   );

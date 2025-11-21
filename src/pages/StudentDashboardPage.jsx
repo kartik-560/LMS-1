@@ -320,8 +320,8 @@ const StudentDashboardPage = () => {
           nextAction = { type: "continue", text: "Continue Learning" };
         } else if (!progressData.courseTestResult.passed) {
           nextAction = { type: "course-test", text: "Take Final Test" };
-        } else if (sum.aiInterviewEligible && !progressData.aiInterviewResult.completed) {
-          nextAction = { type: "ai-interview", text: "Take AI Interview" };
+        // } else if (sum.aiInterviewEligible && !progressData.aiInterviewResult.completed) {
+        //   nextAction = { type: "ai-interview", text: "Take AI Interview" };
         } else if (hasCertificate) {
           nextAction = { type: "certificate", text: "View Certificate", icon: Trophy };
         } else {
@@ -1138,7 +1138,7 @@ const StudentDashboardPage = () => {
             </Card>
 
             {/* AI Interview Status */}
-            <Card>
+            {/* <Card>
               <Card.Header>
                 <Card.Title className="flex items-center">
                   <Brain size={20} className="mr-2 text-purple-500" />
@@ -1206,7 +1206,7 @@ const StudentDashboardPage = () => {
                   )}
                 </div>
               </Card.Content>
-            </Card>
+            </Card> */}
 
             {/* Recent Test Results */}
             <Card>
@@ -1266,7 +1266,7 @@ const StudentDashboardPage = () => {
             </Card>
 
             {/* Learning Goals (kept; no module goal) */}
-            <Card>
+            {/* <Card>
               <Card.Header>
                 <Card.Title className="flex items-center">
                   <Target size={20} className="mr-2 text-green-500" />
@@ -1341,7 +1341,7 @@ const StudentDashboardPage = () => {
                   </div>
                 </div>
               </Card.Content>
-            </Card>
+            </Card> */}
           </div>
         </div>
       </div>

@@ -26,6 +26,8 @@ import CertificatePreviewPage from "./pages/CertificatePreviewPage";
 import ViewFinalTest from "./pages/ViewFinalTest";
 import AddDepartments from "./pages/AddDepartments";
 import DepartmentAnalyticsDashboard from "./pages/DepartmentAnalyticsDashboard";
+// import ChapterViewPage from "./pages/ChapterViewPage";
+
 const ROLE = {
   SUPERADMIN: "SUPERADMIN",
   ADMIN: "ADMIN",
@@ -33,11 +35,13 @@ const ROLE = {
   STUDENT: "STUDENT",
 };
 
+
 const normalizeRole = (r) =>
   String(r || "")
     .trim()
     .toUpperCase()
     .replace(/[^A-Z]/g, "_");
+
 
 const roleHome = {
   [ROLE.SUPERADMIN]: "/superadmin",
@@ -46,60 +50,77 @@ const roleHome = {
   [ROLE.STUDENT]: "/dashboard",
 };
 
+
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
   const { isAuthenticated, userRole, hasHydrated } = useAuthStore();
   if (!hasHydrated) return <div />;
 
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+
 
   const role = normalizeRole(userRole);
   const need = allowedRoles.map(normalizeRole);
 
+
   if (role === ROLE.SUPERADMIN) return children;
+
 
   if (!need.length) return children;
 
+
   if (need.includes(role)) return children;
+
 
   return <Navigate to={roleHome[role] || "/"} replace />;
 };
+
 
 // const ProtectedRoute = ({ children, allowedRoles = [] }) => {
 //   const token = useAuthStore((state) => state.token); // ✅ Get ONLY token
 //   const user = useAuthStore((state) => state.user); // ✅ Get ONLY user
 //   const userRole = useAuthStore((state) => state.userRole); // ✅ Get ONLY role
 
+
 //   console.log('[ProtectedRoute] Checking auth:', { token: !!token, user: !!user, userRole });
+
 
 //   // ✅ Simple check: if no token, redirect to login
 //   if (!token) {
 //     return <Navigate to="/login" replace />;
 //   }
 
+
 //   // ✅ If no user, redirect to login
 //   if (!user) {
 //     return <Navigate to="/login" replace />;
 //   }
+
 
 //   // ✅ If no roles required, allow
 //   if (!allowedRoles || allowedRoles.length === 0) {
 //     return children;
 //   }
 
+
 //   // ✅ Check role
 //   const role = normalizeRole(userRole);
 //   const normalizedAllowed = allowedRoles.map(normalizeRole);
+
 
 //   if (role === ROLE.SUPERADMIN) {
 //     return children;
 //   }
 
+
 //   if (normalizedAllowed.includes(role)) {
 //     return children;
 //   }
 
+
 //   return <Navigate to={roleHome[role] || "/"} replace />;
 // };
+
 
 
 const PublicRoute = ({ children }) => {
@@ -108,23 +129,29 @@ const PublicRoute = ({ children }) => {
   const location = useLocation();
   const allowWhenLoggedIn = location.state?.allowWhenLoggedIn === true;
 
+
   if (!isAuthenticated || allowWhenLoggedIn) return children;
+
 
   const role = normalizeRole(userRole);
   return <Navigate to={roleHome[role] || "/dashboard"} replace />;
 };
 
 
+
 const App = () => {
   const { isAuthenticated } = useAuthStore();
+
 
   return (
     <div className="App">
       {isAuthenticated && <Navbar />}
 
+
       <Routes>
         {/* Public */}
         <Route path="/" element={<LandingPage />} />
+
 
         <Route path="/test-certificate" element={<Certificate />} />
         <Route
@@ -154,6 +181,7 @@ const App = () => {
           }
         />
 
+
         <Route
           path="/courses-list"
           element={
@@ -170,8 +198,10 @@ const App = () => {
           }
         />
 
+
         <Route path="/terms" element={<Terms />} />
         <Route path="/privacy" element={<Privacy />} />
+
 
         {/* Auth */}
         <Route
@@ -208,6 +238,7 @@ const App = () => {
           }
         />
 
+
         <Route
           path="/register"
           element={
@@ -216,6 +247,7 @@ const App = () => {
             </ProtectedRoute>
           }
         />
+
 
         <Route
           path="/add_department"
@@ -231,6 +263,7 @@ const App = () => {
           }
         />
 
+
         <Route
           path="/dashboard"
           element={
@@ -240,6 +273,7 @@ const App = () => {
           }
         />
 
+
         <Route
           path="/instructor"
           element={
@@ -248,6 +282,17 @@ const App = () => {
             </ProtectedRoute>
           }
         />
+
+
+        {/* <Route
+          path="/instructor/courses/:courseId/chapters/:chapterId"
+          element={
+            <ProtectedRoute allowedRoles={[ROLE.INSTRUCTOR]}>
+              <ChapterViewPage />
+            </ProtectedRoute>
+          }
+        /> */}
+
 
         <Route
           path="/courses/:courseId"
@@ -265,6 +310,7 @@ const App = () => {
           }
         />
 
+
         <Route
           path="/courses/create"
           element={
@@ -273,6 +319,7 @@ const App = () => {
             </ProtectedRoute>
           }
         />
+
 
         <Route
           path="/courses/:courseId/edit"
@@ -283,6 +330,7 @@ const App = () => {
           }
         />
 
+
         <Route
           path="/superadmin"
           element={
@@ -291,6 +339,7 @@ const App = () => {
             </ProtectedRoute>
           }
         />
+
 
         <Route
           path="/create_finaltest"
@@ -301,6 +350,7 @@ const App = () => {
           }
         />
 
+
         <Route
           path="/view_finaltest"
           element={
@@ -310,6 +360,7 @@ const App = () => {
           }
         />
 
+
         <Route
           path="/add_college"
           element={
@@ -318,6 +369,7 @@ const App = () => {
             </ProtectedRoute>
           }
         />
+
 
         <Route
           path="/admin"
@@ -337,10 +389,12 @@ const App = () => {
         />
 
 
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </div>
   );
 };
+
 
 export default App;

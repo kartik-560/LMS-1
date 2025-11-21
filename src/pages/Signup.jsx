@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "react-hot-toast";
-import { BookOpen, Mail, Shield } from "lucide-react";
+import { BookOpen, Mail, Shield, Loader2, Lock } from "lucide-react";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import { authAPI } from "../services/api";
@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../store/useAuthStore";
 import { GoogleLogin } from "@react-oauth/google";
+
 const SignupPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
@@ -46,7 +47,6 @@ const SignupPage = () => {
         return "STUDENT";
     }
   };
-
 
   const startLockTimer = () => {
     setIsLocked(true);
@@ -88,8 +88,7 @@ const SignupPage = () => {
       await new Promise((resolve) => setTimeout(resolve, 200));
 
       toast.success("Sign up successful!");
-      navigate("/login", { replace: true })
-
+      navigate("/login", { replace: true });
     } catch (e) {
       console.error("Google signup error:", e);
       toast.error(
@@ -99,8 +98,6 @@ const SignupPage = () => {
       setIsLoading(false);
     }
   };
-
-
 
   const handleGoogleSignupError = () => {
     console.error("Google Signup Failed");
@@ -121,7 +118,7 @@ const SignupPage = () => {
   };
 
   const handleVerifyOtp = async ({ email, otp }) => {
-
+    setIsLoading(true);
     try {
       const response = await authAPI.loginOtpVerify(email, otp);
 
@@ -130,219 +127,216 @@ const SignupPage = () => {
       localStorage.setItem("reg_data", JSON.stringify(registration));
       sessionStorage.setItem("reg_data", JSON.stringify(registration));
 
-
       toast.success("OTP verified!");
       navigate("/register-first", { replace: true });
-
     } catch (e) {
       console.error("OTP verification failed:", e);
       toast.error(e?.response?.data?.message || "Invalid OTP");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-return (
-  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-    <div className="w-full max-w-md">
-      {/* Header */}
-      <header className="flex flex-col items-center mb-8">
-        <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-primary-600 to-purple-600 rounded-3xl flex items-center justify-center shadow-lg">
-          <BookOpen size={28} className="text-white" />
-        </div>
-
-        <h1 className="mt-4 text-center text-2xl sm:text-3xl font-extrabold text-gray-900">
-          Welcome to PugArch LMS
-        </h1>
-
-        <p className="mt-2 text-sm sm:text-base text-gray-600 text-center">
-          Sign in or create an account to access your learning dashboard.
-        </p>
-
-        <Link
-          to="/login"
-          className="mt-3 text-sm text-primary-700 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-300 rounded px-2 py-1"
-        >
-          Already have an account? Log in
-        </Link>
-      </header>
-
-      {/* Card */}
-      <main className="bg-white py-8 px-6 sm:px-8 shadow-xl rounded-2xl border border-gray-100">
-        {/* Choice Step */}
-        {step === "choice" && (
-          <div className="space-y-4">
-            {/* Google Login Button */}
-            <div className="w-full [&>div]:w-full [&>div>div]:w-full">
-              <GoogleLogin
-                onSuccess={handleGoogleSignup}
-                onError={handleGoogleSignupError}
-                size="large"
-                text="signup_with"
-                shape="rectangular"
-                width="400"
-              />
-            </div>
-
-            {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-white px-2 text-gray-500">Or</span>
-              </div>
-            </div>
-
-            {/* Email Button */}
-            <Button
-              onClick={() => setStep("email")}
-              variant="outline"
-              className="w-full flex items-center justify-center gap-2"
-              size="lg"
-              aria-label="Sign up with email"
-            >
-              <Mail size={18} className="text-gray-500" />
-              <span>Sign up with email</span>
-            </Button>
-
-            <p className="text-center text-xs text-gray-500 pt-2">
-              By continuing you agree to our{" "}
-              <Link to="/terms" className="text-primary-600 hover:underline">
-                Terms
-              </Link>{" "}
-              and{" "}
-              <Link to="/privacy" className="text-primary-600 hover:underline">
-                Privacy Policy
-              </Link>
-              .
-            </p>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <header className="flex flex-col items-center mb-8">
+          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-primary-600 to-purple-600 rounded-3xl flex items-center justify-center shadow-lg">
+            <BookOpen size={28} className="text-white" />
           </div>
-        )}
 
-        {/* Email + OTP Step */}
-        {step === "email" && (
-          <form
-            className="space-y-5"
-            onSubmit={handleSubmit(otpSent ? handleVerifyOtp : handleSendOtp)}
-            aria-label="Email signup form"
+          <h1 className="mt-4 text-center text-2xl sm:text-3xl font-extrabold text-gray-900">
+            Welcome to PugArch LMS
+          </h1>
+
+          <p className="mt-2 text-sm sm:text-base text-gray-600 text-center">
+            Sign in or create an account to access your learning dashboard.
+          </p>
+
+          <Link
+            to="/login"
+            className="mt-3 text-sm text-primary-700 hover:underline focus:outline-none focus:ring-2 focus:ring-primary-300 rounded px-2 py-1"
           >
-            <div>
-              <Input
-                id="email"
-                label="Email address"
-                type="email"
-                placeholder="name@example.com"
-                error={errors.email?.message}
-                {...register("email", {
-                  required: "Email is required",
-                  pattern: {
-                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                    message: "Please enter a valid email address",
-                  },
-                })}
-                leftElement={
-                  <Mail
-                    size={18}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                  />
-                }
-                className="pl-10"
-                aria-invalid={!!errors.email}
-                required
-              />
-            </div>
+            Already have an account? Log in
+          </Link>
+        </header>
 
-            {otpSent && (
+        {/* Card */}
+        <main className="bg-white py-8 px-6 sm:px-8 shadow-xl rounded-2xl border border-gray-100">
+          {/* Choice Step */}
+          {step === "choice" && (
+            <div className="space-y-4">
+              {/* Google Login Button */}
+              <div className="w-full [&>div]:w-full [&>div>div]:w-full">
+                <GoogleLogin
+                  onSuccess={handleGoogleSignup}
+                  onError={handleGoogleSignupError}
+                  size="large"
+                  text="signup_with"
+                  shape="rectangular"
+                  width="400"
+                />
+              </div>
+
+              {/* Divider */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-white px-2 text-gray-500">Or</span>
+                </div>
+              </div>
+
+              {/* Email Button */}
+              <Button
+                onClick={() => setStep("email")}
+                variant="outline"
+                className="w-full flex items-center justify-center gap-2"
+                size="lg"
+                aria-label="Sign up with email"
+              >
+                <Mail size={18} className="text-gray-500" />
+                <span>Sign up with email</span>
+              </Button>
+
+              <p className="text-center text-xs text-gray-500 pt-2">
+                By continuing you agree to our{" "}
+                <Link to="/terms" className="text-primary-600 hover:underline">
+                  Terms
+                </Link>{" "}
+                and{" "}
+                <Link to="/privacy" className="text-primary-600 hover:underline">
+                  Privacy Policy
+                </Link>
+                .
+              </p>
+            </div>
+          )}
+
+          {/* Email + OTP Step */}
+          {step === "email" && (
+            <form
+              className="space-y-5"
+              onSubmit={handleSubmit(otpSent ? handleVerifyOtp : handleSendOtp)}
+              aria-label="Email signup form"
+            >
               <div>
                 <Input
-                  id="otp"
-                  label="OTP"
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="Enter the 4+ digit code"
-                  error={errors.otp?.message}
-                  {...register("otp", {
-                    required: "OTP is required",
-                    minLength: {
-                      value: 4,
-                      message: "OTP must be at least 4 digits",
+                  id="email"
+                  label="Email address"
+                  type="email"
+                  placeholder="name@example.com"
+                  error={errors.email?.message}
+                  {...register("email", {
+                    required: "Email is required",
+                    pattern: {
+                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                      message: "Please enter a valid email address",
                     },
                   })}
-                  aria-invalid={!!errors.otp}
+                  leftElement={
+                    <Mail
+                      size={18}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                  }
+                  className="pl-10"
+                  aria-invalid={!!errors.email}
+                  required
                 />
-                <p className="mt-2 text-xs text-gray-500">
-                  Didn't receive the code? Check your spam folder or resend after a few seconds.
-                </p>
               </div>
-            )}
 
-            <div className="space-y-3">
-              <Button
-                type="submit"
-                className="w-full flex items-center justify-center gap-2"
-                disabled={isLoading || isLocked}
-                size="lg"
-                aria-busy={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    <span>{otpSent ? "Verifying OTP..." : "Sending OTP..."}</span>
-                  </>
-                ) : isLocked ? (
-                  <>
-                    <Lock size={16} />
-                    <span>Locked ({formatLockTime(lockTimer)})</span>
-                  </>
-                ) : (
-                  <span>{otpSent ? "Verify OTP" : "Send OTP"}</span>
-                )}
-              </Button>
+              {otpSent && (
+                <div>
+                  <Input
+                    id="otp"
+                    label="OTP"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="Enter the 4+ digit code"
+                    error={errors.otp?.message}
+                    {...register("otp", {
+                      required: "OTP is required",
+                      minLength: {
+                        value: 4,
+                        message: "OTP must be at least 4 digits",
+                      },
+                    })}
+                    aria-invalid={!!errors.otp}
+                  />
+                  <p className="mt-2 text-xs text-gray-500">
+                    Didn't receive the code? Check your spam folder or resend after a few seconds.
+                  </p>
+                </div>
+              )}
 
-              <Button
-                type="button"
-                onClick={() => setStep("choice")}
-                variant="ghost"
-                className="w-full"
-                aria-label="Go back to signup choice"
-              >
-                ← Back
-              </Button>
+              <div className="space-y-3">
+                <Button
+                  type="submit"
+                  className="w-full flex items-center justify-center gap-2"
+                  disabled={isLoading || isLocked}
+                  size="lg"
+                  aria-busy={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      <span>{otpSent ? "Verifying OTP..." : "Sending OTP..."}</span>
+                    </>
+                  ) : isLocked ? (
+                    <>
+                      <Lock size={16} />
+                      <span>Locked ({formatLockTime(lockTimer)})</span>
+                    </>
+                  ) : (
+                    <span>{otpSent ? "Verify OTP" : "Send OTP"}</span>
+                  )}
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={() => setStep("choice")}
+                  variant="ghost"
+                  className="w-full"
+                  aria-label="Go back to signup choice"
+                >
+                  ← Back
+                </Button>
+              </div>
+            </form>
+          )}
+
+          {/* Security Note */}
+          <div className="mt-6 p-3 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-center gap-2">
+              <Shield size={14} className="text-gray-500 flex-shrink-0" />
+              <span className="text-xs sm:text-sm text-gray-600">
+                Your data is protected with enterprise-grade security.
+              </span>
             </div>
-          </form>
-        )}
-
-        {/* Security Note */}
-        <div className="mt-6 p-3 bg-gray-50 rounded-lg">
-          <div className="flex items-center justify-center gap-2">
-            <Shield size={14} className="text-gray-500 flex-shrink-0" />
-            <span className="text-xs sm:text-sm text-gray-600">
-              Your data is protected with enterprise-grade security.
-            </span>
           </div>
-        </div>
-      </main>
+        </main>
 
-      {/* Footer */}
-      <footer className="mt-8 text-center">
-        <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500">
-          <Link to="/help" className="hover:text-gray-700 transition-colors">
-            Help Center
-          </Link>
-          <Link to="/privacy" className="hover:text-gray-700 transition-colors">
-            Privacy
-          </Link>
-          <Link to="/terms" className="hover:text-gray-700 transition-colors">
-            Terms
-          </Link>
-        </div>
-        <p className="mt-3 text-xs text-gray-400">© 2025 Pugarch. All rights reserved.</p>
-      </footer>
+        {/* Footer */}
+        <footer className="mt-8 text-center">
+          <div className="flex flex-wrap items-center justify-center gap-4 text-sm text-gray-500">
+            <Link to="/help" className="hover:text-gray-700 transition-colors">
+              Help Center
+            </Link>
+            <Link to="/privacy" className="hover:text-gray-700 transition-colors">
+              Privacy
+            </Link>
+            <Link to="/terms" className="hover:text-gray-700 transition-colors">
+              Terms
+            </Link>
+          </div>
+          <p className="mt-3 text-xs text-gray-400">© 2025 Pugarch. All rights reserved.</p>
+        </footer>
+      </div>
     </div>
-  </div>
-);
-
-
-
+  );
 };
 
 export default SignupPage;

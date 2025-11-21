@@ -152,6 +152,10 @@ export const superAdminAPI = {
     const { data } = await api.delete(`/superadmin/users/${userId}`);
     return data;
   },
+  updateUserStatus: async (userId, data) => {
+    const response = await api.put(`/users/${userId}/status`, data);
+    return response.data;
+  },
 };
 
 export const adminScopedAPI = {
@@ -308,6 +312,10 @@ export const collegesAPI = {
     api.delete(`/colleges/${id}`, { headers: makeHeaders() }),
   getDepartmentsForCollege: (collegeId) =>
     api.get(`/colleges/${collegeId}/departments`),
+  updateCollegeStatus: async (collegeId, data) => {
+    const response = await api.put(`/colleges/${collegeId}/status`, data);
+    return response.data;
+  },
   // 🔽 NEW: permissions
   getPermissions: (collegeId) =>
     api.get(`/colleges/${collegeId}/permissions`, { headers: makeHeaders() }),
@@ -447,4 +455,5 @@ export const departmentAPI = {
   addDepartmentToCatalog: (data) =>
     api.post("/auth/admin/departments-catalog/add", data),
 };
+
 export default api;

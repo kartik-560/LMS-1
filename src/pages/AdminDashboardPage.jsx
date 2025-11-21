@@ -1094,7 +1094,7 @@ const overviewStats = useMemo(() => {
   <div className="space-y-6">
     {/* Quick Stats Grid */}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <Card className="p-6">
+      {/* <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Total Users</p>
@@ -1109,7 +1109,7 @@ const overviewStats = useMemo(() => {
             <Users className="text-blue-600" size={24} />
           </div>
         </div>
-      </Card>
+      </Card> */}
 
       {/* <Card className="p-6">
         <div className="flex items-center justify-between">
@@ -1128,7 +1128,7 @@ const overviewStats = useMemo(() => {
         </div>
       </Card> */}
 
-      <Card className="p-6">
+      {/* <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Total Enrollments</p>
@@ -1143,9 +1143,9 @@ const overviewStats = useMemo(() => {
             <Target className="text-purple-600" size={24} />
           </div>
         </div>
-      </Card>
+      </Card> */}
 
-      <Card className="p-6">
+      {/* <Card className="p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-gray-600">Active This Week</p>
@@ -1160,7 +1160,7 @@ const overviewStats = useMemo(() => {
             <Activity className="text-yellow-600" size={24} />
           </div>
         </div>
-      </Card>
+      </Card> */}
     </div>
 
     {/* Two Column Layout */}

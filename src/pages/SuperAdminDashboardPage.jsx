@@ -2164,75 +2164,7 @@ export default function SuperAdminDashboardPage() {
             )}
           </TabsContent>
 
-          <TabsContent value="assignments">
-            {loadingCourses ? (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-                <p>Loading courses...</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                <Card className="p-5 sm:p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Course-User Assignments
-                  </h3>
-                  <div className="space-y-4">
-                    {allCourses.map((course) => {
-                      // const instructors = getCourseInstructors(course.id);
-                      // const students = getCourseStudents(course.id);
-                      return (
-                        <div
-                          key={course.id}
-                          className="border border-gray-200 rounded-lg p-4"
-                        >
-                          <div className="flex flex-col md:flex-row md:items-start justify-between gap-3 mb-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 flex-none">
-                                <img
-                                  src={course.thumbnail}
-                                  alt={course.title}
-                                  className="w-full h-full object-cover"
-                                />
-                              </div>
-                              <div className="min-w-0">
-                                <h4 className="font-medium text-gray-900 truncate">
-                                  {course.title}
-                                </h4>
-                              </div>
-                            </div>
-
-                            <div className="flex gap-2 flex-wrap items-center">
-                              {canEditCourse(course) && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => goEdit(course.id)}
-                                  className="ml-auto bg-amber-300"
-                                >
-                                  <Pencil size={14} className="mr-1" />
-                                  Edit
-                                </Button>
-                              )}
-
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleOpenAssignModal(course)}
-                                className="ml-auto bg-green-500 text-white hover:bg-green-600"
-                              >
-                                <Pencil size={14} className="mr-1" />
-                                Assign Course
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </Card>
-              </div>
-            )}
-          </TabsContent>
+          \
 
           {courseToAssign && (
             <AssignCourseModal

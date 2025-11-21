@@ -167,6 +167,11 @@ export const adminScopedAPI = {
     api
       .get("/admin/courses", { params: { collegeId, ...params } })
       .then((r) => r.data),
+
+  getDepartmentAnalytics: (departmentId) =>
+    api
+      .get(`/colleges/departments/${departmentId}/analytics`)
+      .then((r) => r.data),
 };
 
 export const coursesAPI = {

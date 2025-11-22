@@ -414,20 +414,6 @@ const CourseViewerPage = () => {
     navigate("/dashboard");
   };
 
-  // UPDATED: Handle chapter click with lock validation
-  const handleChapterClick = (chapter) => {
-    const isLocked = chapter.hasQuiz && !isQuizUnlocked(chapter);
-    
-    if (isLocked) {
-      toast.error("Complete all previous chapters to unlock this quiz!");
-      return;
-    }
-    
-    setCurrentChapter(chapter);
-    setPageIndex(0);
-    if (!chapter.content) hydrateChapter(chapter.id);
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -521,14 +507,13 @@ const CourseViewerPage = () => {
                         return (
                           <button
                             key={chapter.id}
-                            onClick={() => handleChapterClick(chapter)}
-                            disabled={isLocked}
-                            className={`w-full p-3 text-left flex items-start space-x-3 transition-colors ${
+                            onClick={() => {
+                              setCurrentChapter(chapter);
+                              setPageIndex(0);
+                              if (!chapter.content) hydrateChapter(chapter.id);
+                            }}
+                            className={`w-full p-3 text-left flex items-start space-x-3 hover:bg-gray-50 transition-colors ${
                               currentChapter?.id === chapter.id ? 'bg-primary-50 ring-1 ring-primary-200' : ''
-                            } ${
-                              isLocked 
-                                ? 'opacity-50 cursor-not-allowed' 
-                                : 'hover:bg-gray-50 cursor-pointer'
                             }`}
                           >
                             <div className="mt-1 flex-shrink-0">
@@ -732,7 +717,7 @@ function LockedQuizNote() {
       <div className="border rounded-lg p-6 bg-gray-50 text-center">
         <Lock size={28} className="mx-auto mb-3 text-gray-600" />
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Quiz locked</h3>
-        <p className="text-sm text-gray-600">Complete all previous chapters to unlock this quiz.</p>
+        <p className="text-sm text-gray-600">Complete the required previous chapter(s) to unlock this quiz.</p>
       </div>
     </div>
   );

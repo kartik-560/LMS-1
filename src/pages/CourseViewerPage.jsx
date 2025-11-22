@@ -64,9 +64,12 @@ const CourseViewerPage = () => {
     }
   }, [courseId]);
 
+  // QUIZ LOCKING LOGIC: Quiz is unlocked only if ALL prior chapters are completed
   const isQuizUnlocked = (chapter) => {
     if (!chapter?.hasQuiz) return false;
+    // Get all chapters that come before this quiz chapter
     const prior = chapters.filter((c) => (c.order || 0) < (chapter.order || 0));
+    // Check if ALL prior chapters are completed
     return prior.every((c) => completedChapterIds.includes(c.id));
   };
 
@@ -153,6 +156,7 @@ const CourseViewerPage = () => {
     }
   }
 
+  // This effect manages quiz loading and ensures quizzes are only loaded when unlocked
   useEffect(() => {
     const resetQuizState = () => {
       setQuiz(null);
@@ -161,16 +165,19 @@ const CourseViewerPage = () => {
       setQuizScore(null);
     };
 
+    // If current chapter doesn't have a quiz, reset quiz state
     if (!currentChapter?.hasQuiz) {
       resetQuizState();
       return;
     }
 
+    // If quiz is locked (prior chapters not completed), reset quiz state
     if (!isQuizUnlocked(currentChapter)) {
       resetQuizState();
       return;
     }
 
+    // Only load quiz if it's unlocked
     loadQuizForChapter(currentChapter.id);
   }, [
     currentChapter?.id,
@@ -271,6 +278,12 @@ const CourseViewerPage = () => {
   };
 
   const isChapterCompleted = (id) => completedChapterIds.includes(id);
+
+  // Check if user is on the last page
+  const isOnLastPage = () => {
+    if (contentPages.length <= 1) return true;
+    return pageIndex === contentPages.length - 1;
+  };
 
   const goToNextChapter = () => {
     if (!currentChapter) return;
@@ -397,9 +410,22 @@ const CourseViewerPage = () => {
     }
   };
 
-  // UPDATED: Handle back navigation to dashboard
   const handleBackNavigation = () => {
     navigate("/dashboard");
+  };
+
+  // UPDATED: Handle chapter click with lock validation
+  const handleChapterClick = (chapter) => {
+    const isLocked = chapter.hasQuiz && !isQuizUnlocked(chapter);
+    
+    if (isLocked) {
+      toast.error("Complete all previous chapters to unlock this quiz!");
+      return;
+    }
+    
+    setCurrentChapter(chapter);
+    setPageIndex(0);
+    if (!chapter.content) hydrateChapter(chapter.id);
   };
 
   if (loading) {
@@ -488,36 +514,45 @@ const CourseViewerPage = () => {
 
                   {expanded && (
                     <div className="divide-y">
-                      {chapters.map((chapter) => (
-                        <button
-                          key={chapter.id}
-                          onClick={() => {
-                            setCurrentChapter(chapter);
-                            setPageIndex(0);
-                            if (!chapter.content) hydrateChapter(chapter.id);
-                          }}
-                          className={`w-full p-3 text-left flex items-start space-x-3 hover:bg-gray-50 transition-colors ${
-                            currentChapter?.id === chapter.id ? 'bg-primary-50 ring-1 ring-primary-200' : ''
-                          }`}
-                        >
-                          <div className="mt-1 flex-shrink-0">
-                            {isChapterCompleted(chapter.id) ? (
-                              <CheckCircle size={16} className="text-green-500" />
-                            ) : (
-                              <div className="w-3 h-3 border border-gray-300 rounded-full" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{chapter.title}</div>
-                            <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
-                              <Clock size={12} />
-                              <span>{chapter.duration}</span>
-                              <span>•</span>
-                              <span>{chapter.type}</span>
+                      {chapters.map((chapter) => {
+                        // Show lock icon for quiz chapters that are locked
+                        const isLocked = chapter.hasQuiz && !isQuizUnlocked(chapter);
+                        
+                        return (
+                          <button
+                            key={chapter.id}
+                            onClick={() => handleChapterClick(chapter)}
+                            disabled={isLocked}
+                            className={`w-full p-3 text-left flex items-start space-x-3 transition-colors ${
+                              currentChapter?.id === chapter.id ? 'bg-primary-50 ring-1 ring-primary-200' : ''
+                            } ${
+                              isLocked 
+                                ? 'opacity-50 cursor-not-allowed' 
+                                : 'hover:bg-gray-50 cursor-pointer'
+                            }`}
+                          >
+                            <div className="mt-1 flex-shrink-0">
+                              {isChapterCompleted(chapter.id) ? (
+                                <CheckCircle size={16} className="text-green-500" />
+                              ) : isLocked ? (
+                                <Lock size={16} className="text-gray-400" />
+                              ) : (
+                                <div className="w-3 h-3 border border-gray-300 rounded-full" />
+                              )}
                             </div>
-                          </div>
-                        </button>
-                      ))}
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{chapter.title}</div>
+                              <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
+                                <Clock size={12} />
+                                <span>{chapter.duration}</span>
+                                <span>•</span>
+                                <span>{chapter.type}</span>
+                                {isLocked && <span className="text-amber-600">• Locked</span>}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -537,7 +572,6 @@ const CourseViewerPage = () => {
         <div className="sticky top-6 bg-transparent z-10 mb-6">
           <div className="flex items-center justify-between bg-white border rounded-lg p-4 shadow-sm">
             <div className="flex items-center space-x-4 flex-1 min-w-0">
-              {/* Show sidebar button when hidden */}
               {!sidebarOpen && (
                 <button
                   onClick={() => setSidebarOpen(true)}
@@ -549,9 +583,8 @@ const CourseViewerPage = () => {
                 </button>
               )}
 
-              {/* UPDATED: Back button navigates to dashboard */}
               <Button variant="ghost" size="sm" onClick={handleBackNavigation} className="flex-shrink-0">
-                <ArrowLeft size={14} className="mr-2" /> Back to Dashboard
+                <ArrowLeft size={14} className="mr-2" /> 
               </Button>
 
               {currentChapter && (
@@ -564,11 +597,6 @@ const CourseViewerPage = () => {
 
             <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
               <div className="text-sm text-gray-600 hidden sm:block">{getCourseProgress()}% complete</div>
-              {currentChapter && !isChapterCompleted(currentChapter.id) && (
-                <Button onClick={() => markChapterComplete({ advance: false })} variant="outline" size="sm">
-                  Mark Complete
-                </Button>
-              )}
               {currentChapter && isChapterCompleted(currentChapter.id) && (
                 <div className="flex items-center space-x-2 text-green-600 text-sm font-medium">
                   <CheckCircle size={16} />
@@ -585,6 +613,7 @@ const CourseViewerPage = () => {
             {!currentChapter ? (
               <EmptyPrompt />
             ) : currentChapter.hasQuiz ? (
+              // KEY LOGIC: Check if quiz is unlocked before showing it
               isQuizUnlocked(currentChapter) ? (
                 <QuizView
                   quiz={quiz}
@@ -598,6 +627,7 @@ const CourseViewerPage = () => {
                   onMarkComplete={() => markChapterComplete({ advance: false })}
                 />
               ) : (
+                // Show locked message if quiz requirements not met
                 <LockedQuizNote />
               )
             ) : (
@@ -631,8 +661,8 @@ const CourseViewerPage = () => {
                   </div>
                 </div>
 
-                {contentPages.length > 1 && (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-6">
+                  {contentPages.length > 1 && (
                     <div className="flex items-center space-x-2">
                       <Button 
                         onClick={() => setPageIndex(i => Math.max(0, i-1))} 
@@ -651,51 +681,30 @@ const CourseViewerPage = () => {
                       </Button>
                       <div className="text-sm text-gray-500">Page {pageIndex+1} of {contentPages.length}</div>
                     </div>
+                  )}
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      {!isChapterCompleted(currentChapter.id) && (
-                        <Button onClick={() => markChapterComplete({ advance: true })} size="sm">
-                          <CheckCircle size={16} className="mr-2" />
-                          Complete & Continue
-                        </Button>
-                      )}
+                  {contentPages.length <= 1 && <div />}
 
-                      {currentChapter.attachments && currentChapter.attachments.length > 0 && (
-                        <a 
-                          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50" 
-                          href={currentChapter.attachments[0]} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                        >
-                          <FileText size={16} className="mr-2" /> Download
-                        </a>
-                      )}
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {!isChapterCompleted(currentChapter.id) && isOnLastPage() && (
+                      <Button onClick={() => markChapterComplete({ advance: true })} size="sm">
+                        <CheckCircle size={16} className="mr-2" />
+                        Complete & Continue
+                      </Button>
+                    )}
+
+                    {currentChapter.attachments && currentChapter.attachments.length > 0 && (
+                      <a 
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50" 
+                        href={currentChapter.attachments[0]} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                      >
+                        <FileText size={16} className="mr-2" /> Download
+                      </a>
+                    )}
                   </div>
-                )}
-
-                {contentPages.length <= 1 && (
-                  <div className="mt-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                    <div />
-                    <div className="flex flex-wrap items-center gap-2">
-                      {!isChapterCompleted(currentChapter.id) && (
-                        <Button onClick={() => markChapterComplete({ advance: true })} size="sm">
-                          <CheckCircle size={16} className="mr-2" /> Mark as Complete
-                        </Button>
-                      )}
-                      {currentChapter.attachments && currentChapter.attachments.length > 0 && (
-                        <a 
-                          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50" 
-                          href={currentChapter.attachments[0]} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                        >
-                          <FileText size={16} className="mr-2" /> Download
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             )}
           </div>
@@ -723,7 +732,7 @@ function LockedQuizNote() {
       <div className="border rounded-lg p-6 bg-gray-50 text-center">
         <Lock size={28} className="mx-auto mb-3 text-gray-600" />
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Quiz locked</h3>
-        <p className="text-sm text-gray-600">Complete the required previous chapter(s) to unlock this quiz.</p>
+        <p className="text-sm text-gray-600">Complete all previous chapters to unlock this quiz.</p>
       </div>
     </div>
   );

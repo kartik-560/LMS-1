@@ -49,6 +49,9 @@ const CourseCatalogPage = () => {
 
   const isInstructor = roleLower === "instructor";
   const isAdmin = roleLower === "admin";
+  const isInstructor = roleLower === "instructor";
+  const isAdmin = roleLower === "admin";
+
 
   const roleStr = useMemo(
     () => String(user?.role || user?.userRole || "").toLowerCase(),
@@ -62,6 +65,7 @@ const CourseCatalogPage = () => {
     [user]
   );
 
+
   const effectiveCollegeId = useMemo(
     () =>
       isSuperAdmin
@@ -70,12 +74,20 @@ const CourseCatalogPage = () => {
     [isSuperAdmin, selectedCollege, resolvedCollegeId]
   );
 
+
   useEffect(() => {
     const handler = () => setIsMobileScreen(window.innerWidth < 1024);
     handler();
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, []);
+  useEffect(() => {
+    const handler = () => setIsMobileScreen(window.innerWidth < 1024);
+    handler();
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
+
 
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated || !isSuperAdmin) return;
@@ -94,6 +106,7 @@ const CourseCatalogPage = () => {
     })();
   }, [hasHydrated, isAuthenticated, isSuperAdmin]);
 
+
   const fetchCourses = async () => {
     setLoading(true);
     try {
@@ -101,6 +114,7 @@ const CourseCatalogPage = () => {
         setCourses([]);
         return;
       }
+
 
       // 2) Use the hoisted values here (do NOT redeclare them)
       if (!isSuperAdmin && !effectiveCollegeId && !isStudent) {
@@ -112,6 +126,7 @@ const CourseCatalogPage = () => {
         return;
       }
 
+
       const buildParams = (view) => ({
         view,
         collegeId: effectiveCollegeId || undefined,
@@ -121,6 +136,7 @@ const CourseCatalogPage = () => {
         pageSize: 100,
       });
       console.log("[FETCH] Courses: userRole =", roleStr, "Params =", buildParams("catalog"));
+
 
       const tryRequest = async (params) => coursesAPI.getCourseCatalog(params);
 
@@ -132,6 +148,7 @@ const CourseCatalogPage = () => {
         const status = err?.response?.status;
         const serverMsg = err?.response?.data?.error || err?.response?.data?.message || "";
         const isUnknownView = status === 400 && /unknown view/i.test(serverMsg);
+
 
         if (isUnknownView) {
           const fallbackView = isSuperAdmin ? "all" : (isStudent ? "enrolled" : "assigned");
@@ -146,7 +163,7 @@ const CourseCatalogPage = () => {
         } else if (status === 403) {
           if (!errorShownRef.current) {
             errorShownRef.current = true;
-            toast.error("You don’t have permission to view these courses.");
+            toast.error("You don't have permission to view these courses.");
           }
           return;
         } else {
@@ -159,7 +176,9 @@ const CourseCatalogPage = () => {
         }
       }
 
+
       console.log("[FETCH] Courses raw response:", res);
+
 
 
       const payload = res?.data || res || {};
@@ -170,6 +189,7 @@ const CourseCatalogPage = () => {
           : Array.isArray(payload)            // allow bare array
             ? payload
             : [];
+
 
       const normalized = list.map((c) => ({
         id: c.id,
@@ -191,7 +211,9 @@ const CourseCatalogPage = () => {
       }));
 
 
+
       console.log("[FETCH] Courses normalized list:", normalized);
+
 
       setCourses(normalized);
     } catch (error) {
@@ -206,6 +228,7 @@ const CourseCatalogPage = () => {
     }
   };
 
+
   useEffect(() => {
     if (!hasHydrated) return;
     fetchCourses();
@@ -219,6 +242,7 @@ const CourseCatalogPage = () => {
     selectedLevel,
     sortBy,
   ]);
+
 
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated || !isStudent) {
@@ -924,4 +948,5 @@ const CourseListItem = ({
   );
 };
 
+export default CourseCatalogPage;
 export default CourseCatalogPage;

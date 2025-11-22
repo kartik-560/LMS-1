@@ -49,9 +49,6 @@ const CourseCatalogPage = () => {
 
   const isInstructor = roleLower === "instructor";
   const isAdmin = roleLower === "admin";
-  const isInstructor = roleLower === "instructor";
-  const isAdmin = roleLower === "admin";
-
 
   const roleStr = useMemo(
     () => String(user?.role || user?.userRole || "").toLowerCase(),
@@ -949,4 +946,4 @@ const CourseListItem = ({
 };
 
 export default CourseCatalogPage;
-export default CourseCatalogPage;
+

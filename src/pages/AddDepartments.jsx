@@ -19,9 +19,12 @@ const AddDepartments = () => {
   }));
 
   const collegeId = college?.id || user?.collegeId;
-  const isSuperAdmin = useAuthStore((state) => state.isSuperAdmin?.())
-    || user?.role?.toUpperCase() === 'SUPERADMIN'
-    || user?.role === 'SUPERADMIN';
+  const isSuperAdmin = user?.role?.toUpperCase() === 'SUPERADMIN'
+
+    || user?.isSuperAdmin === true
+    || user?.isSuperAdmin === 'true'
+    || user?.is_superadmin === true
+    || user?.type === 'superadmin';
 
   const adminName = user?.name || user?.email || 'Admin';
 
@@ -230,245 +233,205 @@ IsSuperAdmin: ${isSuperAdmin}`}
   }
 
   return (
-  <div className="max-w-5xl mx-auto my-8 p-6 bg-white rounded-2xl shadow-lg">
-    {/* Header */}
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-      <div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-800">
-          {isSuperAdmin ? "Department Management" : "Add Departments"}
+    <div className="max-w-4xl mx-auto my-8 p-8 bg-white rounded-lg shadow-md">
+      {/* Header Section */}
+      <div className="mb-6">
+        <h2 className="text-3xl font-bold text-gray-800">
+          {isSuperAdmin ? 'Department Management' : 'Add Departments'}
         </h2>
-        <div className="mt-2 text-sm text-slate-500">
+        <div className="text-sm text-gray-600 mt-2">
+          <p>Admin: <span className="font-semibold">{adminName}</span></p>
+          {collegeId && (
+            <p>College ID: <span className="font-semibold">{collegeId}</span></p>
+          )}
           {isSuperAdmin && (
-            <span className="inline-flex items-center gap-2 px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">
-              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 11c0 1.657-1.343 3-3 3s-3-1.343-3-3 1.343-3 3-3 3 1.343 3 3z" />
-                <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-6" />
-              </svg>
-              Superadmin Access
-            </span>
+            <p className="mt-1 inline-block px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">
+              🔐 Superadmin Access
+            </p>
           )}
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        <div className="hidden sm:flex items-center gap-2 bg-slate-50 rounded-md px-2 py-1">
-          <button
-            type="button"
-            onClick={() => {}}
-            className="px-3 py-1 text-sm rounded-md text-slate-600 hover:bg-white"
-            aria-pressed="true"
-          >
-            List
-          </button>
-          <button type="button" onClick={() => {}} className="px-3 py-1 text-sm rounded-md text-slate-600 hover:bg-white">
-            Grid
-          </button>
+      {/* Alert Messages */}
+      {error && (
+        <div className="mb-6 p-4 bg-red-50 text-red-700 border-l-4 border-red-500 rounded">
+          {error}
         </div>
+      )}
 
-        <button
-          type="button"
-          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md shadow-sm text-sm"
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-            <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" />
-          </svg>
-          New
-        </button>
-      </div>
-    </div>
-
-    {/* Alerts */}
-    <div className="space-y-3 mb-4">
-      {error && <div className="p-3 rounded-md bg-red-50 text-red-700 border-l-4 border-red-400">{error}</div>}
-      {successMessage && <div className="p-3 rounded-md bg-green-50 text-green-700 border-l-4 border-green-400">{successMessage}</div>}
-    </div>
-
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Left column - Add / Summary */}
-      <aside className="space-y-4">
-        {isSuperAdmin ? (
-          <form onSubmit={handleAddToCatalog} className="p-4 bg-gradient-to-b from-white to-slate-50 rounded-lg border border-slate-100">
-            <div className="flex items-start gap-3">
-              <div className="p-2 rounded-full bg-indigo-50">
-                <svg className="w-5 h-5 text-indigo-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <rect x="3" y="3" width="18" height="18" rx="2" strokeWidth="2" />
-                </svg>
-              </div>
-              <div className="flex-1">
-                <label htmlFor="departmentName" className="block text-sm font-medium text-slate-700">
-                  Department Name
-                </label>
-                <input
-                  id="departmentName"
-                  type="text"
-                  value={newDepartmentName}
-                  onChange={(e) => setNewDepartmentName(e.target.value)}
-                  placeholder="e.g., Computer Science"
-                  maxLength={100}
-                  disabled={submitting}
-                  className="mt-2 w-full px-3 py-2 border border-slate-200 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-200"
-                />
-                <div className="flex items-center justify-between mt-2 text-xs text-slate-500">
-                  <span>{newDepartmentName.length}/100</span>
-                  <button
-                    type="submit"
-                    disabled={submitting || !newDepartmentName.trim()}
-                    className={`inline-flex items-center gap-2 px-3 py-1 rounded-md text-white text-sm ${submitting || !newDepartmentName.trim() ? 'bg-slate-300' : 'bg-indigo-600 hover:bg-indigo-700'}`}
-                  >
-                    {submitting ? (
-                      <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <circle cx="12" cy="12" r="10" strokeWidth="4" className="opacity-25" />
-                        <path d="M4 12a8 8 0 018-8" strokeWidth="4" className="opacity-75" />
-                      </svg>
-                    ) : null}
-                    Add to Catalog
-                  </button>
-                </div>
-                <p className="mt-2 text-xs text-slate-400">Added departments appear in the global catalog for all colleges.</p>
-              </div>
-            </div>
-          </form>
-        ) : (
-          <div className="p-4 rounded-lg bg-slate-50 border border-slate-100">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded bg-slate-100">
-                <svg className="w-5 h-5 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path d="M3 7h18M3 12h18M3 17h18" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </div>
-              <div>
-                <div className="text-sm font-medium text-slate-700">Already Added</div>
-                <div className="text-xs text-slate-400">{existingDepartments.length} departments</div>
-              </div>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {existingDepartments.length ? (
-                existingDepartments.map((dept) => (
-                  <span key={dept} className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 text-sm">
-                    {dept}
-                  </span>
-                ))
-              ) : (
-                <div className="text-sm text-slate-500">No departments added yet.</div>
-              )}
-            </div>
-          </div>
-        )}
-
-        <div className="p-4 rounded-lg bg-white border border-slate-100 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="text-sm font-medium text-slate-700">Catalog Overview</div>
-            <div className="text-xs text-slate-400">{departments.length} total</div>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-            <div className="p-2 bg-slate-50 rounded">
-              <div className="text-xs text-slate-500">Available</div>
-              <div className="font-semibold">{availableDepartments.length}</div>
-            </div>
-            <div className="p-2 bg-slate-50 rounded">
-              <div className="text-xs text-slate-500">Assigned</div>
-              <div className="font-semibold">{existingDepartments.length}</div>
-            </div>
-          </div>
+      {successMessage && (
+        <div className="mb-6 p-4 bg-green-50 text-green-700 border-l-4 border-green-500 rounded">
+          {successMessage}
         </div>
-      </aside>
+      )}
 
-      {/* Right column - Search + List */}
-      <main className="lg:col-span-2">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div className="flex items-center gap-2 w-full sm:w-2/3">
-            <div className="flex items-center w-full bg-slate-50 border border-slate-100 rounded-md px-3 py-2">
-              <svg className="w-4 h-4 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <circle cx="11" cy="11" r="7" strokeWidth="2" />
-                <path d="M21 21l-4.35-4.35" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+      {/* Conditional Rendering Based on Role */}
+      {isSuperAdmin ? (
+        // ===== SUPERADMIN VIEW =====
+        <div>
+          <div className="bg-purple-50 border-l-4 border-purple-500 p-4 mb-6 rounded">
+            <p className="text-purple-900 font-medium">🔐 Superadmin Only</p>
+            <p className="text-purple-800 text-sm mt-1">Add new departments to the global catalog that will be available for all colleges to add.</p>
+          </div>
+
+          <form onSubmit={handleAddToCatalog} className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+            <div className="mb-6">
+              <label htmlFor="departmentName" className="block text-sm font-semibold text-gray-700 mb-2">
+                Department Name
+              </label>
               <input
-                aria-label="Search departments"
-                placeholder="Search available departments..."
-                className="ml-2 w-full bg-transparent text-sm outline-none"
-                onChange={() => {}}
+                type="text"
+                id="departmentName"
+                value={newDepartmentName}
+                onChange={(e) => setNewDepartmentName(e.target.value)}
+                placeholder="e.g., Computer Science, Business Administration"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
+                disabled={submitting}
+                maxLength="100"
               />
+              <p className="text-gray-500 text-xs mt-1">{newDepartmentName.length}/100 characters</p>
             </div>
 
-            <select className="ml-2 text-sm border border-slate-100 rounded-md px-2 py-1 bg-white">
-              <option>Sort A → Z</option>
-              <option>Sort Z → A</option>
-            </select>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button onClick={handleSelectAll} type="button" className="px-3 py-2 rounded-md border bg-white text-sm">
-              {selectedDepartments.length === availableDepartments.length ? 'Deselect All' : 'Select All'}
-            </button>
-          </div>
-        </div>
-
-        {/* Available Departments */}
-        {availableDepartments.length === 0 ? (
-          <div className="p-8 rounded-lg border-2 border-dashed border-slate-200 text-center text-slate-500">
-            <svg className="mx-auto w-12 h-12 mb-2 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-              <path d="M9 12l2 2 4-4" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="12" cy="12" r="9" strokeWidth="2" />
-            </svg>
-            <div className="font-medium">All departments added!</div>
-            <div className="text-sm mt-1">Your college has all available departments.</div>
-          </div>
-        ) : (
-          <form onSubmit={handleAddToCollege}>
-            <div className="max-h-96 overflow-y-auto pr-2 space-y-3">
-              {availableDepartments.map((department) => (
-                <label
-                  key={department.key}
-                  className="flex items-center p-3 gap-3 bg-white rounded-lg border border-slate-100 hover:shadow-sm transition"
-                >
-                  <input
-                    type="checkbox"
-                    name="departments"
-                    value={department.name}
-                    checked={selectedDepartments.includes(department.name)}
-                    onChange={() => handleCheckboxChange(department.name)}
-                    className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-200"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-slate-800 truncate">{department.name}</div>
-                    <div className="text-xs text-slate-400">Key: {department.key}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button type="button" title="Remove" onClick={() => {}} className="p-1 rounded hover:bg-slate-50">
-                      <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M3 6h18" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M8 6v14a2 2 0 002 2h4a2 2 0 002-2V6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M10 11v6M14 11v6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  </div>
-                </label>
-              ))}
-            </div>
-
-            <div className="flex items-center justify-between pt-4 border-t border-slate-100 mt-4">
-              <div className="text-sm text-slate-600">
-                {selectedDepartments.length} department{selectedDepartments.length !== 1 ? 's' : ''} selected
-              </div>
-
+            <div className="flex gap-3">
               <button
                 type="submit"
-                disabled={submitting || selectedDepartments.length === 0}
-                className={`px-4 py-2 rounded-md text-white font-semibold ${submitting || selectedDepartments.length === 0 ? 'bg-slate-300' : 'bg-blue-600 hover:bg-blue-700'}`}
+                disabled={submitting || !newDepartmentName.trim()}
+                className={`px-6 py-2 rounded-md font-semibold text-white transition duration-200 ${submitting || !newDepartmentName.trim()
+                  ? 'bg-gray-400 cursor-not-allowed'
+                  : 'bg-purple-600 hover:bg-purple-700 active:bg-purple-800'
+                  }`}
               >
-                {submitting ? 'Adding...' : `Add Department${selectedDepartments.length !== 1 ? 's' : ''}`}
+                {submitting ? (
+                  <span className="flex items-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Adding...
+                  </span>
+                ) : (
+                  'Add to Catalog'
+                )}
               </button>
             </div>
           </form>
-        )}
-      </main>
+
+          <div className="mt-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+            <p className="text-blue-900 font-medium text-sm">📝 Note</p>
+            <p className="text-blue-800 text-sm mt-1">New departments added here will appear in the global catalog and become available for all colleges to add to their departments.</p>
+          </div>
+
+          {/* Show all departments in catalog */}
+          <div className="mt-6">
+            <h3 className="text-xl font-semibold text-gray-700 mb-4">Current Department Catalog ({departments.length})</h3>
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-80 overflow-y-auto">
+              {departments.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {departments.map(dept => (
+                    <span key={dept.key} className="bg-blue-100 text-blue-800 px-3 py-1 rounded text-sm">
+                      {dept.name}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-center">No departments in catalog</p>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : (
+        // ===== REGULAR ADMIN VIEW =====
+        <div>
+          {existingDepartments.length > 0 && (
+            <div className="mb-6 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+              <p className="text-blue-900 font-medium">Already Added Departments ({existingDepartments.length}):</p>
+              <div className="text-blue-800 text-sm mt-2 flex flex-wrap gap-2">
+                {existingDepartments.map(dept => (
+                  <span key={dept} className="bg-blue-200 px-3 py-1 rounded">
+                    {dept}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {availableDepartments.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <p className="text-gray-600 text-lg font-medium mt-4">All departments added!</p>
+              <p className="text-gray-500 text-sm mt-1">Your college has all available departments.</p>
+            </div>
+          ) : (
+            <form onSubmit={handleAddToCollege}>
+              <div className="flex items-center justify-between mb-6 pb-4 border-b-2 border-gray-200">
+                <h3 className="text-xl font-semibold text-gray-700">
+                  Available Departments ({availableDepartments.length})
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleSelectAll}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-md text-sm font-medium text-gray-700 transition duration-200"
+                >
+                  {selectedDepartments.length === availableDepartments.length ? 'Deselect All' : 'Select All'}
+                </button>
+              </div>
+
+              <div className="space-y-3 mb-8 max-h-96 overflow-y-auto pr-2">
+                {availableDepartments.map((department) => (
+                  <label
+                    key={department.key}
+                    className="flex items-center p-3 cursor-pointer hover:bg-gray-50 rounded-md transition duration-150"
+                  >
+                    <input
+                      type="checkbox"
+                      name="departments"
+                      value={department.name}
+                      checked={selectedDepartments.includes(department.name)}
+                      onChange={() => handleCheckboxChange(department.name)}
+                      className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    />
+                    <span className="ml-3 text-gray-800 font-medium select-none">
+                      {department.name}
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between pt-6 border-t border-gray-200">
+                <div className="text-gray-600 text-sm font-medium">
+                  {selectedDepartments.length} department{selectedDepartments.length !== 1 ? 's' : ''} selected
+                </div>
+                <button
+                  type="submit"
+                  disabled={submitting || selectedDepartments.length === 0}
+                  className={`px-6 py-2 rounded-md font-semibold text-white transition duration-200 ${submitting || selectedDepartments.length === 0
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
+                    }`}
+                >
+                  {submitting ? (
+                    <span className="flex items-center">
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Adding...
+                    </span>
+                  ) : (
+                    `Add Department${selectedDepartments.length !== 1 ? 's' : ''}`
+                  )}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      )}
     </div>
-
-    <div className="mt-6 text-xs text-slate-400">Tip: Use search to quickly find departments. Superadmins can add to the global catalog.</div>
-  </div>
-);
-
+  );
 };
+
+
 
 export default AddDepartments;

@@ -13,6 +13,7 @@ import {
   Play,
   Share2,
   Heart,
+  Eye,
 } from "lucide-react";
 import { useRef } from "react";
 import Button from "../components/ui/Button";
@@ -23,7 +24,6 @@ import {
   collegesAPI,
   FALLBACK_THUMB,
 } from "../services/api";
-
 
 const CourseCatalogPage = () => {
   const { user, isAuthenticated, hasHydrated } = useAuthStore();
@@ -47,18 +47,15 @@ const CourseCatalogPage = () => {
   const levels = ["Beginner", "Intermediate", "Advanced"];
   const roleLower = String(user?.role || user?.userRole || "").toLowerCase();
 
-
   const isInstructor = roleLower === "instructor";
   const isAdmin = roleLower === "admin";
-
 
   const roleStr = useMemo(
     () => String(user?.role || user?.userRole || "").toLowerCase(),
     [user]
   );
   const isSuperAdmin = roleStr === "superadmin";
-  const isStudent    = roleStr === "student";
-
+  const isStudent = roleStr === "student";
 
   const resolvedCollegeId = useMemo(
     () => user?.collegeId ?? user?.college?.id ?? null,
@@ -81,6 +78,12 @@ const CourseCatalogPage = () => {
     window.addEventListener("resize", handler);
     return () => window.removeEventListener("resize", handler);
   }, []);
+  useEffect(() => {
+    const handler = () => setIsMobileScreen(window.innerWidth < 1024);
+    handler();
+    window.addEventListener("resize", handler);
+    return () => window.removeEventListener("resize", handler);
+  }, []);
 
 
   useEffect(() => {
@@ -91,8 +94,8 @@ const CourseCatalogPage = () => {
         const arr = Array.isArray(res?.data?.data?.items)
           ? res.data.data.items
           : Array.isArray(res?.data?.data)
-          ? res.data.data
-          : res?.data || [];
+            ? res.data.data
+            : res?.data || [];
         setColleges(arr);
       } catch {
         // non-blocking
@@ -135,7 +138,6 @@ const CourseCatalogPage = () => {
       const tryRequest = async (params) => coursesAPI.getCourseCatalog(params);
 
 
-      
       let res;
       try {
         res = await tryRequest(buildParams("catalog"));
@@ -180,10 +182,10 @@ const CourseCatalogPage = () => {
       const list = Array.isArray(payload?.data)
         ? payload.data
         : Array.isArray(payload?.items)
-        ? payload.items
-        : Array.isArray(payload)            // allow bare array
-        ? payload
-        : [];
+          ? payload.items
+          : Array.isArray(payload)            // allow bare array
+            ? payload
+            : [];
 
 
       const normalized = list.map((c) => ({
@@ -230,8 +232,8 @@ const CourseCatalogPage = () => {
   }, [
     hasHydrated,
     isAuthenticated,
-    isSuperAdmin,        
-    effectiveCollegeId,  
+    isSuperAdmin,
+    effectiveCollegeId,
     searchTerm,
     selectedCategory,
     selectedLevel,
@@ -261,7 +263,6 @@ const CourseCatalogPage = () => {
     })();
   }, [hasHydrated, isAuthenticated, isStudent]);
 
-
   const getCategoryColor = (category) => {
     const colors = {
       programming: "bg-blue-100 text-blue-800",
@@ -280,7 +281,6 @@ const CourseCatalogPage = () => {
     );
   };
 
-
   const getLevelColor = (level) => {
     const colors = {
       beginner: "bg-green-100 text-green-800",
@@ -291,7 +291,6 @@ const CourseCatalogPage = () => {
       colors[(level || "beginner").toLowerCase()] || "bg-gray-100 text-gray-800"
     );
   };
-
 
   const categories = useMemo(
     () => [
@@ -308,10 +307,8 @@ const CourseCatalogPage = () => {
     []
   );
 
-
   useEffect(() => {
     let filtered = [...courses];
-
 
     if (selectedLevel !== "all") {
       filtered = filtered.filter(
@@ -319,12 +316,10 @@ const CourseCatalogPage = () => {
       );
     }
 
-
     filtered = filtered.filter((c) => {
       const price = Number(c.price || 0);
       return price >= priceRange[0] && price <= priceRange[1];
     });
-
 
     switch (sortBy) {
       case "newest":
@@ -357,10 +352,8 @@ const CourseCatalogPage = () => {
         );
     }
 
-
     setFilteredCourses(filtered);
   }, [courses, selectedLevel, priceRange, sortBy]);
-
 
   const toggleFavorite = (courseId) => {
     setFavorites((prev) =>
@@ -370,7 +363,6 @@ const CourseCatalogPage = () => {
     );
   };
 
-
   const clearFilters = () => {
     setSearchTerm("");
     setSelectedCategory("all");
@@ -378,7 +370,6 @@ const CourseCatalogPage = () => {
     setPriceRange([0, 500]);
     setSortBy("popular");
   };
-
 
   const handleEnrollRequest = async (course) => {
     if (!isAuthenticated) {
@@ -395,12 +386,11 @@ const CourseCatalogPage = () => {
       return;
     }
 
-
     try {
       await enrollmentsAPI.requestEnrollment(course.id);
       setPendingRequests((prev) => new Set(prev).add(course.id));
       toast.success(
-        "Request sent to the instructor. You'll be notified on approval."
+        "Request sent to the instructor. You’ll be notified on approval."
       );
     } catch (e) {
       const msg =
@@ -410,7 +400,6 @@ const CourseCatalogPage = () => {
       toast.error(msg);
     }
   };
-
 
   if (loading) {
     return (
@@ -422,7 +411,6 @@ const CourseCatalogPage = () => {
       </div>
     );
   }
-
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -462,7 +450,6 @@ const CourseCatalogPage = () => {
         </div>
       </div>
 
-              
       {/* Toolbar & Filters */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         <div className="mb-6">
@@ -476,7 +463,7 @@ const CourseCatalogPage = () => {
                 <SlidersHorizontal size={16} className="mr-2" />
                 Filters
               </Button>
-                  
+
               <div className="flex items-center justify-between sm:justify-start space-x-2 ml-auto md:ml-0">
                 <span className="text-sm text-gray-600 hidden sm:inline">
                   View:
@@ -484,22 +471,20 @@ const CourseCatalogPage = () => {
                 <div className="flex border border-gray-300 rounded-lg overflow-hidden">
                   <button
                     onClick={() => setViewMode("grid")}
-                    className={`p-2 ${
-                      viewMode === "grid"
-                        ? "bg-primary-600 text-white"
-                        : "bg-white text-gray-600 hover:bg-gray-50"
-                    }`}
+                    className={`p-2 ${viewMode === "grid"
+                      ? "bg-primary-600 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
                     aria-label="Grid view"
                   >
                     <Grid3X3 size={16} />
                   </button>
                   <button
                     onClick={() => setViewMode("list")}
-                    className={`p-2 ${
-                      viewMode === "list"
-                        ? "bg-primary-600 text-white"
-                        : "bg-white text-gray-600 hover:bg-gray-50"
-                    }`}
+                    className={`p-2 ${viewMode === "list"
+                      ? "bg-primary-600 text-white"
+                      : "bg-white text-gray-600 hover:bg-gray-50"
+                      }`}
                     aria-label="List view"
                   >
                     <List size={16} />
@@ -508,33 +493,30 @@ const CourseCatalogPage = () => {
               </div>
             </div>
 
+            {/* <div className="flex items-center gap-3 mt-3 md:mt-0">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-600 hidden sm:inline">
+                      Sort by:
+                    </span>
+                    <select
+                      value={sortBy}
+                      onChange={(e) => setSortBy(e.target.value)}
+                      className="px-2 sm:px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    >
+                      <option value="popular">Most Popular</option>
+                      <option value="newest">Newest First</option>
+                      <option value="rating">Highest Rated</option>
+                      <option value="price-low">Price: Low to High</option>
+                      <option value="price-high">Price: High to Low</option>
+                      <option value="duration">Duration</option>
+                    </select>
+                  </div>
 
-            <div className="flex items-center gap-3 mt-3 md:mt-0">
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600 hidden sm:inline">
-                  Sort by:
-                </span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  className="px-2 sm:px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                >
-                  <option value="popular">Most Popular</option>
-                  <option value="newest">Newest First</option>
-                  <option value="rating">Highest Rated</option>
-                  <option value="price-low">Price: Low to High</option>
-                  <option value="price-high">Price: High to Low</option>
-                  <option value="duration">Duration</option>
-                </select>
-              </div>
-
-
-              <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
-                Showing {filteredCourses.length} of {courses.length} courses
-              </div>
-            </div>
+                  <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
+                    Showing {filteredCourses.length} of {courses.length} courses
+                  </div>
+                </div> */}
           </div>
-
 
           {/* Inline filters panel (no external Card dependency) */}
           {showFilters && (
@@ -551,13 +533,12 @@ const CourseCatalogPage = () => {
                 selectedCollege={
                   isStudent ? user?.collegeId || "all" : selectedCollege
                 }
-                setSelectedCollege={isStudent ? () => {} : setSelectedCollege}
+                setSelectedCollege={isStudent ? () => { } : setSelectedCollege}
                 isStudent={isStudent}
               />
             </div>
           )}
         </div>
-
 
         {/* Results */}
         {filteredCourses.length === 0 ? (
@@ -583,13 +564,10 @@ const CourseCatalogPage = () => {
                 <CourseCard
                   key={course.id}
                   course={course}
-                  isFavorite={favorites.includes(course.id)}
-                  onToggleFavorite={() => toggleFavorite(course.id)}
                   onEnroll={() => handleEnrollRequest(course)}
                   isPending={pendingRequests.has(course.id)}
                   getCategoryColor={getCategoryColor}
-                  getLevelColor={getLevelColor}
-                  isStudent={isStudent}
+                  userRole={user?.role}
                 />
               ) : (
                 <CourseListItem
@@ -601,7 +579,6 @@ const CourseCatalogPage = () => {
                   isPending={pendingRequests.has(course.id)}
                   getCategoryColor={getCategoryColor}
                   getLevelColor={getLevelColor}
-                  isStudent={isStudent}
                 />
               )
             )}
@@ -611,7 +588,6 @@ const CourseCatalogPage = () => {
     </div>
   );
 };
-
 
 const FilterForm = ({
   categories,
@@ -645,7 +621,6 @@ const FilterForm = ({
         </select>
       </div>
 
-
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">
           Level
@@ -662,7 +637,6 @@ const FilterForm = ({
           ))}
         </select>
       </div>
-
 
       {/* Institution filter disabled for students (always their college) */}
       <div>
@@ -684,7 +658,6 @@ const FilterForm = ({
         </select>
       </div>
 
-
       <div className="flex items-end">
         <Button
           type="button"
@@ -699,17 +672,84 @@ const FilterForm = ({
   );
 };
 
+// const CourseCard = ({
+//   course,
+//   isFavorite,
+//   onToggleFavorite,
+//   onEnroll,
+//   isPending,
+//   getCategoryColor,
+//   getLevelColor,
+// }) => {
+//   return (
+//     <div className="overflow-hidden rounded-xl bg-white border border-gray-200 hover:shadow-lg transition-all duration-300 group">
+//       <div className="relative bg-gradient-to-br from-primary-100 to-primary-200 h-40 sm:aspect-video overflow-hidden">
+//         <img
+//           src={course.thumbnail}
+//           alt={course.title}
+//           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+//           onError={(e) => (e.currentTarget.src = FALLBACK_THUMB)}
+//         />
+//       </div>
+
+//       <div className="p-4 sm:p-6">
+//         <div className="flex items-center justify-between mb-3">
+//           <div className="flex items-center space-x-2 flex-wrap">
+//             <span
+//               className={`text-xs px-2 py-1 rounded ${getCategoryColor(
+//                 course.category
+//               )}`}
+//             >
+//               {course.category}
+//             </span>
+
+//           </div>
+//         </div>
+
+//         <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-primary-600 transition-colors">
+//           {course.title}
+//         </h3>
+
+//         {course.description && (
+//           <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+//             {course.description}
+//           </p>
+//         )}
+//         <div className="flex items-center justify-between gap-3">
+
+//           <div>
+//             {course.progress !== undefined ? (
+//               <Link to={`/courses/${course.id}`}>
+//                 <Button size="sm">
+//                   <Play size={16} className="mr-1" />
+//                   Continue
+//                 </Button>
+//               </Link>
+//             ) : isPending ? (
+//               <Button size="sm" variant="outline" disabled>
+//                 Requested
+//               </Button>
+//             ) : (
+//               <Button size="sm" onClick={onEnroll}>
+//                 Enroll
+//               </Button>
+//             )}
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
 
 const CourseCard = ({
   course,
-  isFavorite,
-  onToggleFavorite,
   onEnroll,
   isPending,
   getCategoryColor,
-  getLevelColor,
-  isStudent,
+  userRole, // <- Add this prop
 }) => {
+  const isNonStudent = ["SUPERADMIN", "ADMIN", "INSTRUCTOR"].includes(userRole);
+
   return (
     <div className="overflow-hidden rounded-xl bg-white border border-gray-200 hover:shadow-lg transition-all duration-300 group">
       <div className="relative bg-gradient-to-br from-primary-100 to-primary-200 h-40 sm:aspect-video overflow-hidden">
@@ -719,24 +759,7 @@ const CourseCard = ({
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
           onError={(e) => (e.currentTarget.src = FALLBACK_THUMB)}
         />
-        <div className="absolute top-3 right-3 flex space-x-2">
-          <button
-            onClick={onToggleFavorite}
-            className={`p-2 rounded-full transition-colors ${
-              isFavorite
-                ? "bg-red-500 text-white"
-                : "bg-white/80 text-gray-600 hover:bg-white"
-            }`}
-            aria-label="Toggle favorite"
-          >
-            <Heart size={16} className={isFavorite ? "fill-current" : ""} />
-          </button>
-          <button className="p-2 rounded-full bg-white/80 text-gray-600 hover:bg-white transition-colors">
-            <Share2 size={16} />
-          </button>
-        </div>
       </div>
-
 
       <div className="p-4 sm:p-6">
         <div className="flex items-center justify-between mb-3">
@@ -748,28 +771,12 @@ const CourseCard = ({
             >
               {course.category}
             </span>
-            <span
-              className={`text-xs px-2 py-1 rounded ${getLevelColor(
-                course.level
-              )}`}
-            >
-              {course.level}
-            </span>
-          </div>
-          <div className="flex items-center space-x-1 text-sm">
-            <Star size={14} className="text-yellow-400 fill-current" />
-            <span className="font-medium text-gray-700">
-              {course.rating ?? 0}
-            </span>
-            <span className="text-gray-500">({course.reviewCount ?? 0})</span>
           </div>
         </div>
-
 
         <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-primary-600 transition-colors">
           {course.title}
         </h3>
-
 
         {course.description && (
           <p className="text-gray-600 text-sm mb-4 line-clamp-2">
@@ -777,29 +784,7 @@ const CourseCard = ({
           </p>
         )}
 
-
-        <div className="flex items-center justify-between text-sm text-gray-500 mb-4 flex-wrap">
-          <div className="flex items-center space-x-1">
-            <Clock size={14} />
-            <span>{course.duration}</span>
-          </div>
-          <div className="flex items-center space-x-1">
-            <Users size={14} />
-            <span>{course.enrolledStudents} students</span>
-          </div>
-        </div>
-
-
         <div className="flex items-center justify-between gap-3">
-          <div className="text-xl font-bold text-gray-900">
-            {course.price === 0 ? (
-              <span className="text-green-600">Free</span>
-            ) : (
-              <span>₹{course.price}</span>
-            )}
-          </div>
-
-
           <div>
             {course.progress !== undefined ? (
               <Link to={`/courses/${course.id}`}>
@@ -808,22 +793,22 @@ const CourseCard = ({
                   Continue
                 </Button>
               </Link>
-            ) : isStudent ? (
-              isPending ? (
-                <Button size="sm" variant="outline" disabled>
-                  Requested
-                </Button>
-              ) : (
-                <Button size="sm" onClick={onEnroll}>
-                  Enroll
-                </Button>
-              )
-            ) : (
+            ) : isNonStudent ? (
+              // Show "View" button for superadmin, admin, instructor
               <Link to={`/courses/${course.id}`}>
                 <Button size="sm" variant="outline">
-                  View Details
+                  <Eye size={16} className="mr-1" />
+                  View
                 </Button>
               </Link>
+            ) : isPending ? (
+              <Button size="sm" variant="outline" disabled>
+                Requested
+              </Button>
+            ) : (
+              <Button size="sm" onClick={onEnroll}>
+                Enroll
+              </Button>
             )}
           </div>
         </div>
@@ -841,7 +826,6 @@ const CourseListItem = ({
   isPending,
   getCategoryColor,
   getLevelColor,
-  isStudent,
 }) => {
   return (
     <div className="overflow-hidden rounded-xl bg-white border border-gray-200 hover:shadow-md transition-shadow">
@@ -854,7 +838,6 @@ const CourseListItem = ({
             onError={(e) => (e.currentTarget.src = FALLBACK_THUMB)}
           />
         </div>
-
 
         <div className="flex-1 p-4 sm:p-6">
           <div className="flex items-start justify-between">
@@ -885,18 +868,15 @@ const CourseListItem = ({
                 </div>
               </div>
 
-
               <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-primary-600 transition-colors line-clamp-2">
                 {course.title}
               </h3>
-
 
               {course.description && (
                 <p className="text-gray-600 mb-3 line-clamp-2">
                   {course.description}
                 </p>
               )}
-
 
               <div className="flex items-center space-x-4 text-sm text-gray-500">
                 <div className="flex items-center space-x-1">
@@ -910,16 +890,14 @@ const CourseListItem = ({
               </div>
             </div>
 
-
             <div className="flex flex-col items-end space-y-3 mt-4 sm:mt-0">
               <div className="flex space-x-2">
                 <button
                   onClick={onToggleFavorite}
-                  className={`p-2 rounded-full transition-colors ${
-                    isFavorite
-                      ? "bg-red-100 text-red-600"
-                      : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                  }`}
+                  className={`p-2 rounded-full transition-colors ${isFavorite
+                    ? "bg-red-100 text-red-600"
+                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+                    }`}
                 >
                   <Heart
                     size={16}
@@ -931,7 +909,6 @@ const CourseListItem = ({
                 </button>
               </div>
 
-
               <div className="text-right">
                 <div className="text-2xl font-bold text-gray-900 mb-1">
                   {course.price === 0 ? (
@@ -941,7 +918,6 @@ const CourseListItem = ({
                   )}
                 </div>
 
-
                 <div>
                   {course.progress !== undefined ? (
                     <Link to={`/courses/${course.id}`}>
@@ -950,22 +926,14 @@ const CourseListItem = ({
                         Continue
                       </Button>
                     </Link>
-                  ) : isStudent ? (
-                    isPending ? (
-                      <Button size="sm" variant="outline" disabled>
-                        Requested
-                      </Button>
-                    ) : (
-                      <Button size="sm" onClick={onEnroll}>
-                        Enroll
-                      </Button>
-                    )
+                  ) : isPending ? (
+                    <Button size="sm" variant="outline" disabled>
+                      Requested
+                    </Button>
                   ) : (
-                    <Link to={`/courses/${course.id}`}>
-                      <Button size="sm" variant="outline">
-                        View Details
-                      </Button>
-                    </Link>
+                    <Button size="sm" onClick={onEnroll}>
+                      Enroll
+                    </Button>
                   )}
                 </div>
               </div>
@@ -977,5 +945,5 @@ const CourseListItem = ({
   );
 };
 
-
 export default CourseCatalogPage;
+

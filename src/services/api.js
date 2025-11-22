@@ -100,8 +100,11 @@ export const authAPI = {
       meUser.collegeId ?? meUser.college_id ?? meUser.college?.id ?? null;
 
     return { ...meUser, collegeId };
+    
   },
-
+ setActiveStatus: (userId, isActive) =>
+    api.patch(`/auth/users/${userId}/active`, { isActive })  
+      .then((res) => res.data),
   logout: () => {
     useAuthStore.getState().logout();
     localStorage.removeItem("auth_token");

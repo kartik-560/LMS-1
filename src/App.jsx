@@ -352,6 +352,16 @@ const App = () => {
 
 
         <Route
+          path="/create_finaltest/:courseId?"
+          element={
+            <ProtectedRoute allowedRoles={[ROLE.SUPERADMIN]}>
+              <CreateFinaltest />
+            </ProtectedRoute>
+          }
+        />
+
+
+        <Route
           path="/view_finaltest"
           element={
             <ProtectedRoute allowedRoles={[ROLE.SUPERADMIN, ROLE.ADMIN, ROLE.STUDENT]}>

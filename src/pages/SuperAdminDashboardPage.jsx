@@ -31,7 +31,7 @@ import Tabs, {
 import { useCallback } from "react";
 import useAuthStore from "../store/useAuthStore";
 
-import { superAdminAPI, coursesAPI, collegesAPI ,departmentAPI} from "../services/api";
+import { superAdminAPI, coursesAPI, collegesAPI, departmentAPI } from "../services/api";
 
 const normalizeRole = (r) =>
   String(r || "")
@@ -2223,6 +2223,15 @@ export default function SuperAdminDashboardPage() {
                                 <Pencil size={14} className="mr-1" />
                                 Assign Course
                               </Button>
+
+                              <Link
+                                to={`/create_finaltest/${course.id}`}
+                                className="ml-auto bg-blue-500 text-white hover:bg-blue-600 px-3 py-2 rounded text-sm inline-flex items-center"
+                              >
+                                <Plus size={16} className="mr-1" />
+                                Create Final Test
+                              </Link>
+
                             </div>
                           </div>
                         </div>
@@ -2236,11 +2245,13 @@ export default function SuperAdminDashboardPage() {
 
           {courseToAssign && (
             <AssignCourseModal
+              course={courseToAssign}
+              role={user.role}
+              collegeId={user.collegeId}
+              colleges={colleges}
               isOpen={isAssignModalOpen}
               onClose={handleCloseAssignModal}
               onSuccess={handleAssignSuccess}
-              course={courseToAssign}
-              colleges={colleges}
             />
           )}
 

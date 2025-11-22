@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { BookOpen, Plus, Trash2, Save, ArrowLeft, Eye } from "lucide-react";
 import { toast } from "react-hot-toast";
@@ -146,26 +146,26 @@ const mapUIQuestionsToAPI = (qs = []) =>
     };
   });
 
-/* ------------------------------ component ------------------------------ */
 export default function EditCoursePage() {
   const { courseId } = useParams();
   const navigate = useNavigate();
-
+  const location = useLocation();
+ 
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
 
   const roleNorm = normRole(user?.role);
   const isSuperAdmin = roleNorm === "SUPERADMIN";
   const isAdminOnly = roleNorm === "ADMIN";
+  const courseFromState = location.state?.course;
 
   const [isLoading, setIsLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
+  const [course, setCourse] = useState(courseFromState || null);
 
   const [base64DataUrl, setBase64DataUrl] = useState(null);
-  const [courseImage, setCourseImage] = useState(null); // preview image (like Create)
-
-  // Lessons shaped exactly like CreateCoursePage + hidden ids for update
+  const [courseImage, setCourseImage] = useState(null);
   const [lessons, setLessons] = useState([
     {
       id: crypto.randomUUID(),
@@ -183,7 +183,6 @@ export default function EditCoursePage() {
   ]);
 
   const [chaptersToDelete, setChaptersToDelete] = useState([]);
-
   const {
     register,
     handleSubmit,
@@ -193,7 +192,6 @@ export default function EditCoursePage() {
   } = useForm();
   const watchedValues = watch();
 
-  /* ------------------------------ lesson ops (same UX as Create) ------------------------------ */
   const addLesson = (type = "text") => {
     setLessons((prev) => [
       ...prev,
@@ -303,16 +301,116 @@ export default function EditCoursePage() {
     );
   };
 
+  // useEffect(() => {
+  //   const loadCourseData = async () => {
+  //     try {
+  //       setInitialLoading(true);
+  //       if (token) api.defaults.headers.common.Authorization = `Bearer ${token}`;
+
+  //       const courseRes = await coursesAPI.get(courseId);
+  //       const c = unwrap(courseRes);
+  //       if (!c?.id) throw new Error("Course not found");
+
+  //       reset({
+  //         title: c?.title || "",
+  //         category: c?.category || "",
+  //         description: c?.description || "",
+  //       });
+  //       setCourseImage(c?.thumbnail || null);
+
+  //       const chaptersRes = await chaptersAPI.listByCourse(courseId);
+  //       let chapters = unwrap(chaptersRes) || [];
+  //       chapters.sort((a, b) => (a?.order || 0) - (b?.order || 0));
+
+  //       const assessmentPromises = chapters.map(ch =>
+  //         assessmentsAPI.listByChapter(ch.id)
+  //           .then(res => {
+  //             const unwrapped = unwrap(res);
+
+  //             return { chapterId: ch.id, assessments: unwrapped || [] };
+  //           })
+  //           .catch(err => {
+  //             console.error(`Could not load assessments for chapter ${ch.id}`, err);
+  //             return { chapterId: ch.id, assessments: [] };
+  //           })
+  //       );
+
+  //       const chapterAssessments = await Promise.all(assessmentPromises);
+
+  //       const assessmentMap = new Map(
+  //         chapterAssessments.map(item => [item.chapterId, item.assessments[0]])
+  //       );
+
+  //       const builtLessons = chapters.map(ch => {
+  //         const assessment = assessmentMap.get(ch.id);
+
+  //         if (assessment) {
+
+  //           const durationMin = assessment.timeLimitSeconds ? Math.round(Number(assessment.timeLimitSeconds) / 60) : "";
+  //           const uiQuestions = (assessment.questions || []).map(mapAPIQuestionToUI);
+
+  //           return {
+  //             id: crypto.randomUUID(),
+  //             type: "test",
+  //             quizTitle: assessment?.title || ch?.title || "",
+  //             content: ch?.content || "", // <-- FIX: Always include the chapter's content
+  //             quizDurationMinutes: durationMin,
+  //             questions: uiQuestions.length ? uiQuestions : [emptyQuizQuestion()],
+  //             _chapterId: ch.id,
+  //             _assessmentId: assessment.id,
+  //             // Unused fields for this lesson type
+  //             title: "",
+  //             pdfFile: null,
+  //           };
+  //         } else {
+  //           return {
+  //             id: crypto.randomUUID(),
+  //             type: "text",
+  //             title: ch?.title || "",
+  //             content: ch?.content || "",
+  //             _chapterId: ch.id,
+  //             // Unused fields for this lesson type
+  //             pdfFile: null,
+  //             quizTitle: "",
+  //             quizDurationMinutes: "",
+  //             questions: [emptyQuizQuestion()],
+  //             _assessmentId: null,
+  //           };
+  //         }
+  //       });
+
+  //       setLessons(builtLessons.length ? builtLessons : [/* default empty lesson */]);
+
+  //     } catch (err) {
+  //       console.error(err);
+  //       toast.error(err?.response?.data?.message || "Failed to load course.");
+  //       navigate(-1);
+  //     } finally {
+  //       setInitialLoading(false);
+  //     }
+  //   };
+
+  //   loadCourseData();
+  // }, [courseId, token, navigate, reset]);
+
+
   useEffect(() => {
+
+    if (!courseId) return;
     const loadCourseData = async () => {
       try {
         setInitialLoading(true);
         if (token) api.defaults.headers.common.Authorization = `Bearer ${token}`;
 
-        const courseRes = await coursesAPI.get(courseId);
-        const c = unwrap(courseRes);
-        if (!c?.id) throw new Error("Course not found");
+        let c = courseFromState;
+        if (!c) {
+          const courseRes = await coursesAPI.get(courseId);
+          c = unwrap(courseRes);
+          if (!c?.id) throw new Error("Course not found");
+        }
+        setCourse(c);
 
+        // Initialize form fields
         reset({
           title: c?.title || "",
           category: c?.category || "",
@@ -320,15 +418,16 @@ export default function EditCoursePage() {
         });
         setCourseImage(c?.thumbnail || null);
 
+        // Chapters and lessons always need to be fetched
         const chaptersRes = await chaptersAPI.listByCourse(courseId);
         let chapters = unwrap(chaptersRes) || [];
         chapters.sort((a, b) => (a?.order || 0) - (b?.order || 0));
 
+        // Fetching assessments for each chapter
         const assessmentPromises = chapters.map(ch =>
           assessmentsAPI.listByChapter(ch.id)
             .then(res => {
               const unwrapped = unwrap(res);
-      
               return { chapterId: ch.id, assessments: unwrapped || [] };
             })
             .catch(err => {
@@ -338,29 +437,27 @@ export default function EditCoursePage() {
         );
 
         const chapterAssessments = await Promise.all(assessmentPromises);
-
         const assessmentMap = new Map(
           chapterAssessments.map(item => [item.chapterId, item.assessments[0]])
         );
 
+        // Build lessons array
         const builtLessons = chapters.map(ch => {
           const assessment = assessmentMap.get(ch.id);
-
           if (assessment) {
-            
-            const durationMin = assessment.timeLimitSeconds ? Math.round(Number(assessment.timeLimitSeconds) / 60) : "";
+            const durationMin = assessment.timeLimitSeconds
+              ? Math.round(Number(assessment.timeLimitSeconds) / 60)
+              : "";
             const uiQuestions = (assessment.questions || []).map(mapAPIQuestionToUI);
-        
             return {
               id: crypto.randomUUID(),
               type: "test",
               quizTitle: assessment?.title || ch?.title || "",
-              content: ch?.content || "", // <-- FIX: Always include the chapter's content
+              content: ch?.content || "",
               quizDurationMinutes: durationMin,
               questions: uiQuestions.length ? uiQuestions : [emptyQuizQuestion()],
               _chapterId: ch.id,
               _assessmentId: assessment.id,
-              // Unused fields for this lesson type
               title: "",
               pdfFile: null,
             };
@@ -371,7 +468,6 @@ export default function EditCoursePage() {
               title: ch?.title || "",
               content: ch?.content || "",
               _chapterId: ch.id,
-              // Unused fields for this lesson type
               pdfFile: null,
               quizTitle: "",
               quizDurationMinutes: "",
@@ -382,7 +478,6 @@ export default function EditCoursePage() {
         });
 
         setLessons(builtLessons.length ? builtLessons : [/* default empty lesson */]);
-
       } catch (err) {
         console.error(err);
         toast.error(err?.response?.data?.message || "Failed to load course.");
@@ -393,9 +488,8 @@ export default function EditCoursePage() {
     };
 
     loadCourseData();
-  }, [courseId, token, navigate, reset]);
+  }, [courseId, token, navigate, reset, courseFromState]);
 
-  /* ------------------------------ validation & submit ------------------------------ */
   const validateBeforeSubmit = () => {
     for (const [i, l] of lessons.entries()) {
       if (l.type === "text") {
@@ -568,7 +662,6 @@ export default function EditCoursePage() {
     }
   };
 
-  /* ------------------------------ preview (same as Create) ------------------------------ */
   const coursePreview = useMemo(
     () => ({
       title: watchedValues.title || "Course Title",
@@ -594,7 +687,6 @@ export default function EditCoursePage() {
     );
   }
 
-  /* ------------------------------ UI cloned to match Create ------------------------------ */
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

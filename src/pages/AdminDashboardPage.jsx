@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useState, forwardRef } from "react";
-import { Link } from "react-router-dom";
+import { useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Shield,
   Users,
   GraduationCap,
   BookOpen,
   Target,
-  Activity,
   Award,
   BarChart3,
   Search,
@@ -15,26 +15,17 @@ import {
   Eye,
   Edit,
   Plus,
-  Download,
   X,
-  Check,
   Building2
 } from "lucide-react";
+import { AssignCourseModal } from "./AssignCourseModal";
 import toast from "react-hot-toast";
 import {
-  superAdminAPI,
-  coursesAPI,
   adminScopedAPI,
   FALLBACK_THUMB,
-  collegesAPI
+  collegesAPI, authAPI
 } from "../services/api";
 import useAuthStore from "../store/useAuthStore";
-
-// const useAuthStore = () => ({
-//   user: { fullName: "Admin User" },
-//   token: "mock-jwt-token",
-//   logout: () => console.log("Logged out"),
-// });
 
 const Button = forwardRef(
   (
@@ -135,28 +126,6 @@ const Modal = ({ isOpen, onClose, title, children, size = "md" }) => {
   );
 };
 
-const Progress = ({ value = 0, variant = "primary", size = "md" }) => {
-  const variantClasses = {
-    primary: "bg-blue-600",
-    success: "bg-green-500",
-    accent: "bg-purple-500",
-  };
-  return (
-    <div className="w-full bg-gray-200 rounded-full h-2">
-      <div
-        className={`${variantClasses[variant]} h-2 rounded-full`}
-        style={{ width: `${value}%` }}
-      ></div>
-    </div>
-  );
-};
-
-
-const uiAvatar = (name = "User") =>
-  `https://ui-avatars.com/api/?name=${encodeURIComponent(
-    name
-  )}&background=random`;
-
 const fmtDate = (d) => {
   if (!d) return "—";
   try {
@@ -166,10 +135,10 @@ const fmtDate = (d) => {
   }
 };
 
-
 export default function AdminDashboardPage() {
   const { user } = useAuthStore();
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const [activeTab, setActiveTab] = useState("overview");
   const [searchTerm, setSearchTerm] = useState("");
@@ -203,6 +172,8 @@ export default function AdminDashboardPage() {
     students: false,
     courses: false,
   });
+  const [showAssignCourseModal, setShowAssignCourseModal] = useState(false);
+  const [selectedCourseForAssign, setSelectedCourseForAssign] = useState(null);
 
   const normRole = (r) => String(r || "").replace(/[^A-Z]/gi, "").toUpperCase();
 
@@ -210,48 +181,42 @@ export default function AdminDashboardPage() {
     const { user } = useAuthStore.getState();
     const role = normRole(user?.role);
     const collegeId = user?.collegeId || user?.college?.id || null;
-
-    const normalizeTotals = (raw) => {
-      const t = raw?.overview?.totals || raw?.overview || raw?.totals || raw || {};
-      return { data: { totals: t } };
-    };
-
     return {
       overview: async () => {
-        if (role === "SUPERADMIN") {
-          const data = await superAdminAPI.getOverview();
 
-          return data;
-        }
         const data = await adminScopedAPI.overview(collegeId);
         return data;
 
       },
 
       instructors: async () => {
-        if (role === "SUPERADMIN") {
-          const data = await superAdminAPI.getInstructors();   // array
-          return { data };
-        }
-        const data = await adminScopedAPI.instructors(collegeId); // { data: [...] } or array
-        return Array.isArray(data) ? { data } : { data: data?.data ?? [] };
+
+        const response = await adminScopedAPI.instructors(collegeId);
+
+        const instructorsList = response?.data || response || [];
+
+        return { data: instructorsList };
       },
 
+
       students: async () => {
-        if (role === "SUPERADMIN") {
-          const data = await superAdminAPI.getStudents();      // array
-          return { data };
+        const data = await adminScopedAPI.students(collegeId);
+        console.log("Students data:", data);
+
+        // Correct: Always return an array, either data.data, or data if it's already an array
+        if (Array.isArray(data)) {
+          return data;
         }
-        const data = await adminScopedAPI.students(collegeId); // { data: [...] }
-        return Array.isArray(data) ? { data } : { data: data?.data ?? [] };
+        if (Array.isArray(data?.data)) {
+          return data.data;
+        }
+        return [];
       },
 
       courses: async () => {
-        if (role === "SUPERADMIN") {
-          const list = await coursesAPI.list();                // superadmin sees all
-          return { data: Array.isArray(list) ? list : list?.data ?? [] };
-        }
-        const data = await adminScopedAPI.courses(collegeId);  // { data: [...] }
+
+        const data = await adminScopedAPI.courses(collegeId);
+        console.log("Course data :", data) // { data: [...] }
         return Array.isArray(data) ? { data } : { data: data?.data ?? [] };
       },
     };
@@ -274,12 +239,6 @@ export default function AdminDashboardPage() {
     return map;
   }, [courses]);
 
-  const courseTitleById = useMemo(() => {
-    const map = {};
-    for (const c of courses) map[c.id] = c.title || c.id;
-    return map;
-  }, [courses]);
-
   const stats = useMemo(() => {
     const ov = overview?.totals ?? overview ?? {};
     const totalInstructors =
@@ -292,60 +251,23 @@ export default function AdminDashboardPage() {
       (typeof ov.courses === "number" ? ov.courses : undefined) ??
       courses.length;
 
+    const certificatesGenerated =
+      typeof ov.certificatesGenerated === "number"
+        ? ov.certificatesGenerated
+        : 0;
+
     const activeUsers =
       [...instructors, ...students].filter((u) => u.isActive).length || 0;
-
-    const completionRate = Math.floor(Math.random() * 30) + 70;
-    const averageGrade = Math.floor(Math.random() * 20) + 75;
 
     return {
       totalInstructors,
       totalStudents,
       totalCourses,
       activeUsers,
-      completionRate,
-      averageGrade,
+      certificatesGenerated,
     };
-  }, [overview, instructors, students, courses,]);
+  }, [overview, instructors, students, courses]);
 
-  // Around line 330 - After existing stats useMemo
-  const overviewStats = useMemo(() => {
-    const activeInstructors = instructors.filter(i => i.isActive).length;
-    const activeStudents = students.filter(s => s.isActive).length;
-    const publishedCourses = courses.filter(c => c.status === 'published').length;
-    const draftCourses = courses.filter(c => c.status === 'draft').length;
-
-    // Calculate engagement metrics
-    const totalEnrollments = students.reduce((sum, s) =>
-      sum + (s.assignedCourses?.length || 0), 0
-    );
-
-    const avgEnrollmentsPerCourse = courses.length > 0
-      ? Math.round(totalEnrollments / courses.length)
-      : 0;
-
-    // Recent activity (last 7 days simulation)
-    const recentLogins = [...instructors, ...students]
-      .filter(u => {
-        if (!u.lastLogin) return false;
-        const loginDate = new Date(u.lastLogin);
-        const weekAgo = new Date();
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        return loginDate >= weekAgo;
-      })
-      .length;
-
-    return {
-      activeInstructors,
-      activeStudents,
-      publishedCourses,
-      draftCourses,
-      totalEnrollments,
-      avgEnrollmentsPerCourse,
-      recentLogins,
-      inactiveUsers: instructors.length + students.length - activeInstructors - activeStudents,
-    };
-  }, [instructors, students, courses]);
 
   useEffect(() => {
     (async () => {
@@ -385,25 +307,27 @@ export default function AdminDashboardPage() {
           lastLogin: i.lastLogin,
           avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(i.fullName || i.name || "I")}&background=random`,
           assignedCourses: i.assignedCourses || null,
+          department: i.department,
         }));
         setInstructors(normInstructors);
       }
 
       if (tabName === "students") {
         const stu = await api.students();
-        const normStudents = (stu?.data || []).map((s) => ({
-          id: s.id,
+
+        // Safely get the array of students in any case
+        const studentsList = Array.isArray(stu)
+          ? stu
+          : (Array.isArray(stu?.data) ? stu.data : []);
+
+        const normStudents = studentsList.map(s => ({
+          ...s,
           fullName: s.fullName || s.name || "Student",
-          email: s.email,
-          isActive: !!s.isActive,
-          lastLogin: s.lastLogin,
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(s.fullName || s.name || "S")}&background=random`,
-          assignedCourses: s.assignedCourses || [],
-          progress: {},
+          avatar: `https://ui-avatars.com/api?name=${encodeURIComponent(s.fullName || s.name || "S")}&background=random`,
         }));
         setStudents(normStudents);
 
-        const statsMap = (stu?.data || []).reduce((acc, s) => {
+        const statsMap = studentsList.reduce((acc, s) => {
           acc[s.id] = {
             finalTests: s.finalTests || 0,
             interviews: s.interviews || 0,
@@ -413,6 +337,24 @@ export default function AdminDashboardPage() {
         }, {});
         setStudentStats(statsMap);
       }
+
+      // if (tabName === "courses") {
+      //   const cr = await api.courses();
+      //   const normCourses = (cr?.data || []).map((c) => ({
+      //     id: c.id,
+      //     title: c.title,
+      //     description: c.description || "",
+      //     thumbnail: c.thumbnail || FALLBACK_THUMB,
+      //     status: c.status || "draft",
+      //     level: c.level ?? null,
+      //     totalModules: c.totalModules ?? 0,
+      //     totalChapters: c.totalChapters ?? 0,
+      //     studentCount: c.studentCount || 0,
+      //     instructorNames: c.instructorNames || [],
+      //     instructorIds: c.instructorIds || (Array.isArray(c.instructors) ? c.instructors.map((x) => x.id) : []),
+      //   }));
+      //   setCourses(normCourses);
+      // }
 
       if (tabName === "courses") {
         const cr = await api.courses();
@@ -426,45 +368,14 @@ export default function AdminDashboardPage() {
           totalModules: c.totalModules ?? 0,
           totalChapters: c.totalChapters ?? 0,
           studentCount: c.studentCount || 0,
+          madeBySuperAdmin: c.madeBySuperAdmin || false, // ✅ Add this
           instructorNames: c.instructorNames || [],
           instructorIds: c.instructorIds || (Array.isArray(c.instructors) ? c.instructors.map((x) => x.id) : []),
         }));
         setCourses(normCourses);
       }
 
-      // ✅ ADD DEPARTMENTS SECTION
-      // if (tabName === "departments") {
-      //   const user = useAuthStore.getState().user;
-      //   const collegeId = user?.collegeId;
 
-      //   if (!collegeId) {
-      //     toast.error('College ID not found');
-      //     return;
-      //   }
-
-      //   const response = await collegesAPI.getDepartmentsForCollege(collegeId);
-
-      //   // ✅ FIXED: Add items path
-      //   const rawData = response?.data?.data?.items      // ← Add this first
-      //     || response?.data?.data
-      //     || response?.data?.items             // ← Add this too
-      //     || response?.data?.departments
-      //     || response?.data
-      //     || [];
-
-      //   const departmentsArray = Array.isArray(rawData) ? rawData : [];
-
-      //   const normDepartments = departmentsArray.map((d) => ({
-      //     id: d.id,
-      //     name: d.name,
-      //     description: d.description || "",
-      //     instructorCount: d.instructorCount || d._count?.instructors || 0,
-      //     studentCount: d.studentCount || d._count?.students || 0,
-      //     courseCount: d.courseCount || d._count?.courses || 0,
-      //   }));
-
-      //   setDepartments(normDepartments);
-      // }
       if (tabName === "departments") {
         const user = useAuthStore.getState().user;
         const collegeId = user?.collegeId;
@@ -536,6 +447,7 @@ export default function AdminDashboardPage() {
     });
   }, [students, searchTerm, userFilter]);
 
+
   const filteredCourses = useMemo(() => {
     const q = (searchTerm || "").toLowerCase();
     return courses.filter((c) => {
@@ -550,23 +462,52 @@ export default function AdminDashboardPage() {
     });
   }, [courses, searchTerm, courseFilter]);
 
-  const toggleUserSelection = (id) => {
-    setSelectedUsers((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  };
+  // const handleUserAction = async (userId, action) => {
+  //   try {
+  //     if (action === "activate" || action === "deactivate") {
+  //       const active = action === "activate";
+  //       setInstructors((arr) =>
+  //         arr.map((u) => (u.id === userId ? { ...u, isActive: active } : u))
+  //       );
+  //       setStudents((arr) =>
+  //         arr.map((u) => (u.id === userId ? { ...u, isActive: active } : u))
+  //       );
+  //       toast.success(`User ${active ? "activated" : "deactivated"}`);
+  //     } else if (action === "view" || action === "edit") {
+  //       const u =
+  //         [...instructors, ...students].find((x) => x.id === userId) || null;
+  //       setSelectedUser(u);
+  //       setShowUserModal(true);
+  //     }
+  //   } catch (e) {
+  //     toast.error(`Failed to ${action} user`);
+  //   }
+  // };
 
   const handleUserAction = async (userId, action) => {
     try {
       if (action === "activate" || action === "deactivate") {
         const active = action === "activate";
-        setInstructors((arr) =>
-          arr.map((u) => (u.id === userId ? { ...u, isActive: active } : u))
-        );
-        setStudents((arr) =>
-          arr.map((u) => (u.id === userId ? { ...u, isActive: active } : u))
-        );
-        toast.success(`User ${active ? "activated" : "deactivated"}`);
+
+        // Call backend API
+        const res = await authAPI.setActiveStatus(userId, active);
+        if (res.success && res.data) {
+          // Update UI state to reflect DB change
+          setInstructors((arr) =>
+            arr.map((u) => (u.id === userId ? { ...u, isActive: res.data.isActive } : u))
+          );
+          setStudents((arr) =>
+            arr.map((u) => (u.id === userId ? { ...u, isActive: res.data.isActive } : u))
+          );
+          setSelectedUser((prev) => ({
+            ...prev,
+            isActive: res.data.isActive,
+          }));
+
+          toast.success(`User ${active ? "activated" : "deactivated"}`);
+        } else {
+          toast.error("Failed to update user status.");
+        }
       } else if (action === "view" || action === "edit") {
         const u =
           [...instructors, ...students].find((x) => x.id === userId) || null;
@@ -578,6 +519,11 @@ export default function AdminDashboardPage() {
     }
   };
 
+
+  const goEdit = useCallback(
+    (course) => navigate(`/courses/${course.id}/edit`, { state: { course } }),
+    [navigate]
+  );
 
   if (loading) {
     return (
@@ -749,7 +695,7 @@ export default function AdminDashboardPage() {
             </div>
           </Card>
 
-          {/* Completion Card */}
+          {/* Certificate Card */}
           <Card
             className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-indigo-300 bg-white"
             onClick={() => setActiveTab("overview")}
@@ -762,14 +708,15 @@ export default function AdminDashboardPage() {
               </div>
               <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
                 <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Completion
+                  Certificates Generated
                 </p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                  {stats?.completionRate || 0}%
+                  {stats?.certificatesGenerated || 0}
                 </p>
               </div>
             </div>
           </Card>
+
 
           {/* Average Grade Card */}
           <Card
@@ -793,8 +740,6 @@ export default function AdminDashboardPage() {
             </div>
           </Card>
         </div>
-
-
 
         {/* Tabs */}
         <div className="mb-6">
@@ -830,203 +775,149 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Overview Tab */}
-          {activeTab === "overview" && (
-            <div className="space-y-6">
-              {/* Quick Stats Grid */}
-              {/* <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total Users</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-2">
-                        {overview.instructors + overview.students}
-                      </p>
-                      <p className="text-xs text-green-600 mt-1">
-                        ↑ {overviewStats.activeInstructors + overviewStats.activeStudents} active
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <Users className="text-blue-600" size={24} />
-                    </div>
-                  </div>
-                </Card>
+        {activeTab === "overview" && (
+          <div className="space-y-6">
 
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Total Enrollments</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-2">
-                        {overviewStats.totalEnrollments}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Avg {overviewStats.avgEnrollmentsPerCourse} per course
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                      <Target className="text-purple-600" size={24} />
-                    </div>
-                  </div>
-                </Card>
-
-                <Card className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-gray-600">Active This Week</p>
-                      <p className="text-3xl font-bold text-gray-900 mt-2">
-                        {overviewStats.recentLogins}
-                      </p>
-                      <p className="text-xs text-green-600 mt-1">
-                        Recent logins
-                      </p>
-                    </div>
-                    <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-                      <Activity className="text-yellow-600" size={24} />
-                    </div>
-                  </div>
-                </Card>
-              </div> */}
-
-              {/* Two Column Layout */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Department Breakdown */}
-                <Card>
-                  <Card.Header>
-                    <Card.Title>Department Distribution</Card.Title>
-                  </Card.Header>
-                  <Card.Content>
-                    {departments.length > 0 ? (
-                      <div className="space-y-4">
-                        {departments.slice(0, 5).map((dept) => (
-                          <div key={dept.id} className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <Building2 size={16} className="text-gray-400" />
-                              <span className="text-sm font-medium text-gray-900">
-                                {dept.name}
-                              </span>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                              <span className="text-xs text-gray-500">
-                                {dept.instructorCount}I / {dept.studentCount}S
-                              </span>
-                              <Badge variant="info" size="sm">
-                                {dept.courseCount} courses
-                              </Badge>
-                            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Department Breakdown */}
+              <Card>
+                <Card.Header>
+                  <Card.Title>Department Distribution</Card.Title>
+                </Card.Header>
+                <Card.Content>
+                  {departments.length > 0 ? (
+                    <div className="space-y-4">
+                      {departments.slice(0, 5).map((dept) => (
+                        <div key={dept.id} className="flex items-center justify-between">
+                          <div className="flex items-center space-x-3">
+                            <Building2 size={16} className="text-gray-400" />
+                            <span className="text-sm font-medium text-gray-900">
+                              {dept.name}
+                            </span>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <Building2 size={32} className="mx-auto text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-500">No departments yet</p>
-                      </div>
-                    )}
-                  </Card.Content>
-                </Card>
-
-                {/* Recent Courses */}
-                <Card>
-                  <Card.Header>
-                    <div className="flex items-center justify-between">
-                      <Card.Title>Recent Courses</Card.Title>
-                      <Link to="/courses">
-                        <Button variant="ghost" size="sm">View All</Button>
-                      </Link>
+                          <div className="flex items-center space-x-4">
+                            <span className="text-xs text-gray-500">
+                              {dept.instructorCount}I / {dept.studentCount}S
+                            </span>
+                            <Badge variant="info" size="sm">
+                              {dept.courseCount} courses
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  </Card.Header>
-                  <Card.Content>
-                    {courses.length > 0 ? (
-                      <div className="space-y-3">
-                        {courses.slice(0, 5).map((course) => (
-                          <div key={course.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg">
-                            <img
-                              src={course.thumbnail || FALLBACK_THUMB}
-                              alt={course.title}
-                              className="w-12 h-12 rounded object-cover"
-                              onError={(e) => (e.currentTarget.src = FALLBACK_THUMB)}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-gray-900 truncate">
-                                {course.title}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {course.studentCount} students
-                              </p>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Building2 size={32} className="mx-auto text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-500">No departments yet</p>
+                    </div>
+                  )}
+                </Card.Content>
+              </Card>
+
+              {/* Recent Courses */}
+              <Card>
+                <Card.Header>
+                  <div className="flex items-center justify-between">
+                    <Card.Title>Recent Courses</Card.Title>
+                    <Link to="/courses">
+                      <Button variant="ghost" size="sm">View All</Button>
+                    </Link>
+                  </div>
+                </Card.Header>
+                <Card.Content>
+                  {courses.length > 0 ? (
+                    <div className="space-y-3">
+                      {courses.slice(0, 5).map((course) => (
+                        <div key={course.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg">
+                          <img
+                            src={course.thumbnail || FALLBACK_THUMB}
+                            alt={course.title}
+                            className="w-12 h-12 rounded object-cover"
+                            onError={(e) => (e.currentTarget.src = FALLBACK_THUMB)}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {course.title}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {course.studentCount} students
+                            </p>
+                          </div>
+                          <Badge
+                            variant={course.status === 'published' ? 'success' : 'warning'}
+                            size="sm"
+                          >
+                            {course.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <BookOpen size={32} className="mx-auto text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-500">No courses available</p>
+                    </div>
+                  )}
+                </Card.Content>
+              </Card>
+
+              {/* Top Instructors */}
+              <Card>
+                <Card.Header>
+                  <Card.Title>Top Instructors</Card.Title>
+                </Card.Header>
+                <Card.Content>
+                  {instructors.length > 0 ? (
+                    <div className="space-y-3">
+                      {instructors
+                        .sort((a, b) => {
+                          const countA = instructorCourseIndex[a.id]?.count || 0;
+                          const countB = instructorCourseIndex[b.id]?.count || 0;
+                          return countB - countA;
+                        })
+                        .slice(0, 5)
+                        .map((instructor) => (
+                          <div key={instructor.id} className="flex items-center justify-between">
+                            <div className="flex items-center space-x-3">
+                              <img
+                                src={instructor.avatar}
+                                alt={instructor.fullName}
+                                className="w-10 h-10 rounded-full"
+                              />
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {instructor.fullName}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {instructorCourseIndex[instructor.id]?.count || 0} courses
+                                </p>
+                              </div>
                             </div>
                             <Badge
-                              variant={course.status === 'published' ? 'success' : 'warning'}
+                              variant={instructor.isActive ? 'success' : 'danger'}
                               size="sm"
                             >
-                              {course.status}
+                              {instructor.isActive ? 'Active' : 'Inactive'}
                             </Badge>
                           </div>
                         ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <BookOpen size={32} className="mx-auto text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-500">No courses available</p>
-                      </div>
-                    )}
-                  </Card.Content>
-                </Card>
-
-                {/* Top Instructors */}
-                <Card>
-                  <Card.Header>
-                    <Card.Title>Top Instructors</Card.Title>
-                  </Card.Header>
-                  <Card.Content>
-                    {instructors.length > 0 ? (
-                      <div className="space-y-3">
-                        {instructors
-                          .sort((a, b) => {
-                            const countA = instructorCourseIndex[a.id]?.count || 0;
-                            const countB = instructorCourseIndex[b.id]?.count || 0;
-                            return countB - countA;
-                          })
-                          .slice(0, 5)
-                          .map((instructor) => (
-                            <div key={instructor.id} className="flex items-center justify-between">
-                              <div className="flex items-center space-x-3">
-                                <img
-                                  src={instructor.avatar}
-                                  alt={instructor.fullName}
-                                  className="w-10 h-10 rounded-full"
-                                />
-                                <div>
-                                  <p className="text-sm font-medium text-gray-900">
-                                    {instructor.fullName}
-                                  </p>
-                                  <p className="text-xs text-gray-500">
-                                    {instructorCourseIndex[instructor.id]?.count || 0} courses
-                                  </p>
-                                </div>
-                              </div>
-                              <Badge
-                                variant={instructor.isActive ? 'success' : 'danger'}
-                                size="sm"
-                              >
-                                {instructor.isActive ? 'Active' : 'Inactive'}
-                              </Badge>
-                            </div>
-                          ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8">
-                        <Users size={32} className="mx-auto text-gray-400 mb-2" />
-                        <p className="text-sm text-gray-500">No instructors yet</p>
-                      </div>
-                    )}
-                  </Card.Content>
-                </Card>
-              </div>
-
-              {/* Action Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <Users size={32} className="mx-auto text-gray-400 mb-2" />
+                      <p className="text-sm text-gray-500">No instructors yet</p>
+                    </div>
+                  )}
+                </Card.Content>
+              </Card>
             </div>
-          )}
+
+            {/* Action Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            </div>
+          </div>
+        )}
 
         {/* Instructors */}
         {activeTab === "instructors" && (
@@ -1078,7 +969,7 @@ export default function AdminDashboardPage() {
                             Courses Assigned
                           </th>
                           <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                            Course Names
+                            Department Name
                           </th>
                           <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
                             Last Login
@@ -1099,10 +990,16 @@ export default function AdminDashboardPage() {
                                   className="w-9 h-9 rounded-full mr-3"
                                 />
                                 <div>
-                                  <div className="font-medium text-gray-900">
+                                  <div className="font-medium text-gray-900"
+                                    onClick={() => {
+                                      handleUserAction(instructor.id, "edit")
+                                    }}
+                                  >
                                     {instructor.fullName}
                                   </div>
-                                  <div className="text-sm text-gray-500">
+                                  <div className="text-sm text-gray-500" onClick={() => {
+                                    handleUserAction(instructor.id, "edit")
+                                  }}>
                                     {instructor.email}
                                   </div>
                                 </div>
@@ -1120,20 +1017,14 @@ export default function AdminDashboardPage() {
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-blue-50 text-blue-700 text-sm font-medium">
-                                {instructor.assignedCourses?.length ??
-                                  (instructorCourseIndex[instructor.id]?.count ||
-                                    0)}
+                                {instructor.department?.totalCourseCount ?? 0}
                               </span>
+
                             </td>
 
                             <td className="px-6 py-4 text-sm text-gray-500">
-                              {instructorCourseIndex[instructor.id]?.titles
-                                ?.length ? (
-                                instructorCourseIndex[instructor.id].titles.join(
-                                  ", "
-                                )
-                              ) : (
-                                <span className="text-gray-500">No Course</span>
+                              {instructor.department?.name || (
+                                <span className="text-gray-400 italic">No Department</span>
                               )}
                             </td>
 
@@ -1151,7 +1042,7 @@ export default function AdminDashboardPage() {
                                 >
                                   <Edit size={16} />
                                 </button>
-                                <button
+                                {/* <button
                                   onClick={() =>
                                     handleUserAction(
                                       instructor.id,
@@ -1168,12 +1059,7 @@ export default function AdminDashboardPage() {
                                     instructor.isActive ? "Deactivate" : "Activate"
                                   }
                                 >
-                                  {instructor.isActive ? (
-                                    <Check size={16} />
-                                  ) : (
-                                    <X size={16} />
-                                  )}
-                                </button>
+                                </button> */}
                               </div>
                             </td>
                           </tr>
@@ -1220,7 +1106,7 @@ export default function AdminDashboardPage() {
                     </select>
                   </div>
 
-                  {/* ✅ FIXED: Removed extra <div> wrapper */}
+                  {/* Bulk action buttons for selected students */}
                   {selectedUsers.length > 0 && (
                     <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
                       <Button
@@ -1261,6 +1147,22 @@ export default function AdminDashboardPage() {
                     <table className="min-w-full divide-y divide-gray-200">
                       <thead className="bg-gray-50">
                         <tr>
+                          <th className="px-3 py-3 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                            <input
+                              type="checkbox"
+                              checked={
+                                filteredStudents.length > 0 &&
+                                filteredStudents.every((s) => selectedUsers.includes(s.id))
+                              }
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedUsers(filteredStudents.map((s) => s.id));
+                                } else {
+                                  setSelectedUsers([]);
+                                }
+                              }}
+                            />
+                          </th>
                           <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
                             Student
                           </th>
@@ -1271,10 +1173,13 @@ export default function AdminDashboardPage() {
                             Final Tests
                           </th>
                           <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
-                            Interviews
+                            Department Name
                           </th>
                           <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
                             Certifications
+                          </th>
+                          <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                            Actions
                           </th>
                         </tr>
                       </thead>
@@ -1288,6 +1193,19 @@ export default function AdminDashboardPage() {
 
                           return (
                             <tr key={s.id} className="hover:bg-gray-50">
+                              <td className="px-3 py-4 whitespace-nowrap">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedUsers.includes(s.id)}
+                                  onChange={(e) => {
+                                    if (e.target.checked) {
+                                      setSelectedUsers([...selectedUsers, s.id]);
+                                    } else {
+                                      setSelectedUsers(selectedUsers.filter(id => id !== s.id));
+                                    }
+                                  }}
+                                />
+                              </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <div className="flex items-center">
                                   <img
@@ -1295,7 +1213,11 @@ export default function AdminDashboardPage() {
                                     alt={s.fullName}
                                     className="w-9 h-9 rounded-full mr-3"
                                   />
-                                  <div>
+                                  <div className="cursor-pointer"
+                                    onClick={() => {
+                                      setSelectedUser(s);
+                                      setShowUserModal(true);
+                                    }}>
                                     <div className="font-medium text-gray-900">
                                       {s.fullName}
                                     </div>
@@ -1317,13 +1239,25 @@ export default function AdminDashboardPage() {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-center">
                                 <span className="text-green-600 font-medium">
-                                  {loadingStats ? "..." : stats.interviews}
+                                  {s.department?.name || <span className="text-gray-400 italic">No Department</span>}
                                 </span>
+
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-center">
                                 <span className="text-purple-600 font-medium">
                                   {loadingStats ? "..." : stats.certifications}
                                 </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button
+                                  onClick={() =>
+                                    handleUserAction(s.id, "edit")
+                                  }
+                                  className="text-blue-600 hover:text-blue-900"
+                                  title="Edit"
+                                >
+                                  <Edit size={16} />
+                                </button>
                               </td>
                             </tr>
                           );
@@ -1371,15 +1305,7 @@ export default function AdminDashboardPage() {
                   </div>
 
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => toast("Export coming soon!")}
-                      className="w-full sm:w-auto"
-                    >
-                      <Download size={16} className="mr-2" />
-                      Export
-                    </Button>
+
                     <Link to="/courses/create" className="w-full sm:w-auto">
                       <Button size="sm" className="w-full sm:w-auto">
                         <Plus size={16} className="mr-2" />
@@ -1414,9 +1340,15 @@ export default function AdminDashboardPage() {
                           >
                             {course.status}
                           </Badge>
-                          <Badge variant="info" size="sm">
-                            {course.level ?? "—"}
-                          </Badge>
+                          {course.madeBySuperAdmin ? (
+                            <Badge variant="outline" size="sm" className="bg-blue-50 text-blue-600 border-blue-200">
+                              Assigned
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" size="sm" className="bg-green-50 text-green-600 border-green-200">
+                              Created
+                            </Badge>
+                          )}
                         </div>
 
                         <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
@@ -1427,41 +1359,44 @@ export default function AdminDashboardPage() {
                         </p>
 
                         <div className="flex items-center justify-between text-xs sm:text-sm text-gray-500 mb-4">
-                          <span>{course.totalModules} modules</span>
+
                           <span>{course.totalChapters} chapters</span>
                           <span>{course.studentCount} students</span>
                         </div>
 
                         <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+                          <Link to={`/courses/${course.id}`}>
+                            <Button size="sm" variant="outline">
+                              <Eye size={16} className="mr-1" />
+                              View
+                            </Button>
+                          </Link>
+                          {!course.madeBySuperAdmin && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => goEdit(course)}
+                              className="w-full sm:w-auto"
+                            >
+                              <Edit size={16} className="mr-1" />
+                              Edit
+                            </Button>
+
+                          )}
+
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              setSelectedCourse(course);
-                              setShowCourseModal(true);
+                              setSelectedCourseForAssign(course);
+                              setShowAssignCourseModal(true);
                             }}
                             className="w-full sm:w-auto"
                           >
-                            <Eye size={16} className="mr-1" />
-                            View
+                            <Plus size={16} className="mr-1" />
+                            Assign
                           </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => toast.info("Course editor coming soon!")}
-                            className="w-full sm:w-auto"
-                          >
-                            <Edit size={16} className="mr-1" />
-                            Edit
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toast.info("Analytics coming soon!")}
-                            className="w-full sm:w-auto"
-                          >
-                            <BarChart3 size={16} />
-                          </Button>
+
                         </div>
                       </Card.Content>
                     </Card>
@@ -1496,18 +1431,18 @@ export default function AdminDashboardPage() {
                         </th>
                       </tr>
                     </thead>
-                  
+
 
                     <tbody className="bg-white divide-y divide-gray-200">
                       {departments.map((dept) => (
-                     
+
                         <tr key={dept.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4">
                             <div className="flex items-center">
                               <Building2 size={20} className="text-gray-400 mr-3 flex-shrink-0" />
                               <div>
                                 <div className="font-medium text-gray-900">
-                                 <Link to={`/departments/${dept.id}/analytics`}>{dept.name}</Link>
+                                  <Link to={`/departments/${dept.id}/analytics`}>{dept.name}</Link>
                                 </div>
                                 {dept.description && (
                                   <div className="text-sm text-gray-500 mt-0.5">
@@ -1544,6 +1479,19 @@ export default function AdminDashboardPage() {
 
       </div>
 
+      <AssignCourseModal
+        course={selectedCourseForAssign}
+        role={user.role}
+        collegeId={user.collegeId}
+        isOpen={showAssignCourseModal}
+        onClose={() => setShowAssignCourseModal(false)}
+        onSuccess={() => {
+          setShowAssignCourseModal(false);
+          // Optionally refresh or update courses/assignments
+        }}
+      />
+
+
       {/* User Modal */}
       <Modal
         isOpen={showUserModal}
@@ -1565,11 +1513,6 @@ export default function AdminDashboardPage() {
                 </h3>
                 <p className="text-gray-600 break-all">{selectedUser.email}</p>
                 <div className="flex flex-wrap justify-center sm:justify-start items-center gap-2 mt-2">
-                  <Badge variant="info" size="sm">
-                    {instructors.some((i) => i.id === selectedUser.id)
-                      ? "instructor"
-                      : "student"}
-                  </Badge>
                   <Badge
                     variant={selectedUser.isActive ? "success" : "danger"}
                     size="sm"
@@ -1580,26 +1523,78 @@ export default function AdminDashboardPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Last Login
-                </label>
-                <p className="text-sm text-gray-900">
-                  {fmtDate(selectedUser.lastLogin)}
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Assigned Courses
-                </label>
-                <p className="text-sm text-gray-900">
-                  {selectedUser.assignedCourses?.length ??
-                    instructorCourseIndex[selectedUser.id]?.count ??
-                    0}
-                </p>
-              </div>
-            </div>
+            {/* STUDENT-SPECIFIC CONTENT */}
+            {selectedUser.role === "student" && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Department
+                    </label>
+                    <p className="text-sm text-gray-900">
+                      {selectedUser.department?.name || (
+                        <span className="text-gray-400 italic">No Department</span>
+                      )}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Enrolled Courses
+                    </label>
+                    <p className="text-sm text-gray-900">
+                      {selectedUser.assignedCourses?.length || 0}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Total Tests Taken
+                    </label>
+                    <p className="text-sm text-gray-900">
+                      {studentStats[selectedUser.id]?.finalTests || 0}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Total Certificates
+                    </label>
+                    <p className="text-sm text-gray-900">
+                      {studentStats[selectedUser.id]?.certifications || 0}
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Last Login
+                    </label>
+                    <p className="text-sm text-gray-900">
+                      {fmtDate(selectedUser.lastLogin)}
+                    </p>
+                  </div>
+                </div>
+
+                {/* List courses for student */}
+                {selectedUser.assignedCourses &&
+                  selectedUser.assignedCourses.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Enrolled Courses
+                      </label>
+                      <div className="bg-gray-50 rounded-lg p-3 max-h-40 overflow-y-auto">
+                        <ul className="space-y-1">
+                          {selectedUser.assignedCourses.map((course, idx) => (
+                            <li key={idx} className="text-sm text-gray-700">
+                              • {course.title || course.name || `Course ${idx + 1}`}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+                  )}
+              </>
+            )}
 
             <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
               <Button
@@ -1672,12 +1667,7 @@ export default function AdminDashboardPage() {
             </p>
 
             <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <div className="text-xl font-bold text-blue-600">
-                  {selectedCourse.totalModules}
-                </div>
-                <div className="text-sm text-blue-800">Modules</div>
-              </div>
+
               <div className="p-3 bg-green-50 rounded-lg">
                 <div className="text-xl font-bold text-green-600">
                   {selectedCourse.totalChapters}
@@ -1700,14 +1690,7 @@ export default function AdminDashboardPage() {
                 <Edit size={16} className="mr-2" />
                 Edit Course
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => toast.info("Analytics coming soon!")}
-                className="w-full sm:w-auto"
-              >
-                <BarChart3 size={16} className="mr-2" />
-                View Analytics
-              </Button>
+
               <Button
                 variant="outline"
                 onClick={() => setShowCourseModal(false)}

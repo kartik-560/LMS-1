@@ -240,13 +240,14 @@ IsSuperAdmin: ${isSuperAdmin}`}
           {isSuperAdmin ? 'Department Management' : 'Add Departments'}
         </h2>
         <div className="text-sm text-gray-600 mt-2">
-          <p>Admin: <span className="font-semibold">{adminName}</span></p>
-          {collegeId && (
-            <p>College ID: <span className="font-semibold">{collegeId}</span></p>
-          )}
-          {isSuperAdmin && (
+
+          {isSuperAdmin ? (
             <p className="mt-1 inline-block px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">
               🔐 Superadmin Access
+            </p>
+          ) : (
+            <p className="mt-1 inline-block px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">
+              🔐 Admin Access
             </p>
           )}
         </div>
@@ -354,6 +355,56 @@ IsSuperAdmin: ${isSuperAdmin}`}
               </div>
             </div>
           )}
+          {/* Direct add department field for Admin */}
+          <div className="mb-8 p-4 bg-green-50 border-l-4 border-green-500 rounded flex items-center">
+            <input
+              type="text"
+              value={newDepartmentName}
+              onChange={e => setNewDepartmentName(e.target.value)}
+              placeholder="Enter new department name"
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-md mr-4 focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition"
+              disabled={submitting}
+              maxLength="100"
+            />
+            <button
+              type="button"
+              disabled={submitting || !newDepartmentName.trim()}
+              onClick={async () => {
+                setSubmitting(true);
+                setError(null);
+                setSuccessMessage("");
+                try {
+                  if (!collegeId) {
+                    setError("College ID is required.");
+                  } else {
+                    const resp = await departmentAPI.postDepartment({
+                      name: newDepartmentName.trim(),
+                      collegeId,
+                    });
+                    if (resp.data.success) {
+                      setSuccessMessage(`Successfully added "${newDepartmentName}" to this college!`);
+                      setNewDepartmentName("");
+                      await fetchExistingDepartments();
+                      setTimeout(() => setSuccessMessage(''), 5000);
+                    } else {
+                      setError(resp.data.message || "Failed to add department");
+                    }
+                  }
+                } catch (err) {
+                  setError(err?.response?.data?.message || err.message || "Error adding department");
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              className={`px-4 py-2 rounded-md font-semibold text-white transition duration-200 ${submitting || !newDepartmentName.trim()
+                ? 'bg-gray-400 cursor-not-allowed'
+                : 'bg-green-600 hover:bg-green-700 active:bg-green-800'
+                }`}
+            >
+              Add Department
+            </button>
+          </div>
+
 
           {availableDepartments.length === 0 ? (
             <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">

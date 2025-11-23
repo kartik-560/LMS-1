@@ -344,7 +344,23 @@ export default function RegisterPage() {
           )}
 
 
-          <Input label="Mobile" type="tel" {...register("mobile", { pattern: { value: /^[6-9]\d{9}$/, message: "Please enter a valid 10-digit Indian mobile number" } })} error={errors.mobile?.message} />
+          <Input
+            label="Mobile"
+            type="tel"
+            maxLength={10}
+            {...register("mobile", {
+              pattern: {
+                value: /^[6-9]\d{9}$/,
+                message: "Please enter a valid 10-digit Indian mobile number",
+              },
+              maxLength: {
+                value: 10,
+                message: "Mobile number must be at most 10 digits"
+              }
+            })}
+            error={errors.mobile?.message}
+          />
+
 
           <Button type="submit" size="sm" className="w-32 mx-auto flex justify-center py-1.5 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700" disabled={isLoading}>
             {isLoading ? "Adding..." : "Add User"}

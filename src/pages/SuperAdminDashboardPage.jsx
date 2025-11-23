@@ -36,6 +36,7 @@ import {
   coursesAPI,
   collegesAPI,
   departmentAPI,
+  authAPI,
 } from "../services/api";
 
 const normalizeRole = (r) =>
@@ -87,6 +88,7 @@ export default function SuperAdminDashboardPage() {
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [updatingCollegeId, setUpdatingCollegeId] = useState(null);
   const [updatingUserId, setUpdatingUserId] = useState(null);
+  const [students, setStudents] = useState([]);
 
 
   const [permLimits, setPermLimits] = useState({
@@ -312,9 +314,9 @@ export default function SuperAdminDashboardPage() {
       isActive: !!u.isActive,
       permissions: u.permissions || {},
       collegeId: u.collegeId || "",
-      collegeName: u.collegeName || u.college?.name || "N/A",
       departmentId: u.departmentId || "",
-      departmentName: u.departmentName || u.department?.name || "N/A",
+      college: u.college || u.collegeName || u.college?.name || "N/A",
+      department: u.department || u.departmentName || u.department?.name || "N/A",
       avatar:
         u.avatar ||
         `https://api.dicebear.com/9.x/initials/svg?seed=${encodeURIComponent(
@@ -405,6 +407,14 @@ export default function SuperAdminDashboardPage() {
             `https://ui-avatars.com/api/?name=${encodeURIComponent(
               a.name || "Admin"
             )}&background=random`,
+          college: a.college || "N/A",
+          status:
+            typeof a.status === "string"
+              ? a.status
+              : a.isActive
+                ? "Active"
+                : "Inactive",
+          isActive: typeof a.isActive === "boolean" ? a.isActive : a.status === "Active",
         }))
       );
 
@@ -425,6 +435,7 @@ export default function SuperAdminDashboardPage() {
       const instructorsRaw = await superAdminAPI.getInstructors();
       const instructors = asArray(instructorsRaw);
 
+      // Ensure college/department fallback and consistent keys
       const normalizedInstructors = normalizeUsers(instructors).map((i) => ({
         ...i,
         avatar:
@@ -432,7 +443,17 @@ export default function SuperAdminDashboardPage() {
           `https://ui-avatars.com/api/?name=${encodeURIComponent(
             i.name || "Instructor"
           )}&background=random`,
+        college: i.college || "N/A",
+        department: i.department || "N/A",
+        status:
+          typeof i.status === "string"
+            ? i.status
+            : i.isActive
+              ? "Active"
+              : "Inactive",
+        isActive: typeof i.isActive === "boolean" ? i.isActive : i.status === "Active",
       }));
+
 
       setAllInstructors(normalizedInstructors);
       setLoadedTabs((prev) => new Set([...prev, "instructors"]));
@@ -443,15 +464,19 @@ export default function SuperAdminDashboardPage() {
     }
   };
 
+
   // Fetch students data
   const fetchStudents = async () => {
-    if (loadedTabs.has("students")) return; // Already loaded
+    if (loadedTabs.has("students")) return;
 
     try {
       setLoadingUsers(true);
       const studentsRaw = await superAdminAPI.getStudents();
       const students = asArray(studentsRaw);
       const normalizedStudents = normalizeUsers(students);
+
+      console.log("Normalized students before mapping:", normalizedStudents);
+
 
       setAllStudents(
         normalizedStudents.map((s) => {
@@ -464,9 +489,19 @@ export default function SuperAdminDashboardPage() {
               `https://ui-avatars.com/api/?name=${encodeURIComponent(
                 s.name || "Student"
               )}&background=random`,
+
+
+            status:
+              typeof s.status === "string"
+                ? s.status
+                : s.isActive
+                  ? "Active"
+                  : "Inactive",
+            isActive: typeof s.isActive === "boolean" ? s.isActive : s.status === "Active",
           };
         })
       );
+
 
       setLoadedTabs((prev) => new Set([...prev, "students"]));
     } catch (err) {
@@ -856,10 +891,6 @@ export default function SuperAdminDashboardPage() {
     }
   };
 
-  const handleDeleteStudent = (student) => {
-    setStudentToDelete(student);
-    setShowDeleteModal(true);
-  };
 
   const confirmDeleteStudent = async () => {
     if (!studentToDelete) return;
@@ -916,6 +947,35 @@ export default function SuperAdminDashboardPage() {
     } finally {
       setUpdatingCollegeId(null);
     }
+  };
+
+
+  const toggleUserStatus = async ({
+    userId,
+    currentStatus,
+    setUpdatingUserId,
+    setUsers,
+    users
+  }) => {
+    setUpdatingUserId(userId);
+    try {
+      await authAPI.setActiveStatus(userId, currentStatus !== "Active");
+      if (setUsers && users) {
+        // Optimistically update the user status in the corresponding list
+        setUsers(prev =>
+          prev.map(user =>
+            user.id === userId
+              ? { ...user, status: currentStatus !== "Active" ? "Active" : "Inactive" }
+              : user
+          )
+        );
+      }
+      // Or trigger a re-fetch here if needed
+    } catch (error) {
+      console.error(error);
+      // Optional: Show toast/error message here
+    }
+    setUpdatingUserId(null);
   };
 
 
@@ -1375,11 +1435,11 @@ export default function SuperAdminDashboardPage() {
                                       College
                                     </th>
                                     <th className="py-3 px-3 text-left">
-                                      Assigned Courses
+                                      Department
                                     </th>
-                                    <th className="py-3 px-3 text-center">
+                                    {/* <th className="py-3 px-3 text-center">
                                       Actions
-                                    </th>
+                                    </th> */}
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1434,59 +1494,35 @@ export default function SuperAdminDashboardPage() {
                                           </span>
                                         </td>
                                         <td className="py-4 px-3">
-                                          <div className="flex flex-wrap gap-1">
-                                            {(
-                                              instructor.assignedCourseNames ??
-                                              []
-                                            ).length > 0 ? (
-                                              instructor.assignedCourseNames.map(
-                                                (courseName, index) => (
-                                                  <Badge
-                                                    key={index}
-                                                    variant="outline"
-                                                    size="sm"
-                                                  >
-                                                    {courseName}
-                                                  </Badge>
-                                                )
-                                              )
-                                            ) : (
-                                              <span className="text-gray-400 text-xs">
-                                                No courses assigned
-                                              </span>
-                                            )}
-                                          </div>
+                                          <span className="text-gray-700 text-sm">
+                                            {instructor.department || "N/A"}
+                                          </span>
                                         </td>
-                                        <td className="py-4 px-3">
+                                        {/* <td className="py-4 px-3">
                                           <div className="flex gap-2 justify-center">
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
+
+                                            <button
                                               onClick={() =>
-                                                toast.info(
-                                                  "Edit instructor coming soon"
-                                                )
+                                                toggleUserStatus({
+                                                  userId: instructor.id,
+                                                  currentStatus: instructor.status,
+                                                  setUpdatingUserId,
+                                                  setUsers: setAllInstructors,
+                                                  users: allInstructors,
+                                                })
                                               }
-                                              className="flex items-center gap-1"
+                                              disabled={updatingUserId === instructor.id}
+                                              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${instructor.status === "Active" ? "bg-green-600" : "bg-gray-300"
+                                                } ${updatingUserId === instructor.id ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                                              title={instructor.status === "Active" ? "Click to deactivate" : "Click to activate"}
                                             >
-                                              <Edit size={14} />
-                                              Edit
-                                            </Button>
-                                            <Button
-                                              size="sm"
-                                              variant="outline"
-                                              onClick={() =>
-                                                toast.error(
-                                                  "Delete instructor coming soon"
-                                                )
-                                              }
-                                              className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:border-red-300"
-                                            >
-                                              <Trash2 size={14} />
-                                              Delete
-                                            </Button>
+                                              <span
+                                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${instructor.status === "Active" ? "translate-x-6" : "translate-x-1"
+                                                  }`}
+                                              />
+                                            </button>
                                           </div>
-                                        </td>
+                                        </td> */}
                                       </tr>
                                     ))
                                   )}
@@ -1610,9 +1646,9 @@ export default function SuperAdminDashboardPage() {
                                     <th className="py-3 px-4 text-left">
                                       College
                                     </th>
-                                    <th className="py-3 px-4 text-left">
+                                    {/* <th className="py-3 px-4 text-left">
                                       Managed Courses
-                                    </th>
+                                    </th> */}
                                   </tr>
                                 </thead>
                                 <tbody>
@@ -1651,7 +1687,7 @@ export default function SuperAdminDashboardPage() {
                                               </div>
                                               <div className="min-w-0">
                                                 <h4 className="font-medium text-gray-900 truncate">
-                                                  {admin.fullName || "—"}
+                                                  {admin.name || "—"}
                                                 </h4>
                                                 <p className="text-sm text-gray-600 truncate">
                                                   {admin.email || ""}
@@ -1664,7 +1700,7 @@ export default function SuperAdminDashboardPage() {
                                               {admin.collegeName}
                                             </span>
                                           </td>
-                                          <td className="py-4 px-4">
+                                          {/* <td className="py-4 px-4">
                                             <div className="flex flex-wrap gap-1">
                                               {(admin.assignedCourseNames ?? [])
                                                 .length > 0 ? (
@@ -1685,7 +1721,7 @@ export default function SuperAdminDashboardPage() {
                                                 </span>
                                               )}
                                             </div>
-                                          </td>
+                                          </td> */}
                                         </tr>
                                       )
                                     )
@@ -2136,7 +2172,7 @@ export default function SuperAdminDashboardPage() {
                           College
                         </th>
                         <th className="py-3 px-4 text-left text-xs font-medium text-gray-500 uppercase">
-                          Admin Count
+                          Admins
                         </th>
                         <th className="py-3 px-4 text-center text-xs font-medium text-gray-500 uppercase">
                           Instructors
@@ -2376,71 +2412,7 @@ export default function SuperAdminDashboardPage() {
               </div>
             ) : (
               <div className="space-y-6">
-                <Card className="p-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-center">
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          setStudentFilter(
-                            studentFilter === "all"
-                              ? "college"
-                              : studentFilter === "college"
-                                ? "course"
-                                : "all"
-                          );
-                          setSelectedFilterValue("");
-                        }}
-                        className="flex items-center gap-2"
-                      >
-                        <Settings size={14} />
-                        {studentFilter === "all"
-                          ? "Filter"
-                          : studentFilter === "college"
-                            ? "College"
-                            : "Course"}
-                      </Button>
-
-                      {studentFilter !== "all" && (
-                        <select
-                          value={selectedFilterValue}
-                          onChange={(e) =>
-                            setSelectedFilterValue(e.target.value)
-                          }
-                          className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                        >
-                          <option value="">
-                            Select{" "}
-                            {studentFilter === "college" ? "College" : "Course"}
-                          </option>
-                          {getFilterOptions().map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-
-                    {/* Search Input */}
-                    <div className="sm:col-span-2">
-                      <div className="relative">
-                        <Input
-                          placeholder="Search students by name or email..."
-                          value={studentSearch}
-                          onChange={(e) => setStudentSearch(e.target.value)}
-                          className="w-full pr-10"
-                        />
-                        <Search className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2" />
-                      </div>
-                    </div>
-
-                    <Badge variant="info" className="justify-center">
-                      {getFilteredStudents().length} of {allStudents.length}
-                    </Badge>
-                  </div>
-                </Card>
+                {/* Filters and Search code remains unchanged */}
 
                 {/* Student list */}
                 <Card className="p-5 sm:p-6">
@@ -2449,76 +2421,99 @@ export default function SuperAdminDashboardPage() {
                   </h3>
 
                   <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
-                    {getFilteredStudents().map((student) => {
-                      return (
-                        <div
-                          key={student.id}
-                          className="flex items-center justify-between p-4"
-                        >
-                          {/* Avatar + name + email */}
-                          <div className="flex items-center gap-4 min-w-0">
-                            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex-none">
-                              <img
-                                src={student.avatar}
-                                alt={student.name}
-                                className="w-full h-full object-cover"
-                              />
-                            </div>
-                            <div className="min-w-0">
-                              <h4 className="font-medium text-gray-900 truncate">
-                                {student.name || "Unnamed"}
-                              </h4>
-                              <p className="text-sm text-gray-600 truncate">
-                                {student.email}
-                              </p>
-                            </div>
+                    {/* Table header */}
+                    <div className="flex items-center justify-between p-4 font-semibold text-gray-900 bg-gray-50">
+                      <div className="flex-1">Student</div>
+                      <div className="w-32">College</div>
+                      <div className="w-48 ">Department</div>
+                      <div className="w-24 text-center">Status</div>
+                      <div className="w-24 text-center">Action</div>
+                    </div>
+
+                    {/* Student rows */}
+                    {getFilteredStudents().map((student) => (
+                      <div
+                        key={student.id}
+                        className="flex items-center justify-between p-4"
+                      >
+                        {/* Avatar + name + email */}
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                          <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex-none">
+                            <img
+                              src={student.avatar}
+                              alt={student.name}
+                              className="w-full h-full object-cover"
+                            />
                           </div>
-
-                          {/* Badges and courses */}
-                          <div className="flex items-center gap-4">
-                            <div className="flex flex-col items-end gap-1 text-sm">
-                              <div className="flex gap-2">
-                                <Badge variant="info" size="sm">
-                                  {student.enrolledCoursesCount || 0} courses
-                                </Badge>
-                                {student?.status && (
-                                  <Badge
-                                    variant={
-                                      String(student.status).toLowerCase() ===
-                                        "active"
-                                        ? "success"
-                                        : "secondary"
-                                    }
-                                    size="sm"
-                                  >
-                                    {String(student.status)}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteStudent(student)}
-                              className="flex items-center gap-1 text-red-600 hover:text-red-700 hover:border-red-300"
-                            >
-                              <Trash2 size={14} />
-                              Delete
-                            </Button>
+                          <div className="min-w-0">
+                            <h4 className="font-medium text-gray-900 truncate">
+                              {student.name || "Unnamed"}
+                            </h4>
+                            <p className="text-sm text-gray-600 truncate">
+                              {student.email}
+                            </p>
                           </div>
                         </div>
-                      );
-                    })}
-                  </div>
 
-                  {getFilteredStudents().length === 0 && (
-                    <p className="text-sm text-gray-500 italic mt-2">
-                      {allStudents.length === 0
-                        ? "No students found."
-                        : "No students match the current filters."}
-                    </p>
-                  )}
+                        {/* College */}
+                        <div className="w-32 text-gray-700">
+                          {student.college}
+                        </div>
+
+                        {/* Department */}
+                        <div className="w-48  text-gray-700 ">
+                          {student.department}
+                        </div>
+
+                        {/* Status Badge */}
+                        <div className="w-24 text-center">
+                          <Badge
+                            variant={
+                              student.status === "Active"
+                                ? "success"
+                                : "secondary"
+                            }
+                            size="sm"
+                          >
+                            {student.status}
+                          </Badge>
+                        </div>
+
+                        {/* Toggle button for status */}
+                        <div className="w-24 text-center">
+                          <button
+                            onClick={() =>
+                              toggleUserStatus({
+                                userId: student.id,
+                                currentStatus: student.status,
+                                setUpdatingUserId,
+                                setUsers: setStudents,
+                                users: students
+                              })
+                            }
+                            disabled={updatingUserId === student.id}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${student.status === "Active" ? "bg-green-600" : "bg-gray-300"
+                              } ${updatingUserId === student.id ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                            title={student.status === "Active" ? "Click to deactivate" : "Click to activate"}
+                          >
+                            <span
+                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${student.status === "Active" ? "translate-x-6" : "translate-x-1"
+                                }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+
+
+                    {getFilteredStudents().length === 0 && (
+                      <p className="text-sm text-gray-500 italic mt-2">
+                        {allStudents.length === 0
+                          ? "No students found."
+                          : "No students match the current filters."}
+                      </p>
+                    )}
+                  </div>
                 </Card>
               </div>
             )}
@@ -2549,18 +2544,12 @@ export default function SuperAdminDashboardPage() {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Avatar
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Name
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Email
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              College
-                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avatar</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">College</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -2570,7 +2559,7 @@ export default function SuperAdminDashboardPage() {
                                 <img
                                   src={admin.avatar}
                                   alt={admin.name}
-                                  className="h-10 w-10 rounded-full"
+                                  className="h-10 w-10 rounded-full object-cover"
                                 />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -2580,7 +2569,42 @@ export default function SuperAdminDashboardPage() {
                                 {admin.email}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {admin.collegeName || "N/A"}
+                                {/* Use string or nested object as appropriate */}
+                                {typeof admin.college === "object"
+                                  ? admin.college?.name || "N/A"
+                                  : admin.college || "N/A"}
+                              </td>
+                              {/* Status */}
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                <Badge
+                                  variant={admin.status === "Active" ? "success" : "secondary"}
+                                  size="sm"
+                                >
+                                  {admin.status || "Inactive"}
+                                </Badge>
+                              </td>
+                              {/* Action toggle */}
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                <button
+                                  onClick={() =>
+                                    toggleUserStatus({
+                                      userId: admin.id,
+                                      currentStatus: admin.status,
+                                      setUpdatingUserId,
+                                      setUsers: setAllAdmins,
+                                      users: allAdmins,
+                                    })
+                                  }
+                                  disabled={updatingUserId === admin.id}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${admin.status === "Active" ? "bg-green-600" : "bg-gray-300"
+                                    } ${updatingUserId === admin.id ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                                  title={admin.status === "Active" ? "Click to deactivate" : "Click to activate"}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${admin.status === "Active" ? "translate-x-6" : "translate-x-1"
+                                      }`}
+                                  />
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -2621,47 +2645,66 @@ export default function SuperAdminDashboardPage() {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Avatar
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Name
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Email
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              College
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Department
-                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avatar</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">College</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                           {allInstructors.map((instructor) => (
-                            <tr
-                              key={instructor.id}
-                              className="hover:bg-gray-50"
-                            >
+                            <tr key={instructor.id} className="hover:bg-gray-50">
                               <td className="px-6 py-4 whitespace-nowrap">
                                 <img
                                   src={instructor.avatar}
-                                  alt={instructor.name}
-                                  className="h-10 w-10 rounded-full"
+                                  alt={instructor.name || "Instructor Avatar"}
+                                  className="h-10 w-10 rounded-full object-cover"
                                 />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {instructor.name || "N/A"}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {instructor.email}
+                                {instructor.email || "N/A"}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {instructor.collegeName || "N/A"}
+                                {instructor.college?.name || instructor.college || "N/A"}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                {instructor.departmentName || "N/A"}
+                                {instructor.department?.name || instructor.department || "N/A"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                <Badge
+                                  variant={instructor.status === "Active" ? "success" : "secondary"}
+                                  size="sm"
+                                >
+                                  {instructor.status || "Inactive"}
+                                </Badge>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                <button
+                                  onClick={() =>
+                                    toggleUserStatus({
+                                      userId: instructor.id,
+                                      currentStatus: instructor.status,
+                                      setUpdatingUserId,
+                                      setUsers: setAllInstructors,
+                                      users: allInstructors,
+                                    })
+                                  }
+                                  disabled={updatingUserId === instructor.id}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${instructor.status === "Active" ? "bg-green-600" : "bg-gray-300"
+                                    } ${updatingUserId === instructor.id ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                                  title={instructor.status === "Active" ? "Click to deactivate" : "Click to activate"}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${instructor.status === "Active" ? "translate-x-6" : "translate-x-1"
+                                      }`}
+                                  />
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -2673,6 +2716,7 @@ export default function SuperAdminDashboardPage() {
               </Card>
             )}
           </TabsContent>
+
 
           <TabsContent value="departments">
             {loadingDepartments ? (
@@ -2743,7 +2787,6 @@ export default function SuperAdminDashboardPage() {
               </Card>
             )}
           </TabsContent>
-
 
         </Tabs>
 

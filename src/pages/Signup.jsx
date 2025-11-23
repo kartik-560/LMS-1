@@ -255,17 +255,23 @@ const SignupPage = () => {
                     label="OTP"
                     type="text"
                     inputMode="numeric"
-                    placeholder="Enter the 4+ digit code"
+                    maxLength={6}
+                    placeholder="Enter the 6 digit code"
                     error={errors.otp?.message}
                     {...register("otp", {
                       required: "OTP is required",
-                      minLength: {
-                        value: 4,
-                        message: "OTP must be at least 4 digits",
+                      maxLength: {
+                        value: 6,
+                        message: "OTP must be exactly 6 digits"
                       },
+                      pattern: {
+                        value: /^\d{6}$/,
+                        message: "OTP must be exactly 6 digits"
+                      }
                     })}
                     aria-invalid={!!errors.otp}
                   />
+
                   <p className="mt-2 text-xs text-gray-500">
                     Didn't receive the code? Check your spam folder or resend after a few seconds.
                   </p>

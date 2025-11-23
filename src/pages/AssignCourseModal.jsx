@@ -14,8 +14,8 @@ const XIcon = (props) => (
 export function AssignCourseModal({
   course,
   role,
-  collegeId,  
-  colleges,     
+  collegeId,
+  colleges,
   isOpen,
   onClose,
   onSuccess
@@ -29,7 +29,6 @@ export function AssignCourseModal({
   const [loadingDepartments, setLoadingDepartments] = useState(false);
   const [error, setError] = useState("");
 
-  // Fetch departments when selected college changes (for superadmin) or for admin's college
   useEffect(() => {
     const fetchDepartments = async () => {
       const targetCollegeId = isSuperadmin ? selectedCollegeId : collegeId;
@@ -51,7 +50,7 @@ export function AssignCourseModal({
     };
 
     fetchDepartments();
-  // For admins, collegeId is fixed; for superadmin, it's selectedCollegeId
+    // For admins, collegeId is fixed; for superadmin, it's selectedCollegeId
   }, [isSuperadmin ? selectedCollegeId : collegeId, isSuperadmin, collegeId]);
 
   // On modal open, reset college selection for superadmin
@@ -71,20 +70,22 @@ export function AssignCourseModal({
       setError("A college must be selected.");
       return;
     }
-    if (!selectedDepartmentId) {
+    // Only require department for Admin, not Superadmin
+    if (!isSuperadmin && !selectedDepartmentId) {
       setError("You must select a department.");
       return;
     }
+
     setIsLoading(true);
     setError("");
     try {
       const payload = {
         collegeId: effectiveCollegeId,
-        departmentId: selectedDepartmentId,
+        departmentId: selectedDepartmentId || null,
         capacity: capacity ? parseInt(capacity, 10) : null,
       };
       await coursesAPI.assign(course.id, payload);
-      toast.success(`Course "${course.title}" assigned successfully!`);
+      toast.success(`Course assigned successfully!`);
       onSuccess();
     } catch (err) {
       const errorMessage = err.response?.data?.error || "An unexpected error occurred.";
@@ -131,7 +132,11 @@ export function AssignCourseModal({
             {/* Department Selection */}
             {(isSuperadmin ? selectedCollegeId : collegeId) && (
               <div className="grid grid-cols-4 items-center gap-4">
-                <label htmlFor="department" className="text-right text-sm font-medium">Department</label>
+                <label htmlFor="department" className="text-right text-sm font-medium">
+                  Department {!isSuperadmin && <span className="text-red-500">*</span>}
+                  {isSuperadmin && <span className="text-gray-400 text-xs block">(Optional)</span>}
+                </label>
+
                 <select
                   id="department"
                   value={selectedDepartmentId}
@@ -139,7 +144,14 @@ export function AssignCourseModal({
                   disabled={isLoading || loadingDepartments}
                   className="col-span-3 flex h-10 w-full items-center justify-between rounded-md border border-gray-300 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <option value="">{loadingDepartments ? "Loading..." : "Select Department"}</option>
+                  <option value="">
+                    {loadingDepartments
+                      ? "Loading..."
+                      : isSuperadmin
+                        ? "None (College-wide)"
+                        : "Select Department"}
+                  </option>
+
                   {departments.map((dept) => (
                     <option key={dept.id} value={dept.id}>{dept.name}</option>
                   ))}
@@ -170,7 +182,13 @@ export function AssignCourseModal({
               className="mt-2 inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md border border-gray-300 bg-transparent px-4 py-2 text-sm font-medium transition-colors hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:pointer-events-none disabled:opacity-50 sm:mt-0">
               Cancel
             </button>
-            <button type="submit" disabled={isLoading || !(isSuperadmin ? selectedCollegeId : collegeId) || !selectedDepartmentId}
+            <button type="submit" disabled={
+              isLoading ||
+              (isSuperadmin ? !selectedCollegeId : !collegeId) ||
+              (!isSuperadmin && !selectedDepartmentId)
+            }
+
+
               className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:pointer-events-none disabled:bg-blue-400">
               {isLoading ? "Assigning..." : "Assign Course"}
             </button>

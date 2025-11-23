@@ -229,7 +229,7 @@ export default function RegisterPage() {
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await authAPI.bulkRegister(formData); 
+      const res = await authAPI.bulkRegister(formData);
       if (res?.data?.success) {
         const { summary, results } = res.data;
         toast.success(
@@ -276,6 +276,10 @@ export default function RegisterPage() {
 
           {roleIsInstructor && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* College dropdown first */}
+              {(!isAdminUser || isSuperAdmin) && collegeDropdown}
+
+              {/* Department dropdown second */}
               <div className="flex flex-col">
                 <label htmlFor="departmentId">Department</label>
                 <div className="relative">
@@ -286,15 +290,19 @@ export default function RegisterPage() {
                     disabled={!collegeIdToFetch || loadingDepartments}
                     defaultValue=""
                   >
-                    <option value="">{!collegeIdToFetch ? "Select a college first" : (loadingDepartments ? "Loading..." : "Select a department")}</option>
-                    {(departments || []).map((dept) => (<option key={dept.id} value={dept.id}>{dept.name}</option>))}
+                    <option value="">
+                      {!collegeIdToFetch ? "Select a college first" : (loadingDepartments ? "Loading..." : "Select a department")}
+                    </option>
+                    {(departments || []).map((dept) => (
+                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                    ))}
                   </select>
                 </div>
                 {errors.departmentId && <p className="mt-2 text-sm text-red-600">{errors.departmentId.message}</p>}
               </div>
-              {(!isAdminUser || isSuperAdmin) && collegeDropdown}
             </div>
           )}
+
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <Input label="Full Name" type="text" {...register("fullName", { required: "Full name is required" })} error={errors.fullName?.message} />
@@ -304,7 +312,10 @@ export default function RegisterPage() {
 
           {roleIsStudent && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Input label="Year" type="text" {...register("year")} />
+              {/* College dropdown first */}
+              {(!isAdminUser || isSuperAdmin) && collegeDropdown}
+
+              {/* Department dropdown second */}
               <div className="flex flex-col">
                 <label htmlFor="departmentId" className="block text-sm font-medium text-gray-700 mb-1">Department</label>
                 <div className="relative">
@@ -315,17 +326,23 @@ export default function RegisterPage() {
                     disabled={!collegeIdToFetch || loadingDepartments}
                     defaultValue=""
                   >
-                    <option value="" disabled>{!collegeIdToFetch ? "Select a college first" : (loadingDepartments ? "Loading..." : "Select a department")}</option>
-                    {(departments || []).map((dept) => (<option key={dept.id} value={dept.id}>{dept.name}</option>))}
+                    <option value="" disabled>
+                      {!collegeIdToFetch ? "Select a college first" : (loadingDepartments ? "Loading..." : "Select a department")}
+                    </option>
+                    {(departments || []).map((dept) => (
+                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                    ))}
                   </select>
                 </div>
                 {errors.departmentId && <p className="mt-2 text-sm text-red-600">{errors.departmentId.message}</p>}
               </div>
+
+              <Input label="Year" type="text" {...register("year")} />
               <Input label="Roll Number" type="text" {...register("rollNumber")} />
               <Input label="Academic Year" type="text" {...register("academicYear")} />
-              {(!isAdminUser || isSuperAdmin) && collegeDropdown}
             </div>
           )}
+
 
           <Input label="Mobile" type="tel" {...register("mobile", { pattern: { value: /^[6-9]\d{9}$/, message: "Please enter a valid 10-digit Indian mobile number" } })} error={errors.mobile?.message} />
 
@@ -352,8 +369,8 @@ export default function RegisterPage() {
           >
             {bulkLoading ? "Uploading..." : "Upload Bulk Users"}
           </Button>
-          <br/>
-          <br/>
+          <br />
+          <br />
           <Button onClick={() => createTemplateWithAllRoles(colleges, departments)} className="mb-4 w-full">
             Download Bulk User Upload Template
           </Button>

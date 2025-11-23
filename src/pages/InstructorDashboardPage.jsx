@@ -23,19 +23,20 @@ import Badge from "../components/ui/Badge";
 import Modal from "../components/ui/Modal";
 import Input from "../components/ui/Input";
 
-// ✅ Use your real APIs
+
 import {
   coursesAPI,
   chaptersAPI,
   enrollmentsAPI,
-  progressAPI,
   FALLBACK_THUMB,
 } from "../services/api";
 
 const InstructorDashboardPage = () => {
   const { user } = useAuthStore();
+  console.log("User in InstructorDashboardPage:", user);
   const navigate = useNavigate();
-
+  const departmentName = user?.department?.name || user?.departmentName || null;
+  const collegeName = user?.college?.name || user?.collegeName || null;
   const [assignedCourses, setAssignedCourses] = useState([]);
   const [myStudents, setMyStudents] = useState([]);
   const [courseModules, setCourseModules] = useState({});
@@ -72,9 +73,6 @@ const InstructorDashboardPage = () => {
     averageTestScore: 0,
   });
 
-  // -----------------------
-  // Helpers - robust & normalized
-  // -----------------------
   const pickId = (v) => {
     if (v == null) return undefined;
     if (typeof v === "string" || typeof v === "number") return String(v);
@@ -87,22 +85,6 @@ const InstructorDashboardPage = () => {
     }
     return undefined;
   };
-  const pickEmail = (v) =>
-    v?.email ?? v?.user?.email ?? v?.student?.email ?? "";
-  const pickName = (v) =>
-    v?.name ??
-    v?.fullName ??
-    v?.user?.name ??
-    v?.student?.name ??
-    v?.studentName ??
-    "Student";
-  const pickAvatar = (v) =>
-    v?.avatar ??
-    v?.photoUrl ??
-    v?.user?.avatar ??
-    v?.student?.avatar ??
-    "https://api.dicebear.com/7.x/initials/svg?seed=" +
-      encodeURIComponent(pickName(v));
 
   const fetchInstructorRequests = async (courses = []) => {
     try {
@@ -147,8 +129,8 @@ const InstructorDashboardPage = () => {
       const assigned = Array.isArray(rawCatalog?.items)
         ? rawCatalog.items
         : Array.isArray(rawCatalog)
-        ? rawCatalog
-        : [];
+          ? rawCatalog
+          : [];
 
       // Normalize course ids to string — prevents number/string mismatch in includes/find
       const normalized = assigned.map((c) => ({
@@ -324,7 +306,6 @@ const InstructorDashboardPage = () => {
     }
   };
 
-  // NEW: fetch full chapters for a course
   const fetchCourseChapters = async (courseId) => {
     try {
       setLoadingChapters(true);
@@ -401,7 +382,6 @@ const InstructorDashboardPage = () => {
     return { status: "inactive", color: "danger" };
   };
 
-  // Filtered students (used by export and UI)
   const filteredStudents = myStudents.filter((student) => {
     const name = (student.name || "").toLowerCase();
     const email = (student.email || "").toLowerCase();
@@ -416,10 +396,7 @@ const InstructorDashboardPage = () => {
 
   const handleExportStudents = () => {
     try {
-      // Prepare CSV data
       const csvData = [];
-
-      // Add headers
       csvData.push([
         "Student Name",
         "Email",
@@ -429,7 +406,6 @@ const InstructorDashboardPage = () => {
         "Last Login",
       ]);
 
-      // Add student data
       filteredStudents.forEach((student) => {
         const studentStatus = getStudentStatus(student);
         const assigned = student.assignedCourses || [];
@@ -442,7 +418,6 @@ const InstructorDashboardPage = () => {
               Math.max(1, assigned.length)) || 0
           ) || 0;
 
-        // Get course names for this student
         const courseNames = assigned
           .map((courseId) => {
             const course = assignedCourses.find((c) => String(c.id) === String(courseId));
@@ -460,14 +435,12 @@ const InstructorDashboardPage = () => {
         ]);
       });
 
-      // Convert to CSV string
       const csvContent = csvData
         .map((row) =>
           row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
         )
         .join("\n");
 
-      // Create blob and download
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const link = document.createElement("a");
       const url = URL.createObjectURL(blob);
@@ -505,7 +478,7 @@ const InstructorDashboardPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="mb-8">
+        {/* <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
             <div className="flex items-center space-x-3 sm:space-x-4">
               <div className="w-10 sm:w-12 h-10 sm:h-12 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -521,7 +494,38 @@ const InstructorDashboardPage = () => {
               </div>
             </div>
           </div>
+        </div> */}
+
+        <div className="mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
+            <div className="flex items-center space-x-3 sm:space-x-4">
+              <div className="w-10 sm:w-12 h-10 sm:h-12 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <BookOpen size={24} className="text-primary-600" />
+              </div>
+              <div>
+                <div className="flex items-center space-x-2 mb-1 flex-wrap">
+                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    Instructor Dashboard
+                  </h1>
+                  {departmentName && (
+                    <Badge variant="primary" size="sm" className="mt-1 sm:mt-0">
+                      {departmentName}
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-sm sm:text-base text-gray-600">
+                  Manage your courses and track student progress.
+                </p>
+                {collegeName && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {collegeName}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
+
 
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-8">
@@ -534,7 +538,7 @@ const InstructorDashboardPage = () => {
                 <p className="text-xs sm:text-sm font-medium text-gray-600">My Courses</p>
                 <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.totalCourses}</p>
                 <p className="text-xs text-gray-500 hidden sm:block">
-                   {stats.totalChapters} chapters
+                  {stats.totalChapters} chapters
                 </p>
               </div>
             </div>
@@ -604,9 +608,9 @@ const InstructorDashboardPage = () => {
                       const avgProgress =
                         enrolledStudents.length > 0
                           ? enrolledStudents.reduce(
-                              (sum, student) => sum + getStudentCourseProgress(student.id, course.id),
-                              0
-                            ) / enrolledStudents.length
+                            (sum, student) => sum + getStudentCourseProgress(student.id, course.id),
+                            0
+                          ) / enrolledStudents.length
                           : 0;
 
                       const completedStudentsCount = enrolledStudents.filter(
@@ -644,12 +648,9 @@ const InstructorDashboardPage = () => {
                                     </span>
                                     <span className="flex items-center space-x-1">
                                       <BookMarked size={14} />
-                                      <span>{modules.length} modules</span>
+                                      <span>{modules.length} Chapter</span>
                                     </span>
-                                    <span className="flex items-center space-x-1">
-                                      <Clock size={14} />
-                                      <span>{course.estimatedDuration || "—"}</span>
-                                    </span>
+
                                   </div>
                                 </div>
                               </div>
@@ -776,13 +777,12 @@ const InstructorDashboardPage = () => {
                           <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full overflow-hidden bg-gray-100 relative flex-shrink-0">
                             <img src={student.avatar} alt={student.name} className="w-full h-full object-cover" />
                             <div
-                              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
-                                studentStatus.color === "success"
-                                  ? "bg-green-500"
-                                  : studentStatus.color === "warning"
+                              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${studentStatus.color === "success"
+                                ? "bg-green-500"
+                                : studentStatus.color === "warning"
                                   ? "bg-yellow-500"
                                   : "bg-gray-400"
-                              }`}
+                                }`}
                             ></div>
                           </div>
                           <div className="flex-1 min-w-0">
@@ -881,10 +881,10 @@ const InstructorDashboardPage = () => {
                     myStudents
                       .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
                       .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
-                      Math.max(
-                        1,
-                        myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
-                      )
+                    Math.max(
+                      1,
+                      myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                    )
                   )}
                   %
                 </div>
@@ -900,10 +900,10 @@ const InstructorDashboardPage = () => {
                     myStudents
                       .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
                       .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
-                      Math.max(
-                        1,
-                        myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
-                      )
+                    Math.max(
+                      1,
+                      myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                    )
                   )}
                   %
                 </span>
@@ -913,12 +913,12 @@ const InstructorDashboardPage = () => {
                   myStudents.length === 0
                     ? 0
                     : myStudents
-                        .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
-                        .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
-                      Math.max(
-                        1,
-                        myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
-                      )
+                      .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
+                      .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
+                    Math.max(
+                      1,
+                      myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                    )
                 }
               />
             </div>
@@ -1020,9 +1020,8 @@ const InstructorDashboardPage = () => {
                     <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 relative">
                       <img src={student.avatar} alt={student.name} className="w-full h-full object-cover" />
                       <div
-                        className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${
-                          studentStatus.color === "success" ? "bg-green-500" : studentStatus.color === "warning" ? "bg-yellow-500" : "bg-gray-400"
-                        }`}
+                        className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${studentStatus.color === "success" ? "bg-green-500" : studentStatus.color === "warning" ? "bg-yellow-500" : "bg-gray-400"
+                          }`}
                       ></div>
                     </div>
                     <div>
@@ -1106,10 +1105,10 @@ const InstructorDashboardPage = () => {
                     myStudents
                       .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
                       .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
-                      Math.max(
-                        1,
-                        myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
-                      )
+                    Math.max(
+                      1,
+                      myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                    )
                   )}
                   %
                 </div>

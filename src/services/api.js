@@ -323,12 +323,10 @@ export const collegesAPI = {
   getPermissions: (collegeId) =>
     api.get(`/colleges/${collegeId}/permissions`, { headers: makeHeaders() }),
 
-  updateLimits: (collegeId, { studentLimit, adminLimit, instructorLimit }) =>
-    api.put(
-      `/colleges/${collegeId}/permissions/limits`,
-      { studentLimit, adminLimit, instructorLimit },
-      { headers: makeHeaders() }
-    ),
+  updateLimits: (collegeId, limits) =>
+    api.put(`/colleges/${collegeId}/permissions/limits`, limits, {
+      headers: makeHeaders(),
+    }),
 
   updateAdminPermissions: (collegeId, userId, patch) =>
     api.put(`/colleges/${collegeId}/permissions/admin/${userId}`, patch, {

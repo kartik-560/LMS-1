@@ -17,6 +17,8 @@ import {
   Pencil,
   Plus,
 } from "lucide-react";
+import ViewOptionsModal from "../components/ui/ViewOptionsModal"
+import EditCourseModal from "../components/ui/EditCourseModal";
 import { AssignCourseModal } from "./AssignCourseModal";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
@@ -37,6 +39,7 @@ import {
   collegesAPI,
   departmentAPI,
   authAPI,
+  assessmentsAPI,
 } from "../services/api";
 
 const normalizeRole = (r) =>
@@ -89,8 +92,9 @@ export default function SuperAdminDashboardPage() {
   const [updatingCollegeId, setUpdatingCollegeId] = useState(null);
   const [updatingUserId, setUpdatingUserId] = useState(null);
   const [students, setStudents] = useState([]);
-
-
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [permLimits, setPermLimits] = useState({
     studentLimit: 0,
     adminLimit: 0,
@@ -280,7 +284,6 @@ export default function SuperAdminDashboardPage() {
   }, [collegeDetailTab, collegeId]);
 
 
-
   const handleApiError = (err, fallback) => {
     const msg =
       err?.response?.data?.message ||
@@ -463,7 +466,6 @@ export default function SuperAdminDashboardPage() {
       setLoadingUsers(false);
     }
   };
-
 
   // Fetch students data
   const fetchStudents = async () => {
@@ -754,30 +756,65 @@ export default function SuperAdminDashboardPage() {
     handleCloseAssignModal();
   };
 
-  const getCourseInstructors = useCallback(
-    (courseId) =>
-      (allInstructors || []).filter(
-        (i) =>
-          Array.isArray(i.assignedCourses) &&
-          i.assignedCourses.includes(courseId)
-      ),
-    [allInstructors]
-  );
-  const getCourseStudents = useCallback(
-    (courseId) =>
-      (allStudents || []).filter(
-        (s) =>
-          Array.isArray(s.assignedCourses) &&
-          s.assignedCourses.includes(courseId)
-      ),
-    [allStudents]
-  );
-
   const goEdit = useCallback(
     (courseId) => navigate(`/courses/${courseId}/edit`),
     [navigate]
   );
 
+  const handleEditFinalTest = async () => {
+    try {
+      const finalTest = await assessmentsAPI.getFinalTestByCourse(selectedCourse.id);
+
+      setIsEditModalOpen(false);
+
+      if (finalTest && finalTest.id) {
+        navigate(`/courses/${selectedCourse.id}/final-test/edit/${finalTest.id}`);
+      } else {
+        alert("No final test found for this course");
+      }
+    } catch (error) {
+      console.error("Error fetching final test:", error);
+      alert("Failed to load final test");
+    }
+  };
+
+  const handleEditCourse = () => {
+    setIsEditModalOpen(false);
+    goEdit(selectedCourse.id);
+  };
+
+  const handleOpenViewOptions = (course) => {
+    setSelectedCourse(course);
+    setModalOpen(true);
+  };
+
+  const handleViewFinalTest = async () => {
+    try {
+      // Fetch the final test for this course
+      const response = await assessmentsAPI.getFinalTestByCourse(selectedCourse.id);
+
+      if (response && response.id) {
+        setModalOpen(false);
+        navigate("/view_finaltest", {
+          state: {
+            courseId: selectedCourse.id,
+            finalTestId: response.id, // Use the fetched final test ID
+          },
+        });
+      } else {
+        alert("No final test found for this course");
+      }
+    } catch (error) {
+      console.error("Error fetching final test:", error);
+      alert("Failed to load final test");
+    }
+  };
+
+
+  const handleViewCourse = () => {
+    setModalOpen(false);
+    navigate(`/courses/${selectedCourse.id}`);
+  };
   const canEditCourse = useCallback(
     (course) => {
       if (!course) return false;
@@ -891,7 +928,6 @@ export default function SuperAdminDashboardPage() {
     }
   };
 
-
   const confirmDeleteStudent = async () => {
     if (!studentToDelete) return;
     try {
@@ -920,34 +956,36 @@ export default function SuperAdminDashboardPage() {
   }
 
   const handleToggleCollegeStatus = async (college) => {
-    const newStatus = !college.isActive;
+    // Calculate new status (integer)
+    const newStatus = college.status === 1 ? 0 : 1;
 
     setUpdatingCollegeId(college.id);
 
     try {
-      await collegesAPI.updateCollegeStatus(college.id, { isActive: newStatus });
+      await collegesAPI.updateCollegeStatus(college.id, { status: newStatus });
 
-      // Update local state
+      // Update local state (uses status field!)
       setColleges(prev =>
         prev.map(c =>
           c.id === college.id
-            ? { ...c, isActive: newStatus }
+            ? { ...c, status: newStatus }
             : c
         )
       );
 
       toast.success(
-        `College ${newStatus ? 'activated' : 'deactivated'} successfully`
+        `College ${newStatus === 1 ? 'activated' : 'deactivated'} successfully`
       );
     } catch (err) {
       toast.error(
         err?.response?.data?.error ||
-        `Failed to ${newStatus ? 'activate' : 'deactivate'} college`
+        `Failed to ${newStatus === 1 ? 'activate' : 'deactivate'} college`
       );
     } finally {
       setUpdatingCollegeId(null);
     }
   };
+
 
 
   const toggleUserStatus = async ({
@@ -1201,7 +1239,7 @@ export default function SuperAdminDashboardPage() {
                   value="assignments"
                   className="whitespace-nowrap snap-start px-3 sm:px-4 py-2 text-xs sm:text-sm"
                 >
-                  Course Assignments
+                  Courses
                 </TabsTrigger>
                 <TabsTrigger
                   value="departments"
@@ -1958,7 +1996,7 @@ export default function SuperAdminDashboardPage() {
                               {/* Limits */}
                               <Card className="p-5">
                                 <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                                  Admin Permissions
+                                  College Permissions
                                 </h3>
 
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -2289,15 +2327,16 @@ export default function SuperAdminDashboardPage() {
                                   <button
                                     onClick={() => handleToggleCollegeStatus(college)}
                                     disabled={isUpdating}
-                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${isActive ? 'bg-green-600' : 'bg-gray-300'
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${college.status === 1 ? 'bg-green-600' : 'bg-gray-300'
                                       } ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
-                                    title={isActive ? 'Click to deactivate' : 'Click to activate'}
+                                    title={college.status === 1 ? 'Click to deactivate' : 'Click to activate'}
                                   >
                                     <span
-                                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${isActive ? 'translate-x-6' : 'translate-x-1'
+                                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${college.status === 1 ? 'translate-x-6' : 'translate-x-1'
                                         }`}
                                     />
                                   </button>
+
                                 </div>
                               </td>
                             </tr>
@@ -2323,7 +2362,7 @@ export default function SuperAdminDashboardPage() {
               <div className="space-y-6">
                 <Card className="p-5 sm:p-6">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Course-User Assignments
+                    Course Assignments
                   </h3>
                   <div className="space-y-4">
                     {allCourses.map((course) => {
@@ -2351,11 +2390,24 @@ export default function SuperAdminDashboardPage() {
                             </div>
 
                             <div className="flex gap-2 flex-wrap items-center">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleOpenViewOptions(course)}
+                                className="ml-auto bg-orange-500 text-white hover:bg-green-600"
+                              >
+                                <Pencil size={14} className="mr-1" />
+                                View
+                              </Button>
+
                               {canEditCourse(course) && (
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => goEdit(course.id)}
+                                  onClick={() => {
+                                    setSelectedCourse(course);
+                                    setIsEditModalOpen(true);
+                                  }}
                                   className="ml-auto bg-amber-300"
                                 >
                                   <Pencil size={14} className="mr-1" />
@@ -2391,6 +2443,20 @@ export default function SuperAdminDashboardPage() {
               </div>
             )}
           </TabsContent>
+
+          <EditCourseModal
+            isOpen={isEditModalOpen}
+            onClose={() => setIsEditModalOpen(false)}
+            onEditCourse={handleEditCourse}
+            onEditFinalTest={handleEditFinalTest}
+          />
+
+          <ViewOptionsModal
+            isOpen={modalOpen}
+            onClose={() => setModalOpen(false)}
+            onViewFinalTest={handleViewFinalTest}
+            onViewCourse={handleViewCourse}
+          />
 
           {courseToAssign && (
             <AssignCourseModal

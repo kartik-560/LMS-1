@@ -50,9 +50,15 @@ const useAuthStore = create()(
         },
 
         logout: () => {
-          localStorage.removeItem("token");
+          localStorage.removeItem("token"); 
+          localStorage.removeItem("user_role"); 
           setAuthToken(null);
-          set({ token: null, user: null, isAuthenticated: false });
+          set({
+            token: null,
+            user: null,
+            isAuthenticated: false,
+            userRole: null,
+          });
         },
 
         updateUser: (userData) => {
@@ -89,7 +95,6 @@ const useAuthStore = create()(
         const role = normalizeRole(state?.userRole);
 
         queueMicrotask(() => {
-  
           _set?.({
             isAuthenticated: Boolean(token),
             userRole: role,

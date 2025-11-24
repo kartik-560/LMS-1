@@ -52,13 +52,15 @@ api.interceptors.response.use(
   (error) => {
     const status = error?.response?.status;
     const url = error?.config?.url || "";
+
     if (
       status === 401 &&
       !["/auth/login", "/auth/registrations", "/auth/signup"].some((p) =>
         url.includes(p)
       )
     ) {
-      setAuthToken(null);
+      useAuthStore.getState().logout();
+
       window.location.assign("/login");
     }
     return Promise.reject(error);
@@ -100,10 +102,10 @@ export const authAPI = {
       meUser.collegeId ?? meUser.college_id ?? meUser.college?.id ?? null;
 
     return { ...meUser, collegeId };
-    
   },
- setActiveStatus: (userId, isActive) =>
-    api.patch(`/auth/users/${userId}/active`, { isActive })  
+  setActiveStatus: (userId, isActive) =>
+    api
+      .patch(`/auth/users/${userId}/active`, { isActive })
       .then((res) => res.data),
   logout: () => {
     useAuthStore.getState().logout();
@@ -316,7 +318,9 @@ export const collegesAPI = {
   getDepartmentsForCollege: (collegeId) =>
     api.get(`/colleges/${collegeId}/departments`),
   updateCollegeStatus: async (collegeId, data) => {
-    const response = await api.put(`/colleges/${collegeId}/status`, data);
+    const response = await api.patch(`/colleges/${collegeId}/status`, data, {
+      headers: makeHeaders(),
+    });
     return response.data;
   },
   // 🔽 NEW: permissions
@@ -419,6 +423,16 @@ export const assessmentsAPI = {
 
   createFinalTest: (courseId, payload) =>
     api.post(`/courses/${courseId}/final-test`, payload).then((r) => r.data),
+
+  getFinalTest: (courseId, assessmentId) =>
+    api
+      .get(`/courses/${courseId}/final-test/${assessmentId}`)
+      .then((r) => r.data),
+
+  updateFinalTest: (courseId, assessmentId, payload) =>
+    api
+      .put(`/courses/${courseId}/final-test/${assessmentId}`, payload)
+      .then((r) => r.data),
 
   get: (id) => api.get(`/assessments/${id}`).then((r) => r.data),
 

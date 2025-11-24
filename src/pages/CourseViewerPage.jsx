@@ -17,7 +17,7 @@ import { toast } from "react-hot-toast";
 import Button from "../components/ui/Button";
 import Progress from "../components/ui/Progress";
 import Badge from "../components/ui/Badge";
-
+import useAuthStore from "../store/useAuthStore";
 import {
   coursesAPI,
   chaptersAPI,
@@ -314,12 +314,12 @@ const CourseViewerPage = () => {
     try {
       console.log("Marking chapter complete:", currentChapter.id);
       await progressAPI.completeChapter(currentChapter.id);
-      
+
       setCompletedChapterIds((prev) => {
         const newSet = new Set([...prev, currentChapter.id]);
         return Array.from(newSet);
       });
-      
+
       toast.success("Chapter completed!");
 
       if (advance) {
@@ -411,7 +411,17 @@ const CourseViewerPage = () => {
   };
 
   const handleBackNavigation = () => {
-    navigate("/dashboard");
+    const userRole = useAuthStore.getState().userRole;
+
+    if (userRole === "SUPERADMIN") {
+      navigate("/superadmin");
+    } else if (userRole === "ADMIN") {
+      navigate("/admin");
+    } else if (userRole === "INSTRUCTOR") {
+      navigate("/instructor");
+    } else {
+      navigate("/dashboard");
+    }
   };
 
   if (loading) {
@@ -503,7 +513,7 @@ const CourseViewerPage = () => {
                       {chapters.map((chapter) => {
                         // Show lock icon for quiz chapters that are locked
                         const isLocked = chapter.hasQuiz && !isQuizUnlocked(chapter);
-                        
+
                         return (
                           <button
                             key={chapter.id}
@@ -512,9 +522,8 @@ const CourseViewerPage = () => {
                               setPageIndex(0);
                               if (!chapter.content) hydrateChapter(chapter.id);
                             }}
-                            className={`w-full p-3 text-left flex items-start space-x-3 hover:bg-gray-50 transition-colors ${
-                              currentChapter?.id === chapter.id ? 'bg-primary-50 ring-1 ring-primary-200' : ''
-                            }`}
+                            className={`w-full p-3 text-left flex items-start space-x-3 hover:bg-gray-50 transition-colors ${currentChapter?.id === chapter.id ? 'bg-primary-50 ring-1 ring-primary-200' : ''
+                              }`}
                           >
                             <div className="mt-1 flex-shrink-0">
                               {isChapterCompleted(chapter.id) ? (
@@ -569,7 +578,7 @@ const CourseViewerPage = () => {
               )}
 
               <Button variant="ghost" size="sm" onClick={handleBackNavigation} className="flex-shrink-0">
-                <ArrowLeft size={14} className="mr-2" /> 
+                <ArrowLeft size={14} className="mr-2" />
               </Button>
 
               {currentChapter && (
@@ -649,22 +658,22 @@ const CourseViewerPage = () => {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mt-6">
                   {contentPages.length > 1 && (
                     <div className="flex items-center space-x-2">
-                      <Button 
-                        onClick={() => setPageIndex(i => Math.max(0, i-1))} 
-                        disabled={pageIndex === 0} 
+                      <Button
+                        onClick={() => setPageIndex(i => Math.max(0, i - 1))}
+                        disabled={pageIndex === 0}
                         variant="outline"
                         size="sm"
                       >
                         Prev Page
                       </Button>
-                      <Button 
-                        onClick={() => setPageIndex(i => Math.min(contentPages.length-1, i+1))} 
-                        disabled={pageIndex === contentPages.length-1}
+                      <Button
+                        onClick={() => setPageIndex(i => Math.min(contentPages.length - 1, i + 1))}
+                        disabled={pageIndex === contentPages.length - 1}
                         size="sm"
                       >
                         Next Page
                       </Button>
-                      <div className="text-sm text-gray-500">Page {pageIndex+1} of {contentPages.length}</div>
+                      <div className="text-sm text-gray-500">Page {pageIndex + 1} of {contentPages.length}</div>
                     </div>
                   )}
 
@@ -679,10 +688,10 @@ const CourseViewerPage = () => {
                     )}
 
                     {currentChapter.attachments && currentChapter.attachments.length > 0 && (
-                      <a 
-                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50" 
-                        href={currentChapter.attachments[0]} 
-                        target="_blank" 
+                      <a
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50"
+                        href={currentChapter.attachments[0]}
+                        target="_blank"
                         rel="noopener noreferrer"
                       >
                         <FileText size={16} className="mr-2" /> Download

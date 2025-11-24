@@ -3,12 +3,19 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../components/ui/Button";
 import { assessmentsAPI, authAPI } from "../services/api";
-
+import useAuthStore from "../store/useAuthStore";
+import { useLocation } from "react-router-dom";
 export default function ViewFinalTest() {
+    const userRole = useAuthStore((state) => state.userRole);
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-    const assessmentId = searchParams.get('assessmentId');
+    const location = useLocation();
+    const { courseId, finalTestId } = location.state || {};
+   const assessmentId = finalTestId || searchParams.get('assessmentId');
 
+    const isReadOnly = userRole === "SUPERADMIN" || userRole === "ADMIN";
+
+    const [selectedAnswers, setSelectedAnswers] = useState({});
     const [assessment, setAssessment] = useState(null);
     const [answers, setAnswers] = useState({});
     const [timeRemaining, setTimeRemaining] = useState(0);
@@ -20,8 +27,7 @@ export default function ViewFinalTest() {
     const [showWarning, setShowWarning] = useState(false);
     const [userName, setUserName] = useState("Student");
 
-    // ✅ Certificate generation states
-    const [certificateStatus, setCertificateStatus] = useState("not_generated"); // "not_generated", "generating", "generated"
+    const [certificateStatus, setCertificateStatus] = useState("not_generated");
     const [certificateError, setCertificateError] = useState(null);
 
     useEffect(() => {
@@ -93,6 +99,7 @@ export default function ViewFinalTest() {
     };
 
     const handleAnswerChange = (questionId, answer) => {
+        if (isReadOnly) return;
         setAnswers((prev) => ({
             ...prev,
             [questionId]: answer,
@@ -131,6 +138,7 @@ export default function ViewFinalTest() {
     };
 
     const handleSubmit = async () => {
+        if (isReadOnly) return;
         if (!showWarning && !isSubmitted) {
             setShowWarning(true);
             return;
@@ -241,7 +249,6 @@ export default function ViewFinalTest() {
     const progress = ((currentQuestionIndex + 1) / assessment.questions.length) * 100;
     const answeredCount = getAnsweredQuestionsCount();
 
-    // ✅ Success screen with two-step certificate flow
     if (isSubmitted && result) {
         return (
             <div className="max-w-4xl mx-auto p-6">
@@ -377,17 +384,19 @@ export default function ViewFinalTest() {
                                 <span>{answeredCount} answered</span>
                             </div>
                         </div>
+                        {!(userRole === "SUPERADMIN" || userRole === "ADMIN") && (
                         <div
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-lg font-bold ${timeRemaining < 60
-                                    ? "bg-red-100 text-red-700 animate-pulse"
-                                    : timeRemaining < 300
-                                        ? "bg-orange-100 text-orange-700"
-                                        : "bg-blue-100 text-blue-700"
+                                ? "bg-red-100 text-red-700 animate-pulse"
+                                : timeRemaining < 300
+                                    ? "bg-orange-100 text-orange-700"
+                                    : "bg-blue-100 text-blue-700"
                                 }`}
                         >
                             <Clock size={20} />
-                            {formatTime(timeRemaining)}
+                            {formatTime(timeRemaining)}                          
                         </div>
+                        )}
                     </div>
 
                     <div className="w-full bg-gray-200 rounded-full h-2">
@@ -424,8 +433,8 @@ export default function ViewFinalTest() {
                                     <label
                                         key={idx}
                                         className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${answers[currentQuestion.id] === idx
-                                                ? "border-blue-500 bg-blue-50"
-                                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                                            ? "border-blue-500 bg-blue-50"
+                                            : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                                             }`}
                                     >
                                         <input
@@ -453,8 +462,8 @@ export default function ViewFinalTest() {
                                     <label
                                         key={idx}
                                         className={`flex items-start p-4 border-2 rounded-lg cursor-pointer transition-all ${(answers[currentQuestion.id] || []).includes(idx)
-                                                ? "border-blue-500 bg-blue-50"
-                                                : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                                            ? "border-blue-500 bg-blue-50"
+                                            : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                                             }`}
                                     >
                                         <input
@@ -542,13 +551,15 @@ export default function ViewFinalTest() {
                                 <ChevronRight size={18} className="ml-1" />
                             </Button>
                         ) : (
-                            <Button
-                                variant="primary"
-                                onClick={handleSubmit}
-                                className="bg-green-600 hover:bg-green-700"
-                            >
-                                Submit Assessment
-                            </Button>
+                            !isReadOnly && (
+                                <Button
+                                    variant="primary"
+                                    onClick={handleSubmit}
+                                    className="bg-green-600 hover:bg-green-700"
+                                >
+                                    Submit Assessment
+                                </Button>
+                            )
                         )}
                     </div>
 
@@ -562,10 +573,10 @@ export default function ViewFinalTest() {
                                     key={q.id}
                                     onClick={() => setCurrentQuestionIndex(idx)}
                                     className={`w-10 h-10 rounded-lg font-medium text-sm transition-all ${idx === currentQuestionIndex
-                                            ? "bg-blue-600 text-white ring-2 ring-blue-300"
-                                            : isQuestionAnswered(q.id)
-                                                ? "bg-green-100 text-green-800 border-2 border-green-500"
-                                                : "bg-white text-gray-700 border-2 border-gray-300 hover:border-blue-300"
+                                        ? "bg-blue-600 text-white ring-2 ring-blue-300"
+                                        : isQuestionAnswered(q.id)
+                                            ? "bg-green-100 text-green-800 border-2 border-green-500"
+                                            : "bg-white text-gray-700 border-2 border-gray-300 hover:border-blue-300"
                                         }`}
                                     title={isQuestionAnswered(q.id) ? "Answered" : "Not answered"}
                                 >

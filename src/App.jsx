@@ -26,6 +26,7 @@ import CertificatePreviewPage from "./pages/CertificatePreviewPage";
 import ViewFinalTest from "./pages/ViewFinalTest";
 import AddDepartments from "./pages/AddDepartments";
 import DepartmentAnalyticsDashboard from "./pages/DepartmentAnalyticsDashboard";
+import EditFinalTest from "./pages/EditFinalTest";
 // import ChapterViewPage from "./pages/ChapterViewPage";
 
 const ROLE = {
@@ -344,17 +345,26 @@ const App = () => {
         <Route
           path="/create_finaltest"
           element={
-            <ProtectedRoute allowedRoles={[ROLE.SUPERADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLE.SUPERADMIN, ROLE.ADMIN]}>
               <CreateFinaltest />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/courses/:courseId/final-test/edit/:assessmentId"
+          element={
+            <ProtectedRoute allowedRoles={[ROLE.SUPERADMIN, ROLE.ADMIN]}>
+              <EditFinalTest />
             </ProtectedRoute>
           }
         />
 
 
+
         <Route
           path="/create_finaltest/:courseId?"
           element={
-            <ProtectedRoute allowedRoles={[ROLE.SUPERADMIN]}>
+            <ProtectedRoute allowedRoles={[ROLE.SUPERADMIN, ROLE.ADMIN]}>
               <CreateFinaltest />
             </ProtectedRoute>
           }

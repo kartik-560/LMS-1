@@ -93,7 +93,7 @@ const LoginPage = () => {
       // ✅ Save to localStorage
 
       setAuthToken(token);
-      localStorage.setItem("auth_token", token);
+      // localStorage.setItem("auth_token", token);
       localStorage.setItem("user_role", canonicalRole);
       localStorage.setItem("user", JSON.stringify(userForStore));
       useAuthStore.getState().login(userForStore, token);
@@ -127,7 +127,7 @@ const LoginPage = () => {
   };
 
 
-  
+
   const handleGoogleError = () => {
     console.error("Google Login Failed");
     toast.error("Google login failed. Please try again.");
@@ -152,7 +152,7 @@ const LoginPage = () => {
         fullName: user.fullName,
         role: canonicalRole,
         collegeId: user.collegeId,
-        departmentId: user.departmentId,    
+        departmentId: user.departmentId,
       };
 
 

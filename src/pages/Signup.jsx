@@ -168,14 +168,14 @@ const SignupPage = () => {
           {step === "choice" && (
             <div className="space-y-4">
               {/* Google Login Button */}
-              <div className="w-full [&>div]:w-full [&>div>div]:w-full">
+              <div className="w-full max-w-xs sm:max-w-sm md:max-w-md lg:max-w-lg">
                 <GoogleLogin
                   onSuccess={handleGoogleSignup}
                   onError={handleGoogleSignupError}
                   size="large"
                   text="signup_with"
                   shape="rectangular"
-                  width="400"
+                  className="w-full"
                 />
               </div>
 

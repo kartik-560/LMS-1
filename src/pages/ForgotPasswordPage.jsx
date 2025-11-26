@@ -4,18 +4,19 @@ import { toast } from "react-hot-toast";
 import { authAPI } from "../services/api";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
-
+import { useNavigate } from "react-router-dom";
 const ForgotPasswordPage = () => {
-  const [step, setStep] = useState(1); // 1=email+otp, 2=otp verify, 3=new password
+  const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
-
+  const navigate = useNavigate();
+  const [resetToken, setResetToken] = useState(null);
   const { register, handleSubmit, watch, formState: { errors }, reset } = useForm();
 
   // ✅ Step 1: Send OTP to user's email
-  const handleSendOtp = async ({ email }) => {
+  const handleSendOtp = async ({ email: e }) => {
     try {
-      await authAPI.sendOtp({ email }); // ⬅️ create this API in your backend
-      setEmail(email);
+      await authAPI.sendOtp({ email: e });
+      setEmail(e);
       toast.success("OTP sent to your email");
       setStep(2);
     } catch (err) {
@@ -26,10 +27,17 @@ const ForgotPasswordPage = () => {
   // ✅ Step 2: Verify OTP
   const handleVerifyOtp = async ({ otp }) => {
     try {
-      await authAPI.verifyOtp({ email, otp }); // ⬅️ backend: verify and return success
+      const res = await authAPI.verifyOtp({ email, otp });
+      // backend response: { success: true, message, data: { token } }
+      const token = res?.data?.token ?? res?.token ?? null;
+      if (!token) {
+        toast.error("OTP verification failed (no token returned)");
+        return;
+      }
+      setResetToken(token);
       toast.success("OTP verified successfully");
       setStep(3);
-      reset(); // clear otp field for next step
+      // reset otp input if you use react-hook-form or similar
     } catch (err) {
       toast.error(err?.response?.data?.message || "Invalid OTP");
     }
@@ -41,10 +49,22 @@ const ForgotPasswordPage = () => {
       toast.error("Passwords do not match");
       return;
     }
+    if (!resetToken) {
+      toast.error("Missing reset token. Re-verify OTP.");
+      return;
+    }
+
     try {
-      await authAPI.resetPassword({ email, newPassword });
+      await authAPI.resetPasswordWithToken({
+        token: resetToken,
+        newPassword,
+        confirmPassword,
+      });
       toast.success("Password reset successful");
-      // Optionally redirect to login
+      setResetToken(null);
+      setEmail("");
+      setStep(1);
+      navigate("/login");
     } catch (err) {
       toast.error(err?.response?.data?.message || "Failed to reset password");
     }
@@ -70,6 +90,13 @@ const ForgotPasswordPage = () => {
             <Button type="submit" className="w-full">
               Send OTP
             </Button>
+            <button
+              type="button"
+              onClick={() => navigate("/login")}
+              className="w-full text-sm text-gray-700 font-medium py-2 rounded-lg bord border-gray-200 hover:bg-gray-100 transition"
+            >
+              ← Back to Login
+            </button>
           </form>
         )}
 

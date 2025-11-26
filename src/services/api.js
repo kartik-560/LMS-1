@@ -127,6 +127,15 @@ export const authAPI = {
         "Content-Type": "multipart/form-data",
       },
     }),
+
+  sendOtp: (payload) =>
+    api.post("/auth/password/forgot-otp", payload).then((r) => r.data),
+
+  verifyOtp: (payload) =>
+    api.post("/auth/password/verify-otp", payload).then((r) => r.data),
+
+  resetPasswordWithToken: (payload) =>
+    api.post("/auth/password/reset-with-token", payload).then((r) => r.data),
 };
 
 export const superAdminAPI = {

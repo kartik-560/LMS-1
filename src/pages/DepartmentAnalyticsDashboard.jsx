@@ -1,8 +1,11 @@
 import { useState, useEffect } from "react";
 import { adminScopedAPI } from "../services/api";
 import { useParams } from "react-router-dom";
-
+import { useNavigate } from "react-router-dom";
+import useAuthStore from "../store/useAuthStore";
 const DepartmentAnalyticsDashboard = () => {
+  const navigate = useNavigate();
+  const isSuperAdmin = useAuthStore(state => state.isSuperAdmin);
   const { departmentId } = useParams();
   const [department, setDepartment] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,6 +54,13 @@ const DepartmentAnalyticsDashboard = () => {
     <div className="p-6 max-w-6xl mx-auto">
       {/* Header */}
       <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
+        <button
+          onClick={() => navigate(isSuperAdmin ? "/superadmin" : "/admin")}
+          className="mb-4 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium transition"
+        >
+          ← Back to Dashboard
+        </button>
+
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold mb-2">{department.name}</h1>

@@ -956,37 +956,33 @@ export default function SuperAdminDashboardPage() {
   }
 
   const handleToggleCollegeStatus = async (college) => {
-    // Calculate new status (integer)
-    const newStatus = college.status === 1 ? 0 : 1;
+
+    const currentStatus = Number(college.status) === 1 ? 1 : 0;
+    const newStatus = currentStatus === 1 ? 0 : 1;
 
     setUpdatingCollegeId(college.id);
 
+    setColleges(prev => prev.map(c => c.id === college.id ? { ...c, status: newStatus } : c));
+
     try {
+
       await collegesAPI.updateCollegeStatus(college.id, { status: newStatus });
 
-      // Update local state (uses status field!)
-      setColleges(prev =>
-        prev.map(c =>
-          c.id === college.id
-            ? { ...c, status: newStatus }
-            : c
-        )
-      );
+      toast.success(`College ${newStatus === 1 ? 'activated' : 'deactivated'} successfully`);
+      console.log('toggle', college.id, 'before:', college.status, 'currentStatus:', currentStatus, 'newStatus:', newStatus);
 
-      toast.success(
-        `College ${newStatus === 1 ? 'activated' : 'deactivated'} successfully`
-      );
     } catch (err) {
+      setColleges(prev => prev.map(c => c.id === college.id ? { ...c, status: currentStatus } : c));
+
       toast.error(
         err?.response?.data?.error ||
         `Failed to ${newStatus === 1 ? 'activate' : 'deactivate'} college`
       );
+      console.error("Toggle status failed:", err);
     } finally {
       setUpdatingCollegeId(null);
     }
   };
-
-
 
   const toggleUserStatus = async ({
     userId,
@@ -2323,13 +2319,16 @@ export default function SuperAdminDashboardPage() {
                                 </div>
                               </td>
                               <td className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
+
                                 <div className="flex justify-center">
+
                                   <button
                                     onClick={() => handleToggleCollegeStatus(college)}
                                     disabled={isUpdating}
                                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${college.status === 1 ? 'bg-green-600' : 'bg-gray-300'
                                       } ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
                                     title={college.status === 1 ? 'Click to deactivate' : 'Click to activate'}
+
                                   >
                                     <span
                                       className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${college.status === 1 ? 'translate-x-6' : 'translate-x-1'

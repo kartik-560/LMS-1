@@ -2,7 +2,7 @@ import { useState } from "react";
 import axios from "axios";
 import { useForm } from "react-hook-form";
 import { toast } from "react-hot-toast";
-
+import { useNavigate } from "react-router-dom";
 import collegeIcon from "../assets/college.png";
 import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
@@ -10,7 +10,7 @@ import { collegesAPI } from "../services/api";
 
 function AddCollegePage() {
   const [isLoading, setIsLoading] = useState(false);
-
+const navigate = useNavigate();
   const {
     register,
     handleSubmit,
@@ -55,14 +55,33 @@ function AddCollegePage() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl w-full bg-white rounded-xl shadow-lg p-6 sm:p-8">
-        <div className="flex items-center justify-center mb-4">
-          <img
-            src={collegeIcon}
-            alt="College Icon"
-            className="h-10 w-10 mr-3"
-          />
-          <h2 className="text-2xl font-bold text-gray-900">Add College</h2>
+        <div className="flex items-center justify-between mb-4 w-full">
+
+          {/* LEFT: Back Button */}
+          <div className="flex-1">
+            <button
+              onClick={() => navigate("/superadmin")}
+              className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium transition"
+            >
+              ← Back to Dashboard
+            </button>
+          </div>
+
+          {/* CENTER: ICON + TITLE */}
+          <div className="flex items-center justify-center flex-1">
+            <img
+              src={collegeIcon}
+              alt="College Icon"
+              className="h-10 w-10 mr-3"
+            />
+            <h2 className="text-2xl font-bold text-gray-900">Add College</h2>
+          </div>
+
+          {/* RIGHT: empty space to keep center truly centered */}
+          <div className="flex-1"></div>
+
         </div>
+
         <p className="text-center text-gray-500 text-sm mb-6">
           Fill out the form below to add a new college to the system.
         </p>

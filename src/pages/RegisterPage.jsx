@@ -252,10 +252,30 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center py-8 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl w-full bg-white rounded-xl shadow-lg p-6 sm:p-8">
-        <div className="flex items-center justify-center mb-4">
-          <img src={userIcon} alt="User Icon" className="h-10 w-10 mr-3" />
-          <h2 className="text-2xl font-bold text-gray-900">Add Users</h2>
+        <div className="flex items-center justify-between mb-4 w-full">
+
+          {/* LEFT: Back Button */}
+          <div className="flex-1">
+            <button
+              onClick={() => navigate(isSuperAdmin ? "/superadmin" : "/admin")}
+              className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium transition"
+            >
+              ← Back to Dashboard
+            </button>
+          </div>
+
+          {/* CENTER: Title */}
+          <div className="flex items-center justify-center flex-1">
+            <img src={userIcon} alt="User Icon" className="h-10 w-10 mr-3" />
+            <h2 className="text-2xl font-bold text-gray-900">Add Users</h2>
+          </div>
+
+          {/* RIGHT: Empty space to keep center aligned */}
+          <div className="flex-1"></div>
+
         </div>
+
+
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="mt-4">

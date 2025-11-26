@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { departmentAPI } from "../services/api";
 import useAuthStore from "../store/useAuthStore";
-
+import { useNavigate } from "react-router-dom";
 const AddDepartments = () => {
-
+  const navigate = useNavigate();
   const [departments, setDepartments] = useState([]);
   const [selectedDepartments, setSelectedDepartments] = useState([]);
   const [existingDepartments, setExistingDepartments] = useState([]);
@@ -235,7 +235,7 @@ IsSuperAdmin: ${isSuperAdmin}`}
   return (
     <div className="max-w-4xl mx-auto my-8 p-8 bg-white rounded-lg shadow-md">
       {/* Header Section */}
-      <div className="mb-6">
+      {/* <div className="mb-6">
         <h2 className="text-3xl font-bold text-gray-800">
           {isSuperAdmin ? 'Department Management' : 'Add Departments'}
         </h2>
@@ -251,7 +251,37 @@ IsSuperAdmin: ${isSuperAdmin}`}
             </p>
           )}
         </div>
+      </div> */}
+
+      <div className="mb-6 flex items-start justify-between">
+        {/* LEFT SIDE */}
+        <div>
+          <h2 className="text-3xl font-bold text-gray-800">
+            {isSuperAdmin ? 'Department Management' : 'Add Departments'}
+          </h2>
+
+          <div className="text-sm text-gray-600 mt-2">
+            {isSuperAdmin ? (
+              <p className="mt-1 inline-block px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">
+                🔐 Superadmin Access
+              </p>
+            ) : (
+              <p className="mt-1 inline-block px-2 py-1 bg-purple-100 text-purple-800 rounded text-xs font-semibold">
+                🔐 Admin Access
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT SIDE - BACK BUTTON */}
+        <button
+          onClick={() => navigate(isSuperAdmin ? "/superadmin" : "/admin")}
+          className="px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md font-medium transition"
+        >
+          ← Back to Dashboard
+        </button>
       </div>
+
 
       {/* Alert Messages */}
       {error && (

@@ -46,6 +46,7 @@ const CourseCatalogPage = () => {
   const [filteredCourses, setFilteredCourses] = useState([]);
   const levels = ["Beginner", "Intermediate", "Advanced"];
   const roleLower = String(user?.role || user?.userRole || "").toLowerCase();
+  const [enrolledCourses, setEnrolledCourses] = useState(new Set());
 
   const isInstructor = roleLower === "instructor";
   const isAdmin = roleLower === "admin";
@@ -70,6 +71,29 @@ const CourseCatalogPage = () => {
         : (resolvedCollegeId ?? undefined),
     [isSuperAdmin, selectedCollege, resolvedCollegeId]
   );
+
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated || !isStudent) {
+      setEnrolledCourses(new Set());
+      return;
+    }
+    (async () => {
+      try {
+        const res = await enrollmentsAPI.listSelf();
+        const enrollments = Array.isArray(res?.data) ? res.data : res || [];
+        const enrolled = new Set(
+          enrollments
+            .filter((e) => String(e.status || "").toUpperCase() === "APPROVED" || e.enrolled)
+            .map((e) => e.courseId)
+            .filter(Boolean)
+        );
+        setEnrolledCourses(enrolled);
+      } catch {
+        // ignore non-blocking
+      }
+    })();
+  }, [hasHydrated, isAuthenticated, isStudent]);
+
 
 
   useEffect(() => {
@@ -493,29 +517,7 @@ const CourseCatalogPage = () => {
               </div>
             </div>
 
-            {/* <div className="flex items-center gap-3 mt-3 md:mt-0">
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-600 hidden sm:inline">
-                      Sort by:
-                    </span>
-                    <select
-                      value={sortBy}
-                      onChange={(e) => setSortBy(e.target.value)}
-                      className="px-2 sm:px-3 py-1 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                    >
-                      <option value="popular">Most Popular</option>
-                      <option value="newest">Newest First</option>
-                      <option value="rating">Highest Rated</option>
-                      <option value="price-low">Price: Low to High</option>
-                      <option value="price-high">Price: High to Low</option>
-                      <option value="duration">Duration</option>
-                    </select>
-                  </div>
-
-                  <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-left">
-                    Showing {filteredCourses.length} of {courses.length} courses
-                  </div>
-                </div> */}
+            
           </div>
 
           {/* Inline filters panel (no external Card dependency) */}
@@ -566,6 +568,7 @@ const CourseCatalogPage = () => {
                   course={course}
                   onEnroll={() => handleEnrollRequest(course)}
                   isPending={pendingRequests.has(course.id)}
+                  isEnrolled={enrolledCourses.has(course.id)}
                   getCategoryColor={getCategoryColor}
                   userRole={user?.role}
                 />
@@ -672,81 +675,13 @@ const FilterForm = ({
   );
 };
 
-// const CourseCard = ({
-//   course,
-//   isFavorite,
-//   onToggleFavorite,
-//   onEnroll,
-//   isPending,
-//   getCategoryColor,
-//   getLevelColor,
-// }) => {
-//   return (
-//     <div className="overflow-hidden rounded-xl bg-white border border-gray-200 hover:shadow-lg transition-all duration-300 group">
-//       <div className="relative bg-gradient-to-br from-primary-100 to-primary-200 h-40 sm:aspect-video overflow-hidden">
-//         <img
-//           src={course.thumbnail}
-//           alt={course.title}
-//           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-//           onError={(e) => (e.currentTarget.src = FALLBACK_THUMB)}
-//         />
-//       </div>
-
-//       <div className="p-4 sm:p-6">
-//         <div className="flex items-center justify-between mb-3">
-//           <div className="flex items-center space-x-2 flex-wrap">
-//             <span
-//               className={`text-xs px-2 py-1 rounded ${getCategoryColor(
-//                 course.category
-//               )}`}
-//             >
-//               {course.category}
-//             </span>
-
-//           </div>
-//         </div>
-
-//         <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2 line-clamp-2 group-hover:text-primary-600 transition-colors">
-//           {course.title}
-//         </h3>
-
-//         {course.description && (
-//           <p className="text-gray-600 text-sm mb-4 line-clamp-2">
-//             {course.description}
-//           </p>
-//         )}
-//         <div className="flex items-center justify-between gap-3">
-
-//           <div>
-//             {course.progress !== undefined ? (
-//               <Link to={`/courses/${course.id}`}>
-//                 <Button size="sm">
-//                   <Play size={16} className="mr-1" />
-//                   Continue
-//                 </Button>
-//               </Link>
-//             ) : isPending ? (
-//               <Button size="sm" variant="outline" disabled>
-//                 Requested
-//               </Button>
-//             ) : (
-//               <Button size="sm" onClick={onEnroll}>
-//                 Enroll
-//               </Button>
-//             )}
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// };
-
 const CourseCard = ({
   course,
   onEnroll,
   isPending,
+  isEnrolled,
   getCategoryColor,
-  userRole, // <- Add this prop
+  userRole,
 }) => {
   const isNonStudent = ["SUPERADMIN", "ADMIN", "INSTRUCTOR"].includes(userRole);
 
@@ -801,6 +736,11 @@ const CourseCard = ({
                   View
                 </Button>
               </Link>
+            ) : isEnrolled ? (
+              // Show "Enrolled" button for enrolled students
+              <Button size="sm" variant="outline" disabled>
+                Enrolled
+              </Button>
             ) : isPending ? (
               <Button size="sm" variant="outline" disabled>
                 Requested
@@ -816,7 +756,6 @@ const CourseCard = ({
     </div>
   );
 };
-
 
 const CourseListItem = ({
   course,
@@ -946,4 +885,3 @@ const CourseListItem = ({
 };
 
 export default CourseCatalogPage;
-

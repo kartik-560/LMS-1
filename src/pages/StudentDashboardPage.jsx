@@ -609,6 +609,17 @@ const StudentDashboardPage = () => {
                   <div className="space-y-6">
                     {assignedCourses.map((course) => {
                       const progress = currentProgress[course.id];
+                      const completedCount = progress?.completedChapters?.length || 0;
+                      const totalCount = course.totalChapters || 1; // Prevent division by zero
+                      const actualProgress = Math.round((completedCount / totalCount) * 100);
+
+                      console.log('Progress Calculation:', {
+                        courseId: course.id,
+                        completedCount,
+                        totalCount,
+                        actualProgress,
+                        cachedProgress: course.courseProgress
+                      });
                       return (
                         <div
                           key={course.id}
@@ -638,7 +649,7 @@ const StudentDashboardPage = () => {
                             </div>
 
 
-                            <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                            {/* <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
                               <Button
                                 key={`action-${course.id}`}
                                 size="sm"
@@ -729,7 +740,63 @@ const StudentDashboardPage = () => {
                                 })()}</Button>
 
 
+                            </div> */}
+                            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                              {/* Always show primary action button */}
+                              <Button
+                                key={`primary-${course.id}`}
+                                size="sm"
+                                className="w-full sm:w-auto"
+                                onClick={() => goToCourse(course.id)}
+                              >
+                                <Play size={16} className="mr-1" />
+                                {(() => {
+                                  // ✅ Check both courseProgress and actual completion
+                                  const progress = course.courseProgress || 0;
+                                  const progressObj = currentProgress[course.id];
+                                  const completedChapters = progressObj?.completedChapters?.length || 0;
+                                  const totalChapters = course.totalChapters || 0;
+
+                                  const isComplete = progress >= 100 || (totalChapters > 0 && completedChapters >= totalChapters);
+
+                                  if (!progress || progress === 0) return "Start Course";
+                                  if (isComplete) return "View Course";
+                                  return "Continue Learning";
+                                })()}
+                              </Button>
+
+                              {/* Final Test Button */}
+                              {(() => {
+                                const completedTests = JSON.parse(localStorage.getItem("completedTests") || "{}");
+                                const isTestCompleted = completedTests[course.id]?.completed;
+
+                                // ✅ Check both progress sources
+                                const progress = course.courseProgress || 0;
+                                const progressObj = currentProgress[course.id];
+                                const completedChapters = progressObj?.completedChapters?.length || 0;
+                                const totalChapters = course.totalChapters || 0;
+
+                                const isComplete = progress >= 100 || (totalChapters > 0 && completedChapters >= totalChapters);
+
+                                if (isComplete && !isTestCompleted && course.nextAction?.type === "course-test") {
+                                  return (
+                                    <Button
+                                      key={`test-${course.id}`}
+                                      size="sm"
+                                      variant="outline"
+                                      className="w-full sm:w-auto"
+                                      onClick={() => goToFinalTest(course.id)}
+                                    >
+                                      <FileText size={16} className="mr-1" />
+                                      Take Final Test
+                                    </Button>
+                                  );
+                                }
+                                return null;
+                              })()}
+
                             </div>
+
                           </div>
 
                           <div className="space-y-3">
@@ -739,11 +806,11 @@ const StudentDashboardPage = () => {
                               </span>
 
                               <span className="font-medium text-gray-900">
-                                {course.courseProgress}%
+                                {actualProgress}%
                               </span>
                             </div>
 
-                            <Progress value={course.courseProgress} size="sm" />
+                            <Progress value={actualProgress} size="sm" />
 
                             <div className="grid grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
                               <div className="text-center">
@@ -754,7 +821,7 @@ const StudentDashboardPage = () => {
                                 </div>
                                 <div className="text-gray-500">Chapters</div>
                               </div>
-                              <div className="text-center">
+                              {/* <div className="text-center">
                                 <div className="font-medium text-gray-900">
 
                                   {aiInterviewStatus[course.id]?.completed
@@ -764,7 +831,7 @@ const StudentDashboardPage = () => {
                                 <div className="text-gray-500">
                                   AI Interview
                                 </div>
-                              </div>
+                              </div> */}
                             </div>
                           </div>
                         </div>
@@ -852,7 +919,7 @@ const StudentDashboardPage = () => {
               </Card.Content>
             </Card>
 
-            
+
           </div>
         </div>
       </div>

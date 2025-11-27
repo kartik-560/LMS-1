@@ -27,6 +27,7 @@ import {
 } from "../services/api";
 
 const CourseViewerPage = () => {
+  const { user } = useAuthStore();
   const { courseId, chapterId } = useParams();
   const navigate = useNavigate();
   const [course, setCourse] = useState(null);
@@ -48,9 +49,11 @@ const CourseViewerPage = () => {
   const preferredStartChapterId =
     startChapterIdFromState ?? startChapterIdFromQuery ?? null;
 
-  // PAGE-LEVEL UI STATE (pagination for chapter content)
   const [contentPages, setContentPages] = useState([]);
   const [pageIndex, setPageIndex] = useState(0);
+  const [submittedQuizzes, setSubmittedQuizzes] = useState(new Set());
+  const userRole = user?.role || user?.userRole || "";
+  const isStaff = ["SUPERADMIN", "ADMIN", "INSTRUCTOR"].includes(userRole);
 
   const chapterIndexMap = useMemo(() => {
     const map = new Map();
@@ -64,12 +67,13 @@ const CourseViewerPage = () => {
     }
   }, [courseId]);
 
-  // QUIZ LOCKING LOGIC: Quiz is unlocked only if ALL prior chapters are completed
   const isQuizUnlocked = (chapter) => {
     if (!chapter?.hasQuiz) return false;
-    // Get all chapters that come before this quiz chapter
+
+    if (isStaff) return true;
+
     const prior = chapters.filter((c) => (c.order || 0) < (chapter.order || 0));
-    // Check if ALL prior chapters are completed
+
     return prior.every((c) => completedChapterIds.includes(c.id));
   };
 
@@ -90,34 +94,62 @@ const CourseViewerPage = () => {
 
       const listRaw = await chaptersAPI.listByCourse(courseId);
 
+      // ✅ CRITICAL DEBUG - Log the EXACT structure
+      console.log('[DEBUG 1] Raw response type:', typeof listRaw);
+      console.log('[DEBUG 2] Raw response keys:', Object.keys(listRaw || {}));
+      console.log('[DEBUG 3] listRaw.data exists?', 'data' in (listRaw || {}));
+      console.log('[DEBUG 4] listRaw.data type:', typeof listRaw?.data);
+      console.log('[DEBUG 5] Full raw response:', JSON.stringify(listRaw, null, 2));
+
       let list = [];
-      if (Array.isArray(listRaw)) {
-        list = listRaw;
-      } else if (listRaw?.data?.data && Array.isArray(listRaw.data.data)) {
-        list = listRaw.data.data;
-      } else if (listRaw?.data && Array.isArray(listRaw.data)) {
+
+      // The response is { data: [...chapters...] }
+      if (listRaw?.data && Array.isArray(listRaw.data)) {
         list = listRaw.data;
-      } else if (listRaw?.chapters && Array.isArray(listRaw.chapters)) {
-        list = listRaw.chapters;
+        console.log('[DEBUG 6] Extracted from listRaw.data');
+      } else if (Array.isArray(listRaw)) {
+        list = listRaw;
+        console.log('[DEBUG 6] listRaw is already an array');
+      } else {
+        console.error('[DEBUG 6] Could not extract chapters array!', listRaw);
       }
+
+      console.log('[DEBUG 7] Extracted list length:', list.length);
+      console.log('[DEBUG 8] First chapter:', list[0]);
 
       const mapped = list
         .sort((a, b) => (a.order || 0) - (b.order || 0))
-        .map((ch) => ({
-          id: ch.id,
-          title: ch.title,
-          duration: ch?.settings?.estimatedMinutes
-            ? `${ch.settings.estimatedMinutes} min`
-            : "—",
-          type:
-            Array.isArray(ch.assessments) && ch.assessments.length > 0
-              ? "quiz"
-              : "text",
-          content: ch.content || ch.description || "",
-          attachments: ch.attachments || [],
-          order: ch.order || 0,
-          hasQuiz: Array.isArray(ch.assessments) && ch.assessments.length > 0,
-        }));
+        .map((ch) => {
+          const hasQuiz = Array.isArray(ch.assessments) && ch.assessments.length > 0;
+
+          console.log(`[DEBUG 9] Chapter "${ch.title}":`, {
+            id: ch.id,
+            order: ch.order,
+            assessments: ch.assessments,
+            isArray: Array.isArray(ch.assessments),
+            length: ch.assessments?.length,
+            hasQuiz: hasQuiz
+          });
+
+          return {
+            id: ch.id,
+            title: ch.title,
+            duration: ch?.settings?.estimatedMinutes
+              ? `${ch.settings.estimatedMinutes} min`
+              : "—",
+            type: hasQuiz ? "quiz" : "text",
+            content: ch.content || ch.description || "",
+            attachments: ch.attachments || [],
+            order: ch.order || 0,
+            hasQuiz: hasQuiz,
+          };
+        });
+
+      console.log('[DEBUG 10] Final mapped chapters:', mapped);
+
+      // Check specifically for the quiz chapter
+      const quizChapter = mapped.find(ch => ch.title.includes('Quiz'));
+      console.log('[DEBUG 11] Quiz chapter found:', quizChapter);
 
       setChapters(mapped);
 
@@ -131,6 +163,7 @@ const CourseViewerPage = () => {
             initial = found;
           }
         }
+        console.log('[DEBUG 12] Initial chapter:', initial);
         setCurrentChapter(initial);
         hydrateChapter(initial.id);
       }
@@ -156,34 +189,45 @@ const CourseViewerPage = () => {
     }
   }
 
-  // This effect manages quiz loading and ensures quizzes are only loaded when unlocked
   useEffect(() => {
     const resetQuizState = () => {
       setQuiz(null);
       setQuizAnswers({});
-      setQuizSubmitted(false);
       setQuizScore(null);
     };
 
-    // If current chapter doesn't have a quiz, reset quiz state
     if (!currentChapter?.hasQuiz) {
+      setQuizSubmitted(false);
       resetQuizState();
       return;
     }
 
-    // If quiz is locked (prior chapters not completed), reset quiz state
-    if (!isQuizUnlocked(currentChapter)) {
+    // ✅ Check if this quiz chapter is already completed
+    const wasSubmitted = completedChapterIds.includes(currentChapter.id);
+    setQuizSubmitted(wasSubmitted);
+
+    // ✅ If already submitted, don't load the quiz
+    if (wasSubmitted) {
+      console.log('[DEBUG] Quiz already submitted (chapter completed), not loading questions');
+      return;
+    }
+
+    const quizUnlocked = isStaff || isQuizUnlocked(currentChapter);
+
+    if (!quizUnlocked) {
       resetQuizState();
       return;
     }
 
-    // Only load quiz if it's unlocked
+    // Only load quiz if not submitted
     loadQuizForChapter(currentChapter.id);
   }, [
     currentChapter?.id,
     currentChapter?.hasQuiz,
-    completedChapterIds.join("|"),
+    isStaff,
+    completedChapterIds, // ✅ Watch the full array, not just length
   ]);
+
 
   useEffect(() => {
     if (!chapters.length || !chapterId) return;
@@ -249,7 +293,6 @@ const CourseViewerPage = () => {
     }
   }
 
-  // Create paginated content pages from chapter.content
   useEffect(() => {
     setPageIndex(0);
     if (!currentChapter?.content) {
@@ -279,7 +322,7 @@ const CourseViewerPage = () => {
 
   const isChapterCompleted = (id) => completedChapterIds.includes(id);
 
-  // Check if user is on the last page
+
   const isOnLastPage = () => {
     if (contentPages.length <= 1) return true;
     return pageIndex === contentPages.length - 1;
@@ -297,6 +340,15 @@ const CourseViewerPage = () => {
   };
 
   const markChapterComplete = async ({ advance = true } = {}) => {
+
+    if (isStaff) {
+      console.log("Staff users don't track progress");
+      if (advance) {
+        goToNextChapter();
+      }
+      return;
+    }
+
     if (!currentChapter) {
       console.warn("No current chapter to mark complete");
       return;
@@ -399,6 +451,7 @@ const CourseViewerPage = () => {
     if (!quiz) return;
     try {
       setQuizSubmitted(true);
+      setSubmittedQuizzes((prev) => new Set(prev).add(currentChapter.id));
       const { score, max } = scoreLocally(quiz, quizAnswers);
       setQuizScore({ score, max });
       toast.success("Quiz submitted!");
@@ -462,7 +515,7 @@ const CourseViewerPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
-      {/* Sidebar - FIXED */}
+      {/* Sidebar - MODIFIED: Hide progress for staff */}
       <aside className={`transition-all duration-300 bg-white border-r border-gray-200 flex-shrink-0 ${sidebarOpen ? 'w-80' : 'w-0'} overflow-hidden`}>
         {sidebarOpen && (
           <>
@@ -486,14 +539,19 @@ const CourseViewerPage = () => {
 
               <Badge variant="info" size="sm" className="mb-3">{course.level}</Badge>
 
-              <div className="mt-4">
-                <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span>Progress</span>
-                  <span className="font-medium">{getCourseProgress()}%</span>
+              {/* CONDITIONAL: Only show progress for students */}
+              {!isStaff && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-xs text-gray-600">
+                    <span>Progress</span>
+                    <span className="font-medium">{getCourseProgress()}%</span>
+                  </div>
+                  <Progress value={getCourseProgress()} size="sm" />
+                  <div className="text-xs text-gray-500 mt-1">
+                    {completedChapterIds.length} / {chapters.length} chapters
+                  </div>
                 </div>
-                <Progress value={getCourseProgress()} size="sm" />
-                <div className="text-xs text-gray-500 mt-1">{completedChapterIds.length} / {chapters.length} chapters</div>
-              </div>
+              )}
             </div>
 
             <div className="overflow-y-auto h-[calc(100vh-200px)] p-3">
@@ -511,8 +569,8 @@ const CourseViewerPage = () => {
                   {expanded && (
                     <div className="divide-y">
                       {chapters.map((chapter) => {
-                        // Show lock icon for quiz chapters that are locked
-                        const isLocked = chapter.hasQuiz && !isQuizUnlocked(chapter);
+                        // Show lock icon for quiz chapters that are locked (students only)
+                        const isLocked = !isStaff && chapter.hasQuiz && !isQuizUnlocked(chapter);
 
                         return (
                           <button
@@ -526,7 +584,8 @@ const CourseViewerPage = () => {
                               }`}
                           >
                             <div className="mt-1 flex-shrink-0">
-                              {isChapterCompleted(chapter.id) ? (
+                              {/* CONDITIONAL: Only show completion status for students */}
+                              {!isStaff && isChapterCompleted(chapter.id) ? (
                                 <CheckCircle size={16} className="text-green-500" />
                               ) : isLocked ? (
                                 <Lock size={16} className="text-gray-400" />
@@ -562,7 +621,7 @@ const CourseViewerPage = () => {
 
       {/* Main panel */}
       <main className="flex-1 p-6 min-w-0">
-        {/* Sticky header */}
+        {/* Sticky header - MODIFIED: Hide progress for staff */}
         <div className="sticky top-6 bg-transparent z-10 mb-6">
           <div className="flex items-center justify-between bg-white border rounded-lg p-4 shadow-sm">
             <div className="flex items-center space-x-4 flex-1 min-w-0">
@@ -590,8 +649,13 @@ const CourseViewerPage = () => {
             </div>
 
             <div className="flex items-center space-x-3 flex-shrink-0 ml-4">
-              <div className="text-sm text-gray-600 hidden sm:block">{getCourseProgress()}% complete</div>
-              {currentChapter && isChapterCompleted(currentChapter.id) && (
+              {/* CONDITIONAL: Only show progress percentage for students */}
+              {!isStaff && (
+                <div className="text-sm text-gray-600 hidden sm:block">{getCourseProgress()}% complete</div>
+              )}
+
+              {/* CONDITIONAL: Only show completion status for students */}
+              {!isStaff && currentChapter && isChapterCompleted(currentChapter.id) && (
                 <div className="flex items-center space-x-2 text-green-600 text-sm font-medium">
                   <CheckCircle size={16} />
                   <span className="hidden sm:inline">Completed</span>
@@ -601,13 +665,13 @@ const CourseViewerPage = () => {
           </div>
         </div>
 
-        {/* Content card (fixed area) */}
+        {/* Content card - MODIFIED for staff viewing */}
         <div className="max-w-4xl mx-auto">
           <div className="bg-white border rounded-2xl shadow p-6">
             {!currentChapter ? (
               <EmptyPrompt />
             ) : currentChapter.hasQuiz ? (
-              // KEY LOGIC: Check if quiz is unlocked before showing it
+              // Quizzes always unlocked for staff
               isQuizUnlocked(currentChapter) ? (
                 <QuizView
                   quiz={quiz}
@@ -619,9 +683,9 @@ const CourseViewerPage = () => {
                   onSubmit={submitQuiz}
                   completed={isChapterCompleted(currentChapter.id)}
                   onMarkComplete={() => markChapterComplete({ advance: false })}
+                  isStaff={isStaff} // Pass to QuizView
                 />
               ) : (
-                // Show locked message if quiz requirements not met
                 <LockedQuizNote />
               )
             ) : (
@@ -631,16 +695,20 @@ const CourseViewerPage = () => {
                     <h3 className="text-2xl font-bold">{currentChapter.title}</h3>
                     <div className="text-sm text-gray-500 mt-1">{currentChapter.type} • {currentChapter.duration}</div>
                   </div>
-                  <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
-                    {isChapterCompleted(currentChapter.id) ? (
-                      <div className="flex items-center space-x-2 text-green-600 text-sm font-medium">
-                        <CheckCircle size={16} />
-                        <span>Completed</span>
-                      </div>
-                    ) : (
-                      <span className="text-sm text-amber-600 font-medium">In progress</span>
-                    )}
-                  </div>
+
+                  {/* CONDITIONAL: Only show completion status for students */}
+                  {!isStaff && (
+                    <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
+                      {isChapterCompleted(currentChapter.id) ? (
+                        <div className="flex items-center space-x-2 text-green-600 text-sm font-medium">
+                          <CheckCircle size={16} />
+                          <span>Completed</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-amber-600 font-medium">In progress</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="prose max-w-none mb-4">
@@ -680,7 +748,8 @@ const CourseViewerPage = () => {
                   {contentPages.length <= 1 && <div />}
 
                   <div className="flex flex-wrap items-center gap-2">
-                    {!isChapterCompleted(currentChapter.id) && isOnLastPage() && (
+                    {/* CONDITIONAL: Only show complete button for students */}
+                    {!isStaff && !isChapterCompleted(currentChapter.id) && isOnLastPage() && (
                       <Button onClick={() => markChapterComplete({ advance: true })} size="sm">
                         <CheckCircle size={16} className="mr-2" />
                         Complete & Continue
@@ -742,15 +811,54 @@ function QuizView({
   onSubmit,
   onMarkComplete,
   completed,
+  isStaff,
 }) {
   return (
     <div className="max-w-3xl mx-auto p-6">
       <h3 className="text-2xl font-bold mb-4">Quiz</h3>
-      {quizLoading && <p className="text-gray-600">Loading quiz…</p>}
-      {!quizLoading && !quiz && (
-        <p className="text-gray-600">No quiz available for this chapter.</p>
+
+      {isStaff && (
+        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>Staff Preview Mode:</strong> You're viewing this quiz in preview mode. Answer selection is disabled.
+          </p>
+        </div>
       )}
-      {!quizLoading && quiz && (
+
+      {quizLoading && (
+        <div className="text-center py-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-2"></div>
+          <p className="text-gray-600">Loading quiz…</p>
+        </div>
+      )}
+
+      {/* ✅ Show completion message if submitted (for students) */}
+      {!isStaff && quizSubmitted && (
+        <div className="my-8 p-6 bg-green-50 border border-green-200 rounded-lg text-center">
+          <CheckCircle size={48} className="mx-auto mb-4 text-green-600" />
+          <h4 className="text-lg font-semibold text-green-900 mb-2">
+            Quiz Completed!
+          </h4>
+          <p className="text-green-700 mb-2">
+            You have already submitted this quiz.
+          </p>
+          {quizScore && (
+            <p className="text-2xl font-bold text-green-800 mt-4">
+              Score: {quizScore.score} / {quizScore.max}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ✅ Show "no quiz" only if NOT loading AND NOT submitted */}
+      {!quizLoading && !quiz && !quizSubmitted && (
+        <div className="text-center py-8 border rounded-lg bg-gray-50">
+          <p className="text-gray-600">No quiz available for this chapter.</p>
+        </div>
+      )}
+
+      {/* ✅ Show questions only if quiz loaded AND (staff OR not submitted) */}
+      {!quizLoading && quiz && (isStaff || !quizSubmitted) && (
         <>
           <p className="text-gray-700 mb-4">{quiz.title}</p>
           <div className="space-y-6">
@@ -761,61 +869,76 @@ function QuizView({
                 q={q}
                 value={quizAnswers[q.id]}
                 onChange={(val) => onAnswerChange(q.id, val)}
-                disabled={quizSubmitted}
+                disabled={quizSubmitted || isStaff}
+                isStaff={isStaff}
               />
             ))}
           </div>
-          <div className="mt-8 flex items-center justify-between">
-            {!quizSubmitted ? (
-              <Button onClick={onSubmit}>Submit Quiz</Button>
-            ) : (
-              <div className="text-green-700 font-medium">
-                Submitted
-                {quizScore
-                  ? ` • Score: ${quizScore.score}/${quizScore.max}`
-                  : ""}
-              </div>
-            )}
-            {!completed && (
-              <Button variant="outline" onClick={onMarkComplete}>
-                <CheckCircle size={16} className="mr-2" />
-                Mark Chapter Complete
-              </Button>
-            )}
-            {completed && (
-              <div className="flex items-center space-x-2 text-green-600 font-medium">
-                <CheckCircle size={16} />
-                <span>Chapter Completed</span>
-              </div>
-            )}
-          </div>
+
+          {!isStaff && (
+            <div className="mt-8 flex items-center justify-between">
+              {!quizSubmitted ? (
+                <Button onClick={onSubmit}>Submit Quiz</Button>
+              ) : (
+                <div className="text-green-700 font-medium">
+                  Submitted
+                  {quizScore ? ` • Score: ${quizScore.score}/${quizScore.max}` : ""}
+                </div>
+              )}
+              {!completed && (
+                <Button variant="outline" onClick={onMarkComplete}>
+                  <CheckCircle size={16} className="mr-2" />
+                  Mark Chapter Complete
+                </Button>
+              )}
+              {completed && (
+                <div className="flex items-center space-x-2 text-green-600 font-medium">
+                  <CheckCircle size={16} />
+                  <span>Chapter Completed</span>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
   );
 }
 
-function QuestionBlock({ index, q, value, onChange, disabled }) {
+
+function QuestionBlock({ index, q, value, onChange, disabled, isStaff }) {
   const isMulti =
     Array.isArray(q.correctOptionIndexes) && q.correctOptionIndexes.length > 0;
   const isSingle =
     typeof q.correctOptionIndex === "number" && q.options?.length;
 
+  // Apply visual styling for staff preview mode
+  const containerClass = isStaff
+    ? "border rounded-lg p-4 bg-gray-50 opacity-75"
+    : "border rounded-lg p-4";
+
   if (isSingle) {
     return (
-      <div className="border rounded-lg p-4">
-        <div className="font-medium mb-3">Q{index + 1}. {q.prompt}</div>
+      <div className={containerClass}>
+        <div className="font-medium mb-3">
+          Q{index + 1}. {q.prompt}
+          {isStaff && <span className="ml-2 text-xs text-blue-600">(Preview Only)</span>}
+        </div>
         <div className="space-y-2">
           {q.options.map((opt, i) => (
-            <label key={i} className="flex items-center space-x-2">
+            <label
+              key={i}
+              className={`flex items-center space-x-2 ${isStaff ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            >
               <input
                 type="radio"
                 name={`q_${q.id}`}
                 disabled={disabled}
                 checked={Number(value) === i}
-                onChange={() => onChange(i)}
+                onChange={() => !isStaff && onChange(i)}
+                className={isStaff ? 'cursor-not-allowed' : ''}
               />
-              <span>{opt}</span>
+              <span className={isStaff ? 'text-gray-600' : ''}>{opt}</span>
             </label>
           ))}
         </div>
@@ -826,22 +949,32 @@ function QuestionBlock({ index, q, value, onChange, disabled }) {
   if (isMulti) {
     const arr = Array.isArray(value) ? value.map(Number) : [];
     const toggle = (i) => {
+      if (isStaff) return; // Prevent staff from toggling
       if (arr.includes(i)) onChange(arr.filter((x) => x !== i));
       else onChange([...arr, i]);
     };
+
     return (
-      <div className="border rounded-lg p-4">
-        <div className="font-medium mb-3">Q{index + 1}. {q.prompt} <span className="text-xs text-gray-500">(Select all that apply)</span></div>
+      <div className={containerClass}>
+        <div className="font-medium mb-3">
+          Q{index + 1}. {q.prompt}
+          <span className="text-xs text-gray-500"> (Select all that apply)</span>
+          {isStaff && <span className="ml-2 text-xs text-blue-600">(Preview Only)</span>}
+        </div>
         <div className="space-y-2">
           {q.options.map((opt, i) => (
-            <label key={i} className="flex items-center space-x-2">
+            <label
+              key={i}
+              className={`flex items-center space-x-2 ${isStaff ? 'cursor-not-allowed' : 'cursor-pointer'}`}
+            >
               <input
                 type="checkbox"
                 disabled={disabled}
                 checked={arr.includes(i)}
                 onChange={() => toggle(i)}
+                className={isStaff ? 'cursor-not-allowed' : ''}
               />
-              <span>{opt}</span>
+              <span className={isStaff ? 'text-gray-600' : ''}>{opt}</span>
             </label>
           ))}
         </div>
@@ -849,19 +982,22 @@ function QuestionBlock({ index, q, value, onChange, disabled }) {
     );
   }
 
+  // Text/essay questions
   return (
-    <div className="border rounded-lg p-4">
-      <div className="font-medium mb-3">Q{index + 1}. {q.prompt}</div>
+    <div className={containerClass}>
+      <div className="font-medium mb-3">
+        Q{index + 1}. {q.prompt}
+        {isStaff && <span className="ml-2 text-xs text-blue-600">(Preview Only)</span>}
+      </div>
       <textarea
         rows={4}
-        className="w-full border rounded-lg p-2"
+        className={`w-full border rounded-lg p-2 ${isStaff ? 'bg-gray-100 cursor-not-allowed' : ''}`}
         value={String(value || "")}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => !isStaff && onChange(e.target.value)}
         disabled={disabled}
-        placeholder="Type your answer…"
+        placeholder={isStaff ? "Preview mode - input disabled" : "Type your answer…"}
       />
     </div>
   );
 }
-
 export default CourseViewerPage;

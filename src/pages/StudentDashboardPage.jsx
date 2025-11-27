@@ -126,11 +126,11 @@ const StudentDashboardPage = () => {
 
       const normalizeCourse = (c) => {
         // ✅ Log to debug
-        console.log("🔍 Raw course data:", c);
+
 
         // ✅ If it's an enrollment object with nested course
         if (c.course && typeof c.course === 'object') {
-          console.log("📦 Extracted from enrollment.course:", c.course.id);
+
           return {
             ...c.course,
             id: c.course.id,
@@ -141,17 +141,16 @@ const StudentDashboardPage = () => {
 
         // ✅ If it has courseId (enrollment structure)
         if (c.courseId && !c.course) {
-          console.log("📝 Using courseId:", c.courseId);
+
           return { ...c, id: c.courseId };
         }
 
-        // ✅ Otherwise just use the id
-        console.log("✅ Using direct id:", c.id);
+
         return { ...c, id: c.id };
       };
 
 
-      myCourses = myCourses.map(normalizeCourse);
+      myCourses = myCourses.map(normalizeCourse); 
 
       if (!Array.isArray(myCourses) || myCourses.length === 0) {
         resetState();
@@ -307,10 +306,6 @@ const StudentDashboardPage = () => {
           nextAction = { type: "continue", text: "Continue Learning" };
         } else if (!progressData.courseTestResult.passed) {
           nextAction = { type: "course-test", text: "Take Final Test" };
-        } else if (sum.aiInterviewEligible && !progressData.aiInterviewResult.completed) {
-          nextAction = { type: "ai-interview", text: "Take AI Interview" };
-        } else if (hasCertificate) {
-          nextAction = { type: "certificate", text: "View Certificate", icon: Trophy };
         } else {
           nextAction = { type: "completed", text: "Course Complete", icon: Trophy };
         }
@@ -448,13 +443,6 @@ const StudentDashboardPage = () => {
     setShowTestModal(true);
   };
 
-  const startAIInterview = async (_courseId) => {
-    try {
-      toast("AI Interview API not wired yet");
-    } catch {
-      toast.error("Failed to start AI interview");
-    }
-  };
 
   const formatTimeSpent = (minutes) => {
     const hours = Math.floor(minutes / 60);
@@ -613,13 +601,6 @@ const StudentDashboardPage = () => {
                       const totalCount = course.totalChapters || 1; // Prevent division by zero
                       const actualProgress = Math.round((completedCount / totalCount) * 100);
 
-                      console.log('Progress Calculation:', {
-                        courseId: course.id,
-                        completedCount,
-                        totalCount,
-                        actualProgress,
-                        cachedProgress: course.courseProgress
-                      });
                       return (
                         <div
                           key={course.id}
@@ -648,99 +629,6 @@ const StudentDashboardPage = () => {
                               </div>
                             </div>
 
-
-                            {/* <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                              <Button
-                                key={`action-${course.id}`}
-                                size="sm"
-                                className="w-full sm:w-auto"
-                                onClick={() => {
-                                  const completedTests = JSON.parse(localStorage.getItem("completedTests") || "{}");
-                                  const isTestCompleted = completedTests[course.id]?.completed;
-
-                                  if (isTestCompleted) {
-
-                                    navigate(`/certificate/${course.id}`);
-                                  } else {
-
-                                    const actionType = course.nextAction.type;
-
-                                    if (actionType === "certificate") {
-                                      navigate(`/certificate/${course.id}`);
-                                    } else if (actionType === "ai-interview") {
-                                      startAIInterview(course.id);
-                                    } else if (actionType === "course-test") {
-                                      goToFinalTest(course.id);
-                                    } else if (actionType === "module-test") {
-                                      const test = availableTests.find(
-                                        (t) => t.courseId === course.id
-                                      );
-                                      if (test) startTest(test);
-                                      else toast("No test available yet");
-                                    } else {
-                                      goToCourse(course.id);
-                                    }
-                                  }
-                                }}
-                                disabled={
-                                  course.nextAction.type === "start" && !currentProgress[course.id]
-                                }
-                              >
-                                {(() => {
-                                  // Check localStorage for completed tests
-                                  const completedTests = JSON.parse(localStorage.getItem("completedTests") || "{}");
-                                  const isTestCompleted = completedTests[course.id]?.completed;
-
-                                  // If test is completed, show certificate button
-                                  if (isTestCompleted) {
-                                    return (
-                                      <>
-                                        <Trophy size={16} className="mr-1" />
-                                        View Certificate
-                                      </>
-                                    );
-                                  }
-
-                                  // Otherwise, show button based on nextAction type
-                                  if (course.nextAction.type === "certificate") {
-                                    return (
-                                      <>
-                                        <Trophy size={16} className="mr-1" />
-                                        {course.nextAction.text}
-                                      </>
-                                    );
-                                  } else if (course.nextAction.type === "ai-interview") {
-                                    return (
-                                      <>
-                                        <Brain size={16} className="mr-1" />
-                                        {course.nextAction.text}
-                                      </>
-                                    );
-                                  } else if (
-                                    course.nextAction.type === "course-test" ||
-                                    course.nextAction.type === "module-test"
-                                  ) {
-                                    return (
-                                      <>
-                                        <FileText size={16} className="mr-1" />
-                                        {course.nextAction.text}
-                                      </>
-                                    );
-                                  } else if (
-                                    course.nextAction.type === "continue" ||
-                                    course.nextAction.type === "start"
-                                  ) {
-                                    return (
-                                      <>
-                                        <Play size={16} className="mr-1" />
-                                        {course.nextAction.text}
-                                      </>
-                                    );
-                                  }
-                                })()}</Button>
-
-
-                            </div> */}
                             <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
                               {/* Always show primary action button */}
                               <Button

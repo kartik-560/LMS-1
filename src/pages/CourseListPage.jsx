@@ -7,16 +7,16 @@ import {
   Brain,
   FileText,
   Trophy,
+  ArrowLeft
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
 import {
-  authAPI,
   coursesAPI,
   chaptersAPI,
-  enrollmentsAPI,
   progressAPI,
   FALLBACK_THUMB,
+  assessmentsAPI
 } from "../services/api";
 import useAuthStore from "../store/useAuthStore";
 import Progress from "../components/ui/Progress";
@@ -33,9 +33,6 @@ const CourseListPage = () => {
   const [loading, setLoading] = useState(true);
   const [assignedCourses, setAssignedCourses] = useState([]);
   const [currentProgress, setCurrentProgress] = useState({});
-  const [aiInterviewStatus, setAiInterviewStatus] = useState({});
-  const [availableTests, setAvailableTests] = useState([]);
-  const [showCourseModal, setShowCourseModal] = useState(false);
   const hasHydrated = true;
 
   // --- START OF CHANGE ---
@@ -55,175 +52,8 @@ const CourseListPage = () => {
     }
     fetchStudentData();
     // --- START OF CHANGE ---
-  }, [hasHydrated, isAuthenticated, currentPage]); // Refetch when currentPage changes
-  // --- END OF CHANGE ---
+  }, [hasHydrated, isAuthenticated, currentPage]);
 
-  // const fetchStudentData = async () => {
-  //     const abort = new AbortController();
-
-  //     const resetState = () => {
-  //       setAssignedCourses([]);
-  //       setCurrentProgress({});
-  //       setAvailableTests([]);
-  //       setAiInterviewStatus({});
-  //       setCurrentPage(1);
-  //       setTotalPages(1);
-  //     };
-
-  //     try {
-  //       setLoading(true);
-
-  //       const roleRaw = (user && user.role) ?? "";
-  //       const role = String(roleRaw).toUpperCase();
-  //       const studentId = String((user && user.id) ?? "").trim();
-
-  //       if (!studentId) {
-  //         toast.error("Could not identify your student account.");
-  //         resetState();
-  //         setLoading(false); // Stop loading
-  //         return () => abort.abort();
-  //       }
-  //       if (!role.includes("STUDENT")) {
-  //         toast.error(
-  //           "This page is for students. Please log in with a student account."
-  //         );
-  //         resetState();
-  //         setLoading(false); // Stop loading
-  //         return () => abort.abort();
-  //       }
-
-  //       // --- START OF SIMPLIFIED LOGIC ---
-  //       // We no longer need the enrollmentsAPI call.
-  //       // We will rely directly on getStudentCourses.
-  //       let myCourses = [];
-  //       let totalCount = null;
-
-  //       try {
-  //         const resp = await coursesAPI.getStudentCourses(
-  //           user && user.collegeId,
-  //           studentId,
-  //           "",
-  //           "all",
-  //           "all",
-  //           "assigned",
-  //           currentPage,
-  //           PAGE_SIZE
-  //         );
-  //         myCourses =
-  //           resp?.data?.data ?? resp?.data ?? (Array.isArray(resp) ? resp : []);
-  //         totalCount =
-  //           resp?.data?.total ??
-  //           resp?.data?.pagination?.total ??
-  //           resp?.data?.meta?.total ??
-  //           null;
-  //       } catch (e) {
-  //         console.warn("getStudentCourses failed", e);
-  //         toast.error("Failed to load your courses.");
-  //         // If the API itself fails, reset and stop.
-  //         resetState();
-  //         setLoading(false);
-  //         return () => abort.abort();
-  //       }
-
-  //       // API call succeeded, now check if it returned anything
-  //       if (!Array.isArray(myCourses) || myCourses.length === 0) {
-  //         // This is not an error, just an empty state.
-  //         // resetState() will clear the courses and reset pagination.
-  //         resetState();
-  //         setLoading(false);
-  //         return () => abort.abort();
-  //       }
-
-  //       // We have courses, so set total pages
-  //       if (totalCount !== null) {
-  //         setTotalPages(Math.ceil(totalCount / PAGE_SIZE));
-  //       } else {
-  //         // Succeeded but no total count, assume 1 page for the results we got
-  //         setTotalPages(1);
-  //       }
-
-  //       const normalizeCourse = (c) => {
-  //         const cid = c?.id ?? c?.courseId ?? c?.course?.id;
-  //         return { ...c, id: cid };
-  //       };
-
-  //       myCourses = myCourses.map(normalizeCourse);
-  //       // --- END OF SIMPLIFIED LOGIC ---
-
-  //       // Fetch chapter and progress data for the courses on the current page
-  //       const [chaptersList, completedChaptersList, summaries] = await Promise.all(
-  //         [
-  //           Promise.all(
-  //             myCourses.map((c) =>
-  //               chaptersAPI
-  //                 .listByCourse(c.courseId ?? c.id)
-  //                 .then((r) => r?.data?.data ?? r?.data ?? [])
-  //                 .catch(() => [])
-  //             )
-  //           ),
-
-  //           Promise.all(
-  //             myCourses.map((c) =>
-  //               progressAPI
-  //                 .completedChapters(c.courseId ?? c.id)
-  //                 .then((r) => r?.data?.data ?? r?.data ?? [])
-  //                 .catch(() => [])
-  //             )
-  //           ),
-
-  //           Promise.all(
-  //             myCourses.map((c) =>
-  //               progressAPI
-  //                 .courseSummary(c.courseId ?? c.id)
-  //                 .then((r) => r?.data?.data ?? null)
-  //                 .catch(() => [])
-  //             )
-  //           ),
-  //         ]
-  //       );
-
-  //       const nextProgressData = {};
-  //       const nextAiStatusData = {};
-  //       const nextCourseWithCounts = [];
-
-  //       myCourses.forEach((course, i) => {
-  //         const totalCourseChapters = chaptersList[i] || [];
-  //         const completedCourseChapters = completedChaptersList[i] || [];
-
-  //         nextProgressData[course.id] = {
-  //           completedChapters: completedCourseChapters,
-  //           courseTestResult: {}, // You might fetch this from summaries[i] if available
-  //           aiInterviewResult: null, // You might fetch this from summaries[i] if available
-  //         };
-
-  //         nextCourseWithCounts.push({
-  //           ...course,
-  //           totalChapters: totalCourseChapters.length,
-  //         });
-  //       });
-
-  //       setAssignedCourses(nextCourseWithCounts);
-  //       setCurrentProgress(nextProgressData);
-  //       setAiInterviewStatus(nextAiStatusData);
-  //       setAvailableTests([]);
-
-  //     } catch (error) {
-  //       console.error("Error fetching student data:", error);
-  //       toast.error(
-  //         (error &&
-  //           error.response &&
-  //           error.response.data &&
-  //           error.response.data.error) ||
-  //           (error && error.message) ||
-  //           "Failed to load dashboard data"
-  //       );
-  //       resetState(); // Reset on final catch-all
-  //     } finally {
-  //       setLoading(false);
-  //     }
-
-  //     return () => abort.abort();
-  //   };
 
   const fetchStudentData = async () => {
     const abort = new AbortController();
@@ -231,8 +61,6 @@ const CourseListPage = () => {
     const resetState = () => {
       setAssignedCourses([]);
       setCurrentProgress({});
-      setAvailableTests([]);
-      setAiInterviewStatus({});
       setCurrentPage(1);
       setTotalPages(1);
     };
@@ -243,7 +71,6 @@ const CourseListPage = () => {
       const roleRaw = (user && user.role) ?? "";
       const role = String(roleRaw).toUpperCase();
       const studentId = String((user && user.id) ?? "").trim();
-
 
       if (!studentId) {
         toast.error("Could not identify your student account.");
@@ -275,7 +102,6 @@ const CourseListPage = () => {
         );
 
         if (!resp || resp.status === 204 || resp.data === '' || resp.data === null) {
-
           resetState();
           setLoading(false);
           return () => abort.abort();
@@ -304,7 +130,6 @@ const CourseListPage = () => {
       }
 
       if (!Array.isArray(myCourses) || myCourses.length === 0) {
-
         resetState();
         setLoading(false);
         return () => abort.abort();
@@ -316,25 +141,17 @@ const CourseListPage = () => {
         setTotalPages(1);
       }
 
-      // Debug the normalization step
       const normalizeCourse = (c) => {
-        // ✅ Log to debug
-
-
-        // ✅ If it's an enrollment object with nested course
         if (c.course && typeof c.course === 'object') {
-
           return {
             ...c.course,
             id: c.course.id,
-            enrollmentId: c.id, // Keep enrollment ID for reference
+            enrollmentId: c.id,
             enrollmentStatus: c.status
           };
         }
 
-        // ✅ If it has courseId (enrollment structure)
         if (c.courseId && !c.course) {
-
           return { ...c, id: c.courseId };
         }
 
@@ -343,15 +160,13 @@ const CourseListPage = () => {
 
       myCourses = myCourses.map(normalizeCourse);
 
-
-      // Fetch chapters/progress/debug their structure
-      const [chaptersList, completedChaptersList, summaries] = await Promise.all([
+      // ✅ Only fetch chapters and completed chapters (removed summaries)
+      const [chaptersList, completedChaptersList] = await Promise.all([
         Promise.all(
           myCourses.map((c) =>
             chaptersAPI
               .listByCourse(c.id)
               .then((r) => {
-
                 if (!r || r.status === 204 || r.data === '' || r.data === null) {
                   return [];
                 }
@@ -372,7 +187,6 @@ const CourseListPage = () => {
             progressAPI
               .completedChapters(c.id)
               .then((r) => {
-               
                 if (!r || r.status === 204 || r.data === '' || r.data === null) {
                   return [];
                 }
@@ -387,28 +201,9 @@ const CourseListPage = () => {
               })
           )
         ),
-
-        Promise.all(
-          myCourses.map((c) =>
-            progressAPI
-              .courseSummary(c.id)
-              .then((r) => {
-              
-                if (!r || r.status === 204 || r.data === '' || r.data === null) {
-                  return null;
-                }
-                return r?.data?.data ?? r?.data ?? null;
-              })
-              .catch((err) => {
-                console.warn(`[Error] fetching summary for course ${c.id}:`, err);
-                return null;
-              })
-          )
-        ),
       ]);
 
       const nextProgressData = {};
-      const nextAiStatusData = {};
       const nextCourseWithCounts = [];
 
       myCourses.forEach((course, i) => {
@@ -417,21 +212,37 @@ const CourseListPage = () => {
 
         nextProgressData[course.id] = {
           completedChapters: completedCourseChapters,
-          courseTestResult: {},
-          aiInterviewResult: null,
         };
+
+        // Calculate nextAction based on progress
+        const completedCount = completedCourseChapters.length;
+        const totalCount = totalCourseChapters.length;
+        const isComplete = totalCount > 0 && completedCount >= totalCount;
+
+        // Check if test is completed from localStorage
+        const completedTests = JSON.parse(localStorage.getItem("completedTests") || "{}");
+        const isTestCompleted = completedTests[course.id]?.completed;
+
+        let nextAction = { type: "start", text: "Start Course" };
+
+        if (completedCount > 0 && !isComplete) {
+          nextAction = { type: "continue", text: "Continue Learning" };
+        } else if (isComplete && !isTestCompleted) {
+          nextAction = { type: "course-test", text: "Take Final Test" };
+        } else if (isComplete && isTestCompleted) {
+          nextAction = { type: "certificate", text: "View Certificate" };
+        }
 
         nextCourseWithCounts.push({
           ...course,
           totalChapters: totalCourseChapters.length,
           completedChaptersCount: completedCourseChapters.length,
+          nextAction,
         });
       });
 
       setAssignedCourses(nextCourseWithCounts);
       setCurrentProgress(nextProgressData);
-      setAiInterviewStatus(nextAiStatusData);
-      setAvailableTests([]);
 
     } catch (error) {
       console.error("[Error] In fetchStudentData:", error);
@@ -446,120 +257,10 @@ const CourseListPage = () => {
       resetState();
     } finally {
       setLoading(false);
-      // console.log("[Done] fetchStudentData finished - loading state set to false.");
     }
 
     return () => abort.abort();
   };
-
-  const startAIInterview = async (_courseId) => {
-    try {
-      toast("AI Interview API not wired yet");
-    } catch {
-      toast.error("Failed to start AI interview");
-    }
-  };
-
-  const getCourseProgress = (courseId) => {
-    const progress = currentProgress[courseId];
-    if (!progress) return 0;
-
-    const course = assignedCourses.find((c) => c.id === courseId);
-    if (!course) return 0;
-
-    const totalSteps = (course.totalChapters || 0) + 2;
-    if (totalSteps <= 0) return 0;
-
-    const completedSteps =
-      (progress.completedChapters?.length || 0) +
-      (progress.courseTestResult?.passed ? 1 : 0) +
-      (progress.aiInterviewResult ? 1 : 0);
-
-    return Math.round((completedSteps / totalSteps) * 100);
-  };
-
-  const getNextAction = (courseId) => {
-    const progress = currentProgress[courseId];
-    const course = assignedCourses.find((c) => c.id === courseId);
-
-    if (!progress || !course) {
-      return { type: "start", text: "Start Course" };
-    }
-
-    const allChaptersDone =
-      (progress.completedChapters?.length || 0) >= course.totalChapters;
-
-    if (!allChaptersDone) {
-      return { type: "continue", text: "Continue Learning" };
-    }
-
-    if (!progress.courseTestResult?.passed) {
-      return { type: "course-test", text: "Take Final Test" };
-    }
-
-    return { type: "certificate", text: "View Certificate", icon: Trophy };
-  };
-
-  // const goToCourse = async (courseId) => {
-  //   if (!courseId) {
-  //     toast.error("Missing course id");
-  //     return;
-  //   }
-
-  //   const id = String(courseId);
-  //   const encodedId = encodeURIComponent(id);
-
-  //   try {
-  //     const response = await chaptersAPI.listByCourse(id);
-  //     let chapters = [];
-  //     if (Array.isArray(response)) {
-  //       chapters = response;
-  //     } else if (response?.data?.data && Array.isArray(response.data.data)) {
-  //       chapters = response.data.data;
-  //     } else if (response?.data && Array.isArray(response.data)) {
-  //       chapters = response.data;
-  //     } else if (response?.chapters && Array.isArray(response.chapters)) {
-  //       chapters = response.chapters;
-  //     }
-
-  //     console.log("Chapters for navigation:", chapters);
-
-  //     if (!chapters || chapters.length === 0) {
-  //       toast.error("No chapters found for this course");
-  //       navigate(`/courses/${encodedId}`);
-  //       return;
-  //     }
-
-  //     const sortedChapters = chapters
-  //       .slice()
-  //       .sort((a, b) => (a?.order ?? 0) - (b?.order ?? 0));
-
-  //     const firstChapter = sortedChapters[0];
-  //     const startId = firstChapter?.id ?? null;
-
-  //     console.log("Navigating with startId:", startId);
-
-  //     if (startId) {
-  //       navigate(`/courses/${encodedId}?start=${encodeURIComponent(startId)}`, {
-  //         state: {
-  //           startChapterId: startId,
-  //           courseId: id,
-  //         },
-  //         replace: false,
-  //       });
-  //     } else {
-  //       navigate(`/courses/${encodedId}`, {
-  //         state: { courseId: id },
-  //       });
-  //     }
-  //   } catch (e) {
-  //     console.error("Failed to fetch chapters:", e);
-  //     toast.error("Failed to load course chapters");
-  //     navigate(`/courses/${encodedId}`, {
-  //       state: { courseId: id },
-  //     });
-  //   }
-  // };
 
   const goToCourse = async (courseId) => {
     if (!courseId) {
@@ -623,11 +324,6 @@ const CourseListPage = () => {
     }
   };
 
-
-  const startTest = (test) => {
-    toast("Test functionality to be implemented");
-  };
-
   // --- START OF CHANGE ---
   const handleNextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages));
@@ -637,6 +333,29 @@ const CourseListPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1));
   };
   // --- END OF CHANGE ---
+
+  const goToFinalTest = async (courseId) => {
+    try {
+      const finalTestResp = await assessmentsAPI.getFinalTestByCourse(courseId);
+
+      // Properly unwrap the response
+      const finalTest = finalTestResp?.data ?? finalTestResp;
+
+      if (!finalTest || !finalTest.id) {
+        toast.error("Final test not available for this course");
+        return;
+      }
+
+      // Navigate to test with state to track course completion
+      navigate(`/view_finaltest?assessmentId=${finalTest.id}`, {
+        state: { courseId: courseId }
+      });
+    } catch (error) {
+      console.error("Failed to fetch final test:", error);
+      toast.error("Failed to load final test");
+    }
+  };
+
 
   if (loading) {
     return (
@@ -648,8 +367,22 @@ const CourseListPage = () => {
 
   return (
     <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 ">
-      <div className="mb-6 text-3xl font-bold text-gray-900">
-        <b>My Courses</b>
+      <div className="flex items-center justify-between mb-6">
+        {/* Page Title */}
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+          My Courses
+        </h1>
+
+        {/* Back to Dashboard Button - Top Right */}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/dashboard")}
+          className="flex items-center"
+        >
+          <ArrowLeft size={18} className="mr-2" />
+          Back to Dashboard
+        </Button>
       </div>
 
       <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow">
@@ -671,8 +404,9 @@ const CourseListPage = () => {
             <div className="space-y-6">
               {assignedCourses.map((course) => {
                 const progress = currentProgress[course.id];
-                const courseProgress = getCourseProgress(course.id);
-                const nextAction = getNextAction(course.id);
+                const completedCount = progress?.completedChapters?.length || 0;
+                const totalCount = course.totalChapters || 1; // Prevent division by zero
+                const actualProgress = Math.round((completedCount / totalCount) * 100);
 
                 return (
                   <div
@@ -702,98 +436,111 @@ const CourseListPage = () => {
                         </div>
                       </div>
 
-                      <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                        {/* <Button
-                          key={`continue-${course.id}`}
-                          type="button"
-                          className="flex-1"
-                          onClick={() => goToCourse(course.id)}
-                        >
-                          <PlayCircle size={16} className="mr-2" />
-                          Continue Learning
-                        </Button> */}
-
+                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                        {/* Primary Action Button */}
                         <Button
-                          key={`action-${course.id}`}
+                          key={`primary-${course.id}`}
                           size="sm"
                           className="w-full sm:w-auto"
-                          onClick={() => {
-                            if (nextAction.type === "certificate") {
-                              navigate(`/certificate/${course.id}`);
-                              return;
-                            }
-
-                            if (nextAction.type === "ai-interview") {
-                              startAIInterview(course.id);
-                            } else if (
-                              nextAction.type === "course-test" ||
-                              nextAction.type === "module-test"
-                            ) {
-                              if (nextAction.type === "course-test") {
-                                startTest(course.id);
-                              } else if (nextAction.type === "module-test") {
-                                const test = availableTests.find(
-                                  (t) => t.courseId === course.id
-                                );
-                                if (test) startTest(course.id);
-                                else toast("No module test available yet");
-                              }
-                            } else {
-                              goToCourse(course.id);
-                            }
-                          }}
-                          disabled={
-                            nextAction.type === "start" && !progress
-                          }
+                          onClick={() => goToCourse(course.id)}
                         >
-                          {nextAction.type === "certificate" && (
-                            <Trophy size={16} className="mr-1" />
-                          )}
-                          {nextAction.type === "ai-interview" && (
-                            <Brain size={16} className="mr-1" />
-                          )}
-                          {(nextAction.type === "course-test" ||
-                            nextAction.type === "module-test") && (
-                              <FileText size={16} className="mr-1" />
-                            )}
-                          {(nextAction.type === "continue" ||
-                            nextAction.type === "start") && (
-                              <Play size={16} className="mr-1" />
-                            )}
-                          {nextAction.text}
+                          <Play size={16} className="mr-1" />
+                          {/* ✅ Use actualProgress directly */}
+                          {actualProgress === 0
+                            ? "Start Course"
+                            : actualProgress >= 100
+                              ? "View Course"
+                              : "Continue Learning"}
                         </Button>
+
+                        {/* Final Test Button */}
+                        {(() => {
+                          const completedTests = JSON.parse(
+                            localStorage.getItem("completedTests") || "{}"
+                          );
+                          const isTestCompleted = completedTests[course.id]?.completed;
+
+                          // ✅ Use actualProgress and check for nextAction
+                          const hasTest = course.nextAction?.type === "course-test";
+
+                          if (actualProgress >= 100 && !isTestCompleted && hasTest) {
+                            return (
+                              <Button
+                                key={`test-${course.id}`}
+                                size="sm"
+                                variant="outline"
+                                className="w-full sm:w-auto"
+                                onClick={() => goToFinalTest(course.id)}
+                              >
+                                <FileText size={16} className="mr-1" />
+                                Take Final Test
+                              </Button>
+                            );
+                          }
+                          return null;
+                        })()}
+
+                        {/* View Certificate Button */}
+                        {(() => {
+                          const completedTests = JSON.parse(
+                            localStorage.getItem("completedTests") || "{}"
+                          );
+                          const isTestCompleted = completedTests[course.id]?.completed;
+
+                          if (isTestCompleted) {
+                            return (
+                              <Button
+                                key={`certificate-${course.id}`}
+                                size="sm"
+                                variant="outline"
+                                className="w-full sm:w-auto"
+                                onClick={() => navigate(`/certificate/${course.id}`)}
+                              >
+                                <Trophy size={16} className="mr-1" />
+                                View Certificate
+                              </Button>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
                     </div>
+
+
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-xs sm:text-sm">
                         <span className="text-gray-600">
                           Overall Progress
                         </span>
+
                         <span className="font-medium text-gray-900">
-                          {courseProgress}%
+                          {actualProgress}%
                         </span>
                       </div>
-                      <Progress value={courseProgress} size="sm" />
+
+                      <Progress value={actualProgress} size="sm" />
 
                       <div className="grid grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
                         <div className="text-center">
                           <div className="font-medium text-gray-900">
+
                             {progress?.completedChapters?.length || 0}/
                             {course.totalChapters}
                           </div>
                           <div className="text-gray-500">Chapters</div>
                         </div>
-                        <div className="text-center">
-                          <div className="font-medium text-gray-900">
-                            {aiInterviewStatus[course.id]?.completed
-                              ? "1/1"
-                              : "0/1"}
-                          </div>
-                          <div className="text-gray-500">
-                            AI Interview
-                          </div>
-                        </div>
+                        {/* <div className="text-center">
+                                <div className="font-medium text-gray-900">
+
+                                  {aiInterviewStatus[course.id]?.completed
+                                    ? "1/1"
+                                    : "0/1"}
+                                </div>
+                                <div className="text-gray-500">
+                                  AI Interview
+                                </div>
+                              </div> */}
                       </div>
                     </div>
                   </div>

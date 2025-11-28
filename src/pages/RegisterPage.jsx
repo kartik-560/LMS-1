@@ -93,10 +93,9 @@ export default function RegisterPage() {
 
   const [selectedRole, setSelectedRole] = useState("student");
 
-  // keep selectedRole in sync when roleOptions change
   useEffect(() => {
     if (!roleOptions.length) return;
-    // if current selectedRole is not in the options, reset to first option
+    
     if (!roleOptions.find(r => r.id === selectedRole)) {
       setSelectedRole(roleOptions[0].id);
     }
@@ -203,7 +202,7 @@ export default function RegisterPage() {
       const res = await authAPI.register(body);
       if (res?.data?.success === false) throw new Error(res.data.message || "Registration failed");
 
-      toast.success("User created. A temporary password has been emailed.");
+      toast.success("User created successfully.");
       reset();
       navigate("/login");
     } catch (err) {

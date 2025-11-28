@@ -46,6 +46,7 @@ const DepartmentAnalyticsDashboard = () => {
 
   // Use counts directly instead of relying on arrays
   const instructorCount = department.instructorCount || 0;
+  const instructors = department.instructors || [];
   const studentCount = department.studentCount || 0;
   const courseCount = department.courseCount || 0;
   const courses = department.courses || department.CoursesAssigned || [];
@@ -126,6 +127,38 @@ const DepartmentAnalyticsDashboard = () => {
               </div>
             ))}
 
+          </div>
+        )}
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-lg p-8 mt-8">
+        <h2 className="text-2xl font-semibold mb-6">
+          Instructors in {department.name}
+        </h2>
+        {instructors.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No instructors found for this department.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {instructors.map(instructor => (
+              <div
+                key={instructor.id}
+                className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-xl">👨‍🏫</span>
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-lg">{instructor.fullName}</h3>
+                    <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-700">
+                      {instructor.role}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>

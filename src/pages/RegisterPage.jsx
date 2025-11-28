@@ -14,6 +14,7 @@ const ALL_ROLES = [
   { id: "student", title: "Student", icon: <User size={24} />, color: "bg-blue-100 text-blue-600" },
   { id: "instructor", title: "Instructor", icon: <BookOpenIcon size={24} />, color: "bg-green-100 text-green-600" },
   { id: "admin", title: "Admin", icon: <Shield size={24} />, color: "bg-purple-100 text-purple-600" },
+  { id: "superadmin", title: "Super Admin", icon: <Shield size={24} />, color: "bg-red-100 text-red-600" },
 ];
 
 function createTemplateWithAllRoles(colleges, departments) {
@@ -84,19 +85,23 @@ export default function RegisterPage() {
   const fileInputRef = useRef(null);
   const roleOptions = useMemo(() => {
     let options = [...ALL_ROLES];
-    // if (isAdminUser && !isSuperAdmin) {
-    //   options = options.filter((r) => r.id !== "admin");
-    // }
+    if (!isSuperAdmin) {
+      options = options.filter((r) => r.id !== "superadmin");
+    }
     return options;
   }, [isAdminUser, isSuperAdmin]);
 
-  const [selectedRole, setSelectedRole] = useState(roleOptions[0]?.id || "student");
+  const [selectedRole, setSelectedRole] = useState("student");
 
+  // keep selectedRole in sync when roleOptions change
   useEffect(() => {
-    if (!roleOptions.find((r) => r.id === selectedRole)) {
-      setSelectedRole(roleOptions[0]?.id || "student");
+    if (!roleOptions.length) return;
+    // if current selectedRole is not in the options, reset to first option
+    if (!roleOptions.find(r => r.id === selectedRole)) {
+      setSelectedRole(roleOptions[0].id);
     }
   }, [roleOptions, selectedRole]);
+
 
   const [isLoading, setIsLoading] = useState(false);
   const { register, handleSubmit, formState: { errors }, reset, setValue, watch, resetField } = useForm();
@@ -105,6 +110,7 @@ export default function RegisterPage() {
   const roleIsStudent = selectedRole === "student";
   const roleIsAdmin = selectedRole === "admin";
   const roleIsInstructor = selectedRole === "instructor";
+  const roleIsSuperAdmin = selectedRole === "superadmin";
   const [colleges, setColleges] = useState([]);
 
   const onSelectRole = (roleId) => {
@@ -158,9 +164,29 @@ export default function RegisterPage() {
   }, [collegeIdToFetch, resetField]);
 
   const onSubmit = async (data) => {
-    // ... (rest of the code is unchanged)
+
     setIsLoading(true);
     try {
+
+      if (roleIsSuperAdmin) {
+        const body = {
+          fullName: (data.fullName || "").trim(),
+          email: data.email,
+          role: "superadmin",
+          authProvider: "credentials",
+          password: data.password,
+          mobile: data.mobile || undefined,
+        };
+
+        const res = await authAPI.registerSuperAdmin(body);
+        if (res?.data?.success === false) throw new Error(res.data.message || "SuperAdmin registration failed");
+
+        toast.success("SuperAdmin created successfully.");
+        reset();
+        navigate("/login");
+        return;
+      }
+
       const body = {
         fullName: (data.fullName || "").trim(),
         email: data.email,
@@ -275,8 +301,6 @@ export default function RegisterPage() {
 
         </div>
 
-
-
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="mt-4">
             <h2 className="text-base font-medium text-gray-900 text-center mb-4">Select User Role</h2>
@@ -328,6 +352,21 @@ export default function RegisterPage() {
             <Input label="Full Name" type="text" {...register("fullName", { required: "Full name is required" })} error={errors.fullName?.message} />
             {roleIsAdmin && (!isAdminUser || isSuperAdmin) && collegeDropdown}
             <Input label="Email" type="email" {...register("email", { required: "Email is required" })} error={errors.email?.message} />
+
+            {roleIsSuperAdmin && (
+              <Input
+                label="Password"
+                type="password"
+                {...register("password", {
+                  required: "Password is required for SuperAdmin",
+                  minLength: {
+                    value: 6,
+                    message: "Password must be at least 6 characters"
+                  }
+                })}
+                error={errors.password?.message}
+              />
+            )}
           </div>
 
           {roleIsStudent && (
@@ -386,33 +425,33 @@ export default function RegisterPage() {
             {isLoading ? "Adding..." : "Add User"}
           </Button>
         </form>
+        {!roleIsSuperAdmin && (
+          <div className="mt-8 border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
+              Bulk Upload Users
+            </h3>
+            <input
+              type="file"
+              accept=".xls,.xlsx"
+              ref={fileInputRef}
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+            />
+            <Button
+              onClick={handleBulkUpload}
+              size="sm"
+              className="w-full mt-4 py-2 text-white bg-green-600 hover:bg-green-700 rounded-md"
+              disabled={bulkLoading}
+            >
+              {bulkLoading ? "Uploading..." : "Upload Bulk Users"}
+            </Button>
+            <br />
+            <br />
+            <Button onClick={() => createTemplateWithAllRoles(colleges, departments)} className="mb-4 w-full">
+              Download Bulk User Upload Template
+            </Button>
 
-        <div className="mt-8 border-t border-gray-200 pt-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4 text-center">
-            Bulk Upload Users
-          </h3>
-          <input
-            type="file"
-            accept=".xls,.xlsx"
-            ref={fileInputRef}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-          />
-          <Button
-            onClick={handleBulkUpload}
-            size="sm"
-            className="w-full mt-4 py-2 text-white bg-green-600 hover:bg-green-700 rounded-md"
-            disabled={bulkLoading}
-          >
-            {bulkLoading ? "Uploading..." : "Upload Bulk Users"}
-          </Button>
-          <br />
-          <br />
-          <Button onClick={() => createTemplateWithAllRoles(colleges, departments)} className="mb-4 w-full">
-            Download Bulk User Upload Template
-          </Button>
-
-        </div>
-
+          </div>
+        )}
       </div>
     </div>
   );

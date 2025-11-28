@@ -85,6 +85,7 @@ export const handleAPIError = (error) => {
 
 export const authAPI = {
   register: (payload) => api.post("/auth/registrations", payload),
+  registerSuperAdmin: (data) => api.post("/auth/register-user", data),
   login: (payload) => api.post("/auth/login", payload),
   loginOtpBegin: (payload) =>
     api.post("/auth/signup/begin", payload).then((r) => r.data),

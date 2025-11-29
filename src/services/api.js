@@ -419,6 +419,9 @@ export const enrollmentsAPI = {
 
   listInstructorRequests: () =>
     api.get("/instructor/enrollment-requests").then((r) => r.data),
+
+  listInstructorDepartmentStudents: () =>
+    api.get("/instructor/enrolled-students").then((r) => r.data),
 };
 
 export const assessmentsAPI = {
@@ -459,6 +462,15 @@ export const assessmentsAPI = {
   update: (id, payload) =>
     api.put(`/assessments/${id}`, payload).then((r) => r.data),
 
+  getFinalScoresByCourse: (courseId, params = {}) =>
+    api
+      .get("/scores", {
+        params: {
+          courseId,
+          ...params, // e.g. { collegeId, departmentId }
+        },
+      })
+      .then((r) => r.data),
   remove: (id) => api.delete(`/assessments/${id}`).then((r) => r.data),
 };
 

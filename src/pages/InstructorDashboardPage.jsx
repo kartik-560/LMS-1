@@ -29,25 +29,22 @@ import {
   chaptersAPI,
   enrollmentsAPI,
   FALLBACK_THUMB,
+  assessmentsAPI,
 } from "../services/api";
 
 const InstructorDashboardPage = () => {
   const { user } = useAuthStore();
-  console.log("User in InstructorDashboardPage:", user);
-  const navigate = useNavigate();
   const departmentName = user?.department?.name || user?.departmentName || null;
   const collegeName = user?.college?.name || user?.collegeName || null;
   const [assignedCourses, setAssignedCourses] = useState([]);
   const [myStudents, setMyStudents] = useState([]);
   const [courseModules, setCourseModules] = useState({});
   const [studentProgress, setStudentProgress] = useState({});
-  const [testResults, setTestResults] = useState([]);
   const [loading, setLoading] = useState(true);
-
+  const [courses, setCourses] = useState([]);
   const [enrollmentRequests, setEnrollmentRequests] = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [showRequestsModal, setShowRequestsModal] = useState(false);
-
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [showCourseModal, setShowCourseModal] = useState(false);
@@ -60,7 +57,10 @@ const InstructorDashboardPage = () => {
   const [openChapterId, setOpenChapterId] = useState(null);
 
   const [studentSearchTerm, setStudentSearchTerm] = useState("");
-  const [courseFilter, setCourseFilter] = useState("all");
+  const [testScoresByStudent, setTestScoresByStudent] = useState({});
+
+  const [students, setStudents] = useState([]);
+
 
   const [stats, setStats] = useState({
     totalCourses: 0,
@@ -115,7 +115,7 @@ const InstructorDashboardPage = () => {
   useEffect(() => {
     if (!user?.id) return;
     fetchAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [user?.id]);
 
   const fetchAll = async () => {
@@ -125,6 +125,8 @@ const InstructorDashboardPage = () => {
       if (user.collegeId) params.collegeId = user.collegeId;
       if (user.departmentId) params.departmentId = user.departmentId;
 
+
+      // 1) Courses
       const rawCatalog = await coursesAPI.getCourseCatalog(params).catch(() => []);
       const assigned = Array.isArray(rawCatalog?.items)
         ? rawCatalog.items
@@ -132,7 +134,7 @@ const InstructorDashboardPage = () => {
           ? rawCatalog
           : [];
 
-      // Normalize course ids to string — prevents number/string mismatch in includes/find
+
       const normalized = assigned.map((c) => ({
         ...c,
         id: pickId(c) ?? String(c.id ?? ""),
@@ -140,10 +142,13 @@ const InstructorDashboardPage = () => {
         status: String(c.status || "draft").toLowerCase(),
       }));
       setAssignedCourses(normalized);
+      setCourses(normalized);
 
+      // 2) Chapters / modules
       const chapterLists = await batchFetchChapters(normalized);
       const modulesData = {};
       let totalChapters = 0;
+
 
       normalized.forEach((course, idx) => {
         const chapters = chapterLists[idx] || [];
@@ -157,35 +162,39 @@ const InstructorDashboardPage = () => {
       });
       setCourseModules(modulesData);
 
+
+      // 3) Enrollments (gives you real students + progress)
       const enrollmentLists = await batchFetchEnrollments(normalized);
+
 
       const studentMap = new Map();
       const progressByStudent = {};
 
-      // Process enrollments and normalize student ids & assigned course ids (strings)
+
       normalized.forEach((course, idx) => {
         const enrollments = enrollmentLists[idx] || [];
         const courseIdStr = String(course.id);
+
         for (const e of enrollments) {
-          // e can be various shapes; try multiple places
+          // IMPORTANT: use real user/student id (matches AssessmentAttempt.studentId)
           const sid =
-            pickId(e) ||
-            pickId(e.student) ||
-            pickId(e.user) ||
-            pickId(e.studentId) ||
-            pickId(e.userId);
+            e.student?.id ||
+            e.user?.id ||
+            e.studentId ||
+            e.userId ||
+            null;
+
           if (!sid) continue;
 
           const studentName =
-            e.studentName ?? e.name ?? e.student?.name ?? e.user?.name ?? "";
+            e.fullName ?? e.name ?? e.student?.name ?? e.user?.name ?? "";
           const studentEmail =
             e.studentEmail ?? e.email ?? e.student?.email ?? e.user?.email ?? "";
 
           const existing =
-            studentMap.get(sid) ||
-            ({
-              id: sid,
-              name: studentName || "Student",
+            studentMap.get(sid) || {
+              id: sid, // now same as AssessmentAttempt.studentId
+              fullName: studentName || "Student",
               email: studentEmail || "",
               avatar:
                 "https://api.dicebear.com/7.x/initials/svg?seed=" +
@@ -196,58 +205,76 @@ const InstructorDashboardPage = () => {
                 e.lastSeen ??
                 (e.student && e.student.lastLogin) ??
                 null,
-            });
+            };
 
-          // store course ids as strings to avoid type mismatch
           if (!existing.assignedCourses.includes(courseIdStr)) {
             existing.assignedCourses.push(courseIdStr);
           }
           studentMap.set(sid, existing);
 
           if (!progressByStudent[sid]) progressByStudent[sid] = {};
-          const rawProg = e.progress ?? e.studentProgress ?? e.progressPercent ?? 0;
-          const prog = Number(rawProg);
-          progressByStudent[sid][courseIdStr] = Number.isFinite(prog)
-            ? Math.max(0, Math.min(100, prog))
-            : 0;
+
+          const chapters = e.student?.chapterProgress || [];
+          if (chapters.length > 0) {
+            const completed = chapters.filter((ch) => ch.isCompleted).length;
+            const total = chapters.length;
+            const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+            progressByStudent[sid][courseIdStr] = pct;
+          } else {
+            const rawProg =
+              e.progress ?? e.studentProgress ?? e.progressPercent ?? 0;
+            const prog = Number(rawProg);
+            progressByStudent[sid][courseIdStr] = Number.isFinite(prog)
+              ? Math.max(0, Math.min(100, prog))
+              : 0;
+          }
         }
       });
+
 
       const students = Array.from(studentMap.values());
       setMyStudents(students);
       setStudentProgress(progressByStudent);
 
+
+
+      // 4) Instructor enrollment requests
       const instrReqs = await fetchInstructorRequests(normalized);
       setEnrollmentRequests(instrReqs);
 
+      // 5) Stats with real average progress
       const totalModules = Object.values(modulesData).flat().length;
+
       const perStudentAvg = students.map((stu) => {
         const ids = stu.assignedCourses || [];
         if (ids.length === 0) return 0;
+
         const sum = ids.reduce(
           (acc, cid) => acc + (progressByStudent[stu.id]?.[cid] ?? 0),
           0
         );
         return sum / ids.length;
       });
+
       const avgProgress =
         perStudentAvg.length > 0
           ? perStudentAvg.reduce((a, b) => a + b, 0) / perStudentAvg.length
           : 0;
 
-      setStats({
+      setStats((prev) => ({
+        ...prev, // keep testsGraded & averageTestScore from scores effect
         totalCourses: normalized.length,
         totalStudents: students.length,
         activeStudents: 0,
         averageProgress: Math.round(avgProgress || 0),
         totalModules,
         totalChapters,
-        testsGraded: 0,
-        averageTestScore: 0,
-      });
+      }));
     } catch (error) {
       console.error("Error loading instructor dashboard:", error);
-      toast.error(error?.response?.data?.error || "Failed to load dashboard data");
+      toast.error(
+        error?.response?.data?.error || "Failed to load dashboard data"
+      );
     } finally {
       setLoading(false);
     }
@@ -368,101 +395,106 @@ const InstructorDashboardPage = () => {
     return Math.max(0, Math.min(100, n));
   };
 
-  const getStudentStatus = (student) => {
-    const lastLoginRaw = student?.lastLogin;
-    let recentActivity = null;
-    if (lastLoginRaw) {
-      const d = new Date(lastLoginRaw);
-      if (!Number.isNaN(d.getTime())) recentActivity = d;
-    }
-    if (!recentActivity) return { status: "inactive", color: "danger" };
-    const daysSinceActivity = Math.floor((Date.now() - recentActivity.getTime()) / 86400000);
-    if (daysSinceActivity === 0) return { status: "online", color: "success" };
-    if (daysSinceActivity <= 3) return { status: "recent", color: "warning" };
-    return { status: "inactive", color: "danger" };
-  };
-
-  const filteredStudents = myStudents.filter((student) => {
-    const name = (student.name || "").toLowerCase();
-    const email = (student.email || "").toLowerCase();
-    const matchesSearch =
-      name.includes(studentSearchTerm.toLowerCase()) ||
-      email.includes(studentSearchTerm.toLowerCase());
-    const matchesCourse =
-      courseFilter === "all" ||
-      (student.assignedCourses || []).includes(String(courseFilter));
-    return matchesSearch && matchesCourse;
+  const filteredStudents = students.filter((student) => {
+    const studentName = (student?.fullName || student?.name || '').toLowerCase();
+    const matchesSearch = studentName.includes(studentSearchTerm.toLowerCase());
+    return matchesSearch;
   });
 
-  const handleExportStudents = () => {
-    try {
-      const csvData = [];
-      csvData.push([
-        "Student Name",
-        "Email",
-        "Status",
-        "Courses Enrolled",
-        "Average Progress (%)",
-        "Last Login",
-      ]);
+  useEffect(() => {
+    const fetchScores = async () => {
+      try {
+        if (!courses || courses.length === 0) return;
 
-      filteredStudents.forEach((student) => {
-        const studentStatus = getStudentStatus(student);
-        const assigned = student.assignedCourses || [];
-        const avgProgress =
-          Math.round(
-            (assigned.reduce(
-              (sum, courseId) => sum + getStudentCourseProgress(student.id, courseId),
-              0
-            ) /
-              Math.max(1, assigned.length)) || 0
-          ) || 0;
+        const params = {};
+        if (user?.collegeId) params.collegeId = user.collegeId;
+        if (user?.departmentId) params.departmentId = user.departmentId;
 
-        const courseNames = assigned
-          .map((courseId) => {
-            const course = assignedCourses.find((c) => String(c.id) === String(courseId));
-            return course ? course.title : "Unknown";
-          })
-          .join("; ");
+        const allScores = [];
 
-        csvData.push([
-          student.name || "N/A",
-          student.email || "N/A",
-          studentStatus.status || "inactive",
-          courseNames || "None",
-          avgProgress,
-          student.lastLogin ? new Date(student.lastLogin).toLocaleDateString() : "Never",
-        ]);
-      });
+        for (const course of courses) {
+          const courseIdStr = String(course.id);
 
-      const csvContent = csvData
-        .map((row) =>
-          row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")
-        )
-        .join("\n");
+          const resp = await assessmentsAPI
+            .getFinalScoresByCourse(courseIdStr, params)
+            .catch(() => null);
 
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      const url = URL.createObjectURL(blob);
+          const data = Array.isArray(resp?.data)
+            ? resp.data
+            : Array.isArray(resp)
+              ? resp
+              : [];
 
-      link.setAttribute("href", url);
-      link.setAttribute(
-        "download",
-        `students_export_${new Date().toISOString().split("T")[0]}.csv`
-      );
-      link.style.visibility = "hidden";
+          allScores.push(...data);
+        }
 
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+        // Build testScoresByStudent[studentId][courseId] = [scores...]
+        const map = {};
 
-      toast.success(`Exported ${filteredStudents.length} students to CSV`);
-    } catch (error) {
-      console.error("Export failed:", error);
-      toast.error("Failed to export students. Please try again.");
+        allScores.forEach((a) => {
+          const sid = String(a.studentId);
+          const cid = String(a.courseId || "");
+          if (!cid) return;
+          if (typeof a.score !== "number") return;
+
+          if (!map[sid]) map[sid] = {};
+          if (!map[sid][cid]) map[sid][cid] = [];
+          map[sid][cid].push(a.score);
+        });
+
+        setTestScoresByStudent(map);
+
+        // ---- compute averages for stats ----
+        const avg = (arr) =>
+          !arr || arr.length === 0
+            ? 0
+            : arr.reduce((a, b) => a + b, 0) / arr.length;
+
+        if (!myStudents || myStudents.length === 0) return;
+
+        const perStudentTestAvg = myStudents.map((stu) => {
+          const ids = stu.assignedCourses || [];
+          if (ids.length === 0) return 0;
+
+          const scores = ids.flatMap(
+            (cid) => map[stu.id]?.[cid] || []
+          );
+          return avg(scores);
+        });
+       
+        const globalTestAvg =
+          perStudentTestAvg.length > 0 ? avg(perStudentTestAvg) : 0;
+
+        const testsGraded = perStudentTestAvg.filter((v) => v > 0).length;
+
+        setStats((prev) => ({
+          ...prev,
+          testsGraded,
+          averageTestScore: Math.round(globalTestAvg || 0),
+        }));
+    
+
+      } catch (err) {
+        console.error("Error loading scores:", err);
+      }
+    };
+
+    fetchScores();
+  }, [courses, user, myStudents]);
+
+
+
+  useEffect(() => {
+    async function fetchStudents() {
+      try {
+        const response = await enrollmentsAPI.listInstructorDepartmentStudents();
+        setStudents(response.data || []);
+      } catch (error) {
+        console.error("Failed to load students", error);
+      }
     }
-  };
+    fetchStudents();
+  }, []);
 
   if (loading) {
     return (
@@ -478,24 +510,6 @@ const InstructorDashboardPage = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* <div className="mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
-            <div className="flex items-center space-x-3 sm:space-x-4">
-              <div className="w-10 sm:w-12 h-10 sm:h-12 bg-primary-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <BookOpen size={24} className="text-primary-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                  Instructor Dashboard
-                </h1>
-                <p className="text-sm sm:text-base text-gray-600">
-                  Manage your courses and track student progress.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div> */}
-
         <div className="mb-8">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
             <div className="flex items-center space-x-3 sm:space-x-4">
@@ -552,7 +566,7 @@ const InstructorDashboardPage = () => {
               <div className="ml-2 sm:ml-4">
                 <p className="text-xs sm:text-sm font-medium text-gray-600">My Students</p>
                 <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.totalStudents}</p>
-                <p className="text-xs text-gray-500">{stats.activeStudents} active</p>
+                {/* <p className="text-xs text-gray-500">{stats.activeStudents} active</p> */}
               </div>
             </div>
           </Card>
@@ -576,12 +590,19 @@ const InstructorDashboardPage = () => {
                 <Award size={24} className="text-yellow-600" />
               </div>
               <div className="ml-2 sm:ml-4">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">Test Average</p>
-                <p className="text-lg sm:text-2xl font-bold text-gray-900">{stats.averageTestScore}%</p>
-                <p className="text-xs text-gray-500">{stats.testsGraded} graded</p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600">
+                  Test Average
+                </p>
+                <p className="text-lg sm:text-2xl font-bold text-gray-900">
+                  {stats.averageTestScore}%
+                </p>
+                <p className="text-xs text-gray-500">
+                  {stats.testsGraded} graded
+                </p>
               </div>
             </div>
           </Card>
+
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
@@ -613,12 +634,14 @@ const InstructorDashboardPage = () => {
                           ) / enrolledStudents.length
                           : 0;
 
+
                       const completedStudentsCount = enrolledStudents.filter(
                         (student) => getStudentCourseProgress(student.id, course.id) >= 100
                       ).length;
                       const totalStudentsCount = enrolledStudents.length;
                       const completionPercent =
                         totalStudentsCount === 0 ? 0 : (completedStudentsCount / totalStudentsCount) * 100;
+
 
                       return (
                         <div
@@ -651,9 +674,11 @@ const InstructorDashboardPage = () => {
                                       <span>{modules.length} Chapter</span>
                                     </span>
 
+
                                   </div>
                                 </div>
                               </div>
+
 
                               <div className="space-y-2">
                                 <div className="flex items-center justify-between text-xs sm:text-sm">
@@ -662,9 +687,10 @@ const InstructorDashboardPage = () => {
                                     {completedStudentsCount} of {totalStudentsCount} students
                                   </span>
                                 </div>
-                                <Progress value={Math.round(completionPercent)} size="sm" />
+                                <Progress value={Math.round(avgProgress)} size="sm" />
                               </div>
                             </div>
+
 
                             {/* Action buttons */}
                             <div className="flex flex-wrap gap-2 lg:flex-col lg:space-y-2">
@@ -692,6 +718,7 @@ const InstructorDashboardPage = () => {
                   </div>
                 )}
               </Card.Content>
+
             </Card>
           </div>
 
@@ -745,66 +772,46 @@ const InstructorDashboardPage = () => {
               <Card.Header className="flex items-center justify-between">
                 <Card.Title className="flex items-center">
                   <Users size={20} className="mr-2 text-green-500" />
-                  Student Progress
+                  Enrolled Student
                 </Card.Title>
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="outline" onClick={() => setShowStudentModal(true)}>
                     View All
                   </Button>
-                  <Button size="sm" variant="outline" onClick={handleExportStudents}>
-                    <Download size={16} className="mr-1" />
-                    Export
-                  </Button>
+
                 </div>
               </Card.Header>
               <Card.Content>
-                {myStudents.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No students assigned</p>
+                {filteredStudents.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4">No students enrolled</p>
                 ) : (
                   <div className="space-y-3">
-                    {myStudents.slice(0, 5).map((student) => {
-                      const studentStatus = getStudentStatus(student);
-                      const assigned = student.assignedCourses || [];
-                      const avgProgress =
-                        (assigned.reduce((sum, courseId) => sum + getStudentCourseProgress(student.id, courseId), 0) /
-                          Math.max(1, assigned.length)) || 0;
-                      return (
-                        <div
-                          key={student.id}
-                          className="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
-                          onClick={() => viewStudentDetails(student)}
-                        >
-                          <div className="w-8 sm:w-10 h-8 sm:h-10 rounded-full overflow-hidden bg-gray-100 relative flex-shrink-0">
-                            <img src={student.avatar} alt={student.name} className="w-full h-full object-cover" />
-                            <div
-                              className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${studentStatus.color === "success"
-                                ? "bg-green-500"
-                                : studentStatus.color === "warning"
-                                  ? "bg-yellow-500"
-                                  : "bg-gray-400"
-                                }`}
-                            ></div>
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">{student.name}</p>
-                            <p className="text-xs text-gray-500 truncate">{(student.assignedCourses || []).length} courses assigned</p>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <div className="text-xs sm:text-sm font-medium text-gray-900">{Math.round(avgProgress)}%</div>
-                            <div className="w-12 sm:w-16 bg-gray-200 rounded-full h-1.5 mt-1">
-                              <div className="bg-primary-600 h-1.5 rounded-full" style={{ width: `${avgProgress}%` }}></div>
-                            </div>
-                          </div>
+                    {filteredStudents.slice(0, 5).map((student) => (
+                      <div
+                        key={student.id}
+                        className="flex items-center space-x-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer"
+                        onClick={() => viewStudentDetails(student)}
+                      >
+                        <div className="w-8 sm:w-10 h-8 sm:h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+                          <span className="text-lg">👨‍🎓</span>
                         </div>
-                      );
-                    })}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                            {student.fullName}
+                          </p>
+                        </div>
+                        <div className="text-xs sm:text-sm font-medium text-gray-400 flex-shrink-0">
+                          View
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </Card.Content>
             </Card>
 
             {/* Recent Test Results */}
-            <Card>
+            {/* <Card>
               <Card.Header>
                 <Card.Title className="flex items-center">
                   <FileText size={20} className="mr-2 text-orange-500" />
@@ -838,7 +845,7 @@ const InstructorDashboardPage = () => {
                   </div>
                 )}
               </Card.Content>
-            </Card>
+            </Card> */}
           </div>
         </div>
       </div>
@@ -984,67 +991,39 @@ const InstructorDashboardPage = () => {
       </Modal>
 
       {/* Student Management Modal */}
-      <Modal isOpen={showStudentModal} onClose={() => setShowStudentModal(false)} title="Student Management" size="xl">
+      <Modal isOpen={showStudentModal} onClose={() => setShowStudentModal(false)} title="Enrolled Students" size="xl">
         <div className="space-y-4">
           <div className="flex items-center space-x-4">
             <div className="flex-1">
-              <Input placeholder="Search students..." value={studentSearchTerm} onChange={(e) => setStudentSearchTerm(e.target.value)} className="w-full" />
+              <Input
+                placeholder="Search students..."
+                value={studentSearchTerm}
+                onChange={(e) => setStudentSearchTerm(e.target.value)}
+                className="w-full"
+              />
             </div>
-            <select
-              value={courseFilter}
-              onChange={(e) => setCourseFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="all">All Courses</option>
-              {assignedCourses.map((course) => (
-                <option key={course.id} value={String(course.id)}>
-                  {course.title}
-                </option>
-              ))}
-            </select>
-            <Button variant="outline" onClick={handleExportStudents}>
-              <Download size={16} className="mr-1" />
-              Export
-            </Button>
           </div>
 
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {filteredStudents.map((student) => {
-              const studentStatus = getStudentStatus(student);
-              const assigned = student.assignedCourses || [];
-              const avgProgress = (assigned.reduce((sum, courseId) => sum + getStudentCourseProgress(student.id, courseId), 0) / Math.max(1, assigned.length)) || 0;
-
-              return (
+            {filteredStudents.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                No students found
+              </div>
+            ) : (
+              filteredStudents.map((student) => (
                 <div key={student.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 relative">
-                      <img src={student.avatar} alt={student.name} className="w-full h-full object-cover" />
-                      <div
-                        className={`absolute bottom-0 right-0 w-3 h-3 rounded-full border-2 border-white ${studentStatus.color === "success" ? "bg-green-500" : studentStatus.color === "warning" ? "bg-yellow-500" : "bg-gray-400"
-                          }`}
-                      ></div>
+                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                      <span className="text-xl">👨‍🎓</span>
                     </div>
                     <div>
-                      <h4 className="font-medium text-gray-900">{student.name}</h4>
-                      <p className="text-sm text-gray-600">{student.email}</p>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Badge variant={studentStatus.color} size="sm">
-                          {studentStatus.status}
-                        </Badge>
-                        <span className="text-xs text-gray-500">{(student.assignedCourses || []).length} courses</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-sm font-medium text-gray-900">{Math.round(avgProgress)}%</div>
-                    <div className="text-xs text-gray-500">Average Progress</div>
-                    <div className="w-20 bg-gray-200 rounded-full h-1.5 mt-1">
-                      <div className="bg-primary-600 h-1.5 rounded-full" style={{ width: `${avgProgress}%` }}></div>
+                      <h4 className="font-medium text-gray-900">{student.fullName}</h4>
+
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
         </div>
       </Modal>

@@ -137,6 +137,14 @@ export const authAPI = {
 
   resetPasswordWithToken: (payload) =>
     api.post("/auth/password/reset-with-token", payload).then((r) => r.data),
+
+  removeUser: (userId, payload = {}) =>
+  api
+    .delete(`/auth/me`, {
+      params: { targetId: userId },   // goes to req.query.targetId
+      data: payload,                  // optional body if you ever need it
+    })
+    .then((r) => r.data),
 };
 
 export const superAdminAPI = {

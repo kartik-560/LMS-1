@@ -796,15 +796,7 @@ const CourseListItem = ({
                 >
                   {course.level}
                 </span>
-                <div className="flex items-center space-x-1 text-sm">
-                  <Star size={14} className="text-yellow-400 fill-current" />
-                  <span className="font-medium text-gray-700">
-                    {course.rating ?? 0}
-                  </span>
-                  <span className="text-gray-500">
-                    ({course.reviewCount ?? 0})
-                  </span>
-                </div>
+                
               </div>
 
               <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-primary-600 transition-colors line-clamp-2">
@@ -817,45 +809,14 @@ const CourseListItem = ({
                 </p>
               )}
 
-              <div className="flex items-center space-x-4 text-sm text-gray-500">
-                <div className="flex items-center space-x-1">
-                  <Clock size={14} />
-                  <span>{course.duration}</span>
-                </div>
-                <div className="flex items-center space-x-1">
-                  <Users size={14} />
-                  <span>{course.enrolledStudents} students</span>
-                </div>
-              </div>
+              
             </div>
 
             <div className="flex flex-col items-end space-y-3 mt-4 sm:mt-0">
-              <div className="flex space-x-2">
-                <button
-                  onClick={onToggleFavorite}
-                  className={`p-2 rounded-full transition-colors ${isFavorite
-                    ? "bg-red-100 text-red-600"
-                    : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-                    }`}
-                >
-                  <Heart
-                    size={16}
-                    className={isFavorite ? "fill-current" : ""}
-                  />
-                </button>
-                <button className="p-2 rounded-full bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
-                  <Share2 size={16} />
-                </button>
-              </div>
+              
 
               <div className="text-right">
-                <div className="text-2xl font-bold text-gray-900 mb-1">
-                  {course.price === 0 ? (
-                    <span className="text-green-600">Free</span>
-                  ) : (
-                    <span>₹{course.price}</span>
-                  )}
-                </div>
+                
 
                 <div>
                   {course.progress !== undefined ? (

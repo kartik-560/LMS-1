@@ -810,7 +810,6 @@ export default function SuperAdminDashboardPage() {
     }
   };
 
-
   const handleViewCourse = () => {
     setModalOpen(false);
     navigate(`/courses/${selectedCourse.id}`);
@@ -1010,6 +1009,53 @@ export default function SuperAdminDashboardPage() {
       // Optional: Show toast/error message here
     }
     setUpdatingUserId(null);
+  };
+
+
+  const handleDelete = async (entityType, id = null, additionalPayload = {}) => {
+    try {
+      let response;
+
+      switch (entityType) {
+        case "course":
+          response = await coursesAPI.remove(id);
+          setAllCourses(prev =>
+            prev.filter(course => course.id !== id)
+          );
+          break;
+
+        case "student":
+          response = await authAPI.removeUser(id, additionalPayload);
+          setAllStudents(prev =>
+            prev.filter(student => student.id !== id)
+          );
+          break;
+
+        case "instructor":
+          response = await authAPI.removeUser(id, additionalPayload);
+          setAllInstructors(prev =>
+            prev.filter(instructor => instructor.id !== id)
+          );
+          break;
+
+        case "admin":
+          response = await authAPI.removeUser(id, additionalPayload);
+          setAllAdmins(prev =>
+            prev.filter(admin => admin.id !== id)
+          );
+          break;
+
+        default:
+          throw new Error("Invalid entity type");
+      }
+
+      alert(`${entityType} deleted successfully`);
+      return response;
+    } catch (error) {
+      console.error(`Error deleting ${entityType}:`, error);
+      alert(`Failed to delete ${entityType}`);
+      throw error;
+    }
   };
 
 
@@ -2431,6 +2477,17 @@ export default function SuperAdminDashboardPage() {
                                 <Plus size={16} className="mr-1" />
                                 Create Final Test
                               </Link>
+                              <button
+                                onClick={() => {
+                                  if (window.confirm('Are you sure you want to delete this course?')) {
+                                    handleDelete('course', course.id);
+                                  }
+                                }}
+                                className="ml-auto bg-red-500 text-white hover:bg-red-600 px-3 py-2 rounded text-sm inline-flex items-center"
+                              >
+                                <Trash2 size={16} className="mr-1" />
+                                Delete
+                              </button>
 
                             </div>
                           </div>
@@ -2493,6 +2550,7 @@ export default function SuperAdminDashboardPage() {
                       <div className="w-48 ">Department</div>
                       <div className="w-24 text-center">Status</div>
                       <div className="w-24 text-center">Action</div>
+                      <div className="w-24 text-center">Delete</div>
                     </div>
 
                     {/* Student rows */}
@@ -2566,7 +2624,23 @@ export default function SuperAdminDashboardPage() {
                                 }`}
                             />
                           </button>
+
+
                         </div>
+                        <div className="w-24 text-center">
+                          <button
+                            onClick={() => {
+                              if (window.confirm(`Are you sure you want to delete ${student.name || "this student"}?`)) {
+                                handleDelete("student", student.id);
+                              }
+                            }}
+                            className="text-red-600 hover:text-red-900 transition-colors"
+                            title="Delete student"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+
                       </div>
                     ))}
 
@@ -2615,6 +2689,7 @@ export default function SuperAdminDashboardPage() {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">College</th>
                             <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Delete</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -2671,6 +2746,20 @@ export default function SuperAdminDashboardPage() {
                                   />
                                 </button>
                               </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete ${admin.name}?`)) {
+                                      handleDelete("admin", admin.id);
+                                    }
+                                  }}
+                                  className="text-red-600 hover:text-red-900 transition-colors"
+                                  title="Delete user"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+
+                              </td>
                             </tr>
                           ))}
                         </tbody>
@@ -2717,6 +2806,7 @@ export default function SuperAdminDashboardPage() {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
                             <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
                             <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Delete</th>
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
@@ -2770,6 +2860,20 @@ export default function SuperAdminDashboardPage() {
                                       }`}
                                   />
                                 </button>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete ${instructor.name}?`)) {
+                                      handleDelete("instructor", instructor.id);
+                                    }
+                                  }}
+                                  className="text-red-600 hover:text-red-900 transition-colors"
+                                  title="Delete user"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+
                               </td>
                             </tr>
                           ))}
@@ -3229,5 +3333,3 @@ export default function SuperAdminDashboardPage() {
     </div>
   );
 }
-
-

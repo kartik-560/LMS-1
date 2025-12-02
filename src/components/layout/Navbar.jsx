@@ -83,7 +83,7 @@ const Navbar = () => {
               <img
                 src={logo}
                 alt="Pugarch Logo"
-           className="h-10 md:h-12 lg:h-16 w-auto object-contain"
+                className="h-10 md:h-12 lg:h-16 w-auto object-contain"
               />
             </div>
           </Link>
@@ -95,44 +95,40 @@ const Navbar = () => {
                 {role === "superadmin" ? (
                   <Link
                     to="/superadmin"
-                    className={`text-sm font-medium transition-colors ${
-                      isActive("/superadmin")
-                        ? "text-primary-600"
-                        : "text-gray-700 hover:text-primary-600"
-                    }`}
+                    className={`text-sm font-medium transition-colors ${isActive("/superadmin")
+                      ? "text-primary-600"
+                      : "text-gray-700 hover:text-primary-600"
+                      }`}
                   >
                     Super Admin
                   </Link>
                 ) : role === "admin" ? (
                   <Link
                     to="/admin"
-                    className={`text-sm font-medium transition-colors ${
-                      isActive("/admin")
-                        ? "text-primary-600"
-                        : "text-gray-700 hover:text-primary-600"
-                    }`}
+                    className={`text-sm font-medium transition-colors ${isActive("/admin")
+                      ? "text-primary-600"
+                      : "text-gray-700 hover:text-primary-600"
+                      }`}
                   >
                     Admin Panel
                   </Link>
                 ) : role === "instructor" ? (
                   <Link
                     to="/instructor"
-                    className={`text-sm font-medium transition-colors ${
-                      isActive("/instructor")
-                        ? "text-primary-600"
-                        : "text-gray-700 hover:text-primary-600"
-                    }`}
+                    className={`text-sm font-medium transition-colors ${isActive("/instructor")
+                      ? "text-primary-600"
+                      : "text-gray-700 hover:text-primary-600"
+                      }`}
                   >
                     My Courses
                   </Link>
                 ) : (
                   <Link
                     to="/dashboard"
-                    className={`text-sm font-medium transition-colors ${
-                      isActive("/dashboard")
-                        ? "text-primary-600"
-                        : "text-gray-700 hover:text-primary-600"
-                    }`}
+                    className={`text-sm font-medium transition-colors ${isActive("/dashboard")
+                      ? "text-primary-600"
+                      : "text-gray-700 hover:text-primary-600"
+                      }`}
                   >
                     My Learning
                   </Link>
@@ -140,11 +136,10 @@ const Navbar = () => {
 
                 <Link
                   to="/courses"
-                  className={`text-sm font-medium transition-colors ${
-                    isActive("/courses")
-                      ? "text-primary-600"
-                      : "text-gray-700 hover:text-primary-600"
-                  }`}
+                  className={`text-sm font-medium transition-colors ${isActive("/courses")
+                    ? "text-primary-600"
+                    : "text-gray-700 hover:text-primary-600"
+                    }`}
                 >
                   Browse Courses
                 </Link>
@@ -167,7 +162,7 @@ const Navbar = () => {
             )}
           </div>
 
- 
+
           <div className="hidden lg:flex items-center space-x-3 xl:space-x-4">
             {isAuthenticated ? (
               <div className="flex items-center space-x-2 xl:space-x-3">
@@ -175,9 +170,23 @@ const Navbar = () => {
                   {getRoleIcon()}
                   <span>{getRoleLabel()}</span>
                 </div>
-                <div className="text-sm text-gray-900 font-medium max-w-32 truncate">
-                  {user?.name || user?.fullName}
+                <div className="relative group">
+                  <div className="text-sm text-gray-900 font-medium max-w-32 truncate cursor-default">
+                    {user?.name || user?.fullName}
+                  </div>
+
+                  {/* Tooltip positioned below */}
+                  <div className="absolute top-full left-0 mt-2 hidden group-hover:block z-50">
+                    <div className="bg-gray-900 text-white text-sm px-3 py-2 rounded-md shadow-lg whitespace-nowrap">
+                      {user?.name || user?.fullName}
+                      {/* Arrow pointing up */}
+                      <div className="absolute bottom-full left-4 w-0 h-0 border-l-4 border-l-transparent border-r-4 border-r-transparent border-b-4 border-b-gray-900"></div>
+                    </div>
+                  </div>
                 </div>
+
+
+
                 <Button
                   variant="ghost"
                   size="sm"
@@ -222,11 +231,10 @@ const Navbar = () => {
                 {role === "superadmin" ? (
                   <Link
                     to="/superadmin"
-                    className={`block px-3 py-2 rounded-md text-base font-medium ${
-                      isActive("/superadmin")
-                        ? "text-primary-600 bg-primary-50"
-                        : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
-                    }`}
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${isActive("/superadmin")
+                      ? "text-primary-600 bg-primary-50"
+                      : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
+                      }`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Super Admin
@@ -234,11 +242,10 @@ const Navbar = () => {
                 ) : role === "admin" ? (
                   <Link
                     to="/admin"
-                    className={`block px-3 py-2 rounded-md text-base font-medium ${
-                      isActive("/admin")
-                        ? "text-primary-600 bg-primary-50"
-                        : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
-                    }`}
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${isActive("/admin")
+                      ? "text-primary-600 bg-primary-50"
+                      : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
+                      }`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     Admin Panel
@@ -246,11 +253,10 @@ const Navbar = () => {
                 ) : role === "instructor" ? (
                   <Link
                     to="/instructor"
-                    className={`block px-3 py-2 rounded-md text-base font-medium ${
-                      isActive("/instructor")
-                        ? "text-primary-600 bg-primary-50"
-                        : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
-                    }`}
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${isActive("/instructor")
+                      ? "text-primary-600 bg-primary-50"
+                      : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
+                      }`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     My Courses
@@ -258,11 +264,10 @@ const Navbar = () => {
                 ) : (
                   <Link
                     to="/dashboard"
-                    className={`block px-3 py-2 rounded-md text-base font-medium ${
-                      isActive("/dashboard")
-                        ? "text-primary-600 bg-primary-50"
-                        : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
-                    }`}
+                    className={`block px-3 py-2 rounded-md text-base font-medium ${isActive("/dashboard")
+                      ? "text-primary-600 bg-primary-50"
+                      : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
+                      }`}
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     My Learning
@@ -271,11 +276,10 @@ const Navbar = () => {
 
                 <Link
                   to="/courses"
-                  className={`block px-3 py-2 rounded-md text-base font-medium ${
-                    isActive("/courses")
-                      ? "text-primary-600 bg-primary-50"
-                      : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
-                  }`}
+                  className={`block px-3 py-2 rounded-md text-base font-medium ${isActive("/courses")
+                    ? "text-primary-600 bg-primary-50"
+                    : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
+                    }`}
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Browse Courses

@@ -525,7 +525,7 @@ const CourseViewerPage = () => {
                   <img src={course.thumbnail} alt="thumb" className="w-10 h-10 rounded-md object-cover flex-shrink-0" />
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold truncate">{course.title}</div>
-                    <div className="text-xs text-gray-500 truncate">by {course.instructorName}</div>
+                    {/* <div className="text-xs text-gray-500 truncate">by {course.instructorName}</div> */}
                   </div>
                 </div>
                 <button
@@ -643,7 +643,7 @@ const CourseViewerPage = () => {
               {currentChapter && (
                 <div className="min-w-0 flex-1">
                   <h2 className="text-lg font-semibold truncate">{currentChapter.title}</h2>
-                  <div className="text-sm text-gray-500 truncate">{course.title} • {currentChapter.duration}</div>
+                  <div className="text-sm text-gray-500 truncate">{course.title} </div>
                 </div>
               )}
             </div>
@@ -692,8 +692,8 @@ const CourseViewerPage = () => {
               <div>
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-2xl font-bold">{currentChapter.title}</h3>
-                    <div className="text-sm text-gray-500 mt-1">{currentChapter.type} • {currentChapter.duration}</div>
+                    {/* <h3 className="text-2xl font-bold">{currentChapter.title}</h3> */}
+                    <div className="text-2xl font-bold">{currentChapter.type} </div>
                   </div>
 
                   {/* CONDITIONAL: Only show completion status for students */}

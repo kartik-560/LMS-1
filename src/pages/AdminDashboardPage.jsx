@@ -525,6 +525,12 @@ export default function AdminDashboardPage() {
     [navigate]
   );
 
+  const goToTab = (tab) => {
+    setActiveTab(tab);
+    // if you also use route segments, add:
+    // navigate(`/admin?tab=${tab}`);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -594,116 +600,147 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Top stats */}
+     
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
           {/* Instructors Card */}
-          <Card
-            className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-blue-300 bg-white"
+          <div
+            className={`cursor-pointer transition-all duration-200 hover:scale-105 ${activeTab === "instructors"
+              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80 scale-105"
+              : "hover:shadow-lg hover:border-blue-300"
+              }`}
             onClick={() => {
               setActiveTab("instructors");
+              setSelectedUsers([]);
               handleTabChange("instructors");
             }}
           >
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Users
-                  className="text-blue-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
-                />
+            <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
+              <div className="flex items-center">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "instructors"
+                  ? "bg-primary-500 shadow-lg shadow-primary-200/50"
+                  : "bg-blue-100 hover:bg-blue-200"
+                  }`}>
+                  <Users
+                    className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-colors ${activeTab === "instructors" ? "text-white" : "text-blue-600"
+                      }`}
+                  />
+                </div>
+                <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Instructors</p>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                    {overview?.instructors || 0}
+                  </p>
+                </div>
               </div>
-              <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Instructors
-                </p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                  {overview?.instructors || 0}
-                </p>
-              </div>
-            </div>
-          </Card>
-
+            </Card>
+          </div>
           {/* Students Card */}
-          <Card
-            className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-green-300 bg-white"
+          <div
+            className={`cursor-pointer transition-all duration-200 hover:scale-105 ${activeTab === "students"
+              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80 scale-105"
+              : "hover:shadow-lg hover:border-blue-300"
+              }`}
             onClick={() => {
               setActiveTab("students");
+              setSelectedUsers([]);
               handleTabChange("students");
             }}
           >
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <GraduationCap
-                  className="text-green-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
-                />
+            <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
+              <div className="flex items-center">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "students"
+                  ? "bg-primary-500 shadow-lg shadow-primary-200/50"
+                  : "bg-green-100 hover:bg-green-200"
+                  }`}>
+                  <GraduationCap
+                    className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-colors ${activeTab === "students" ? "text-white" : "text-green-600"
+                      }`}
+                  />
+                </div>
+                <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Students</p>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                    {overview?.students || 0}
+                  </p>
+                </div>
               </div>
-              <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Students
-                </p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                  {overview?.students || 0}
-                </p>
-              </div>
-            </div>
-          </Card>
-
+            </Card>
+          </div>
           {/* Courses Card */}
-          <Card
-            className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-purple-300 bg-white"
+
+          <div
+            className={`cursor-pointer transition-all duration-200 hover:scale-105 ${activeTab === "courses"
+              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80 scale-105"
+              : "hover:shadow-lg hover:border-blue-300"
+              }`}
             onClick={() => {
               setActiveTab("courses");
+              setSelectedUsers([]);
               handleTabChange("courses");
             }}
           >
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <BookOpen
-                  className="text-purple-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
-                />
+            <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
+              <div className="flex items-center">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "courses"
+                  ? "bg-primary-500 shadow-lg shadow-primary-200/50"
+                  : "bg-purple-100 hover:bg-purple-200"
+                  }`}>
+                  <BookOpen
+                    className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-colors ${activeTab === "courses" ? "text-white" : "text-purple-600"
+                      }`}
+                  />
+                </div>
+                <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Courses</p>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                    {overview?.courses || 0}
+                  </p>
+                </div>
               </div>
-              <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Courses
-                </p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                  {overview?.courses || 0}
-                </p>
-              </div>
-            </div>
-          </Card>
-
+            </Card>
+          </div>
           {/* Departments Card */}
-          <Card
-            className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-yellow-300 bg-white"
+          <div
+            className={`cursor-pointer transition-all duration-200 hover:scale-105 ${activeTab === "departments"
+              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80 scale-105"
+              : "hover:shadow-lg hover:border-blue-300"
+              }`}
             onClick={() => {
-              setActiveTab("departments");
-              handleTabChange("departments");
+               setActiveTab("departments");
+                setSelectedUsers([]);
+                handleTabChange("departments");
             }}
           >
-            <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-yellow-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                <Building2
-                  className="text-yellow-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
-                />
+            <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
+              <div className="flex items-center">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "departments"
+                  ? "bg-primary-500 shadow-lg shadow-primary-200/50"
+                  : "bg-yellow-100 hover:bg-yellow-200"
+                  }`}>
+                  <Building2
+                    className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-colors ${activeTab === "departments" ? "text-white" : "text-yellow-600"
+                      }`}
+                  />
+                </div>
+                <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Departments</p>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                    {overview?.departments || 0}
+                  </p>
+                </div>
               </div>
-              <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Departments
-                </p>
-                <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                  {overview?.departments || 0}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* Certificate Card */}
-          <Card
-            className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-indigo-300 bg-white"
-            onClick={() => setActiveTab("overview")}
-          >
+            </Card>
+          </div>
+          {/* Certificates Card - Overview */}
+          <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
             <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "overview"
+                ? "bg-primary-500 shadow-lg shadow-primary-200/50"
+                : "bg-indigo-100 hover:bg-indigo-200"
+                }`}>
                 <Target
-                  className="text-indigo-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
+                  className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-colors ${activeTab === "overview" ? "text-white" : "text-indigo-600"
+                    }`}
                 />
               </div>
               <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
@@ -717,22 +754,20 @@ export default function AdminDashboardPage() {
             </div>
           </Card>
 
-
-          {/* Average Grade Card */}
-          <Card
-            className="p-3 sm:p-4 lg:p-6 cursor-pointer hover:shadow-lg transition-all duration-200 hover:scale-105 hover:border-red-300 bg-white"
-            onClick={() => setActiveTab("overview")}
-          >
+          {/* Average Grade Card - Overview */}
+         <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
             <div className="flex items-center">
-              <div className="w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "overview"
+                ? "bg-primary-500 shadow-lg shadow-primary-200/50"
+                : "bg-red-100 hover:bg-red-200"
+                }`}>
                 <Award
-                  className="text-red-600 w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6"
+                  className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-colors ${activeTab === "overview" ? "text-white" : "text-red-600"
+                    }`}
                 />
               </div>
               <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
-                <p className="text-xs sm:text-sm font-medium text-gray-600">
-                  Avg Grade
-                </p>
+                <p className="text-xs sm:text-sm font-medium text-gray-600">Avg Grade</p>
                 <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
                   {stats?.averageGrade || 0}%
                 </p>
@@ -740,6 +775,9 @@ export default function AdminDashboardPage() {
             </div>
           </Card>
         </div>
+
+
+
 
         {/* Tabs */}
         <div className="mb-6">

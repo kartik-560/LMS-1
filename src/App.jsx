@@ -53,75 +53,29 @@ const roleHome = {
 
 
 const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-  const { isAuthenticated, userRole, hasHydrated } = useAuthStore();
-  if (!hasHydrated) return <div />;
+  const { isAuthenticated, userRole, isInitializing, hasHydrated } = useAuthStore();
 
+  // ✅ Wait for BOTH hydration AND initialization
+  if (isInitializing || !hasHydrated) {
+    return <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+    </div>;
+  }
 
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
-
+  if (!isAuthenticated) {
+    console.log('Not authenticated, redirecting to login');
+    return <Navigate to="/login" replace />;
+  }
 
   const role = normalizeRole(userRole);
   const need = allowedRoles.map(normalizeRole);
 
-
   if (role === ROLE.SUPERADMIN) return children;
-
-
   if (!need.length) return children;
-
-
   if (need.includes(role)) return children;
-
 
   return <Navigate to={roleHome[role] || "/"} replace />;
 };
-
-
-// const ProtectedRoute = ({ children, allowedRoles = [] }) => {
-//   const token = useAuthStore((state) => state.token); // ✅ Get ONLY token
-//   const user = useAuthStore((state) => state.user); // ✅ Get ONLY user
-//   const userRole = useAuthStore((state) => state.userRole); // ✅ Get ONLY role
-
-
-//   console.log('[ProtectedRoute] Checking auth:', { token: !!token, user: !!user, userRole });
-
-
-//   // ✅ Simple check: if no token, redirect to login
-//   if (!token) {
-//     return <Navigate to="/login" replace />;
-//   }
-
-
-//   // ✅ If no user, redirect to login
-//   if (!user) {
-//     return <Navigate to="/login" replace />;
-//   }
-
-
-//   // ✅ If no roles required, allow
-//   if (!allowedRoles || allowedRoles.length === 0) {
-//     return children;
-//   }
-
-
-//   // ✅ Check role
-//   const role = normalizeRole(userRole);
-//   const normalizedAllowed = allowedRoles.map(normalizeRole);
-
-
-//   if (role === ROLE.SUPERADMIN) {
-//     return children;
-//   }
-
-
-//   if (normalizedAllowed.includes(role)) {
-//     return children;
-//   }
-
-
-//   return <Navigate to={roleHome[role] || "/"} replace />;
-// };
-
 
 
 const PublicRoute = ({ children }) => {

@@ -9,7 +9,8 @@ import { Link } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../store/useAuthStore";
 import { GoogleLogin } from "@react-oauth/google";
-
+import { setAuthToken } from "../services/token";
+import { normalizeRole, ROLE } from "../store/useAuthStore";
 const SignupPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
@@ -70,6 +71,35 @@ const SignupPage = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, "0")}`;
   };
 
+  // const handleGoogleSignup = async (credentialResponse) => {
+  //   setIsLoading(true);
+  //   try {
+  //     const resp = await authAPI.googleSignup({
+  //       credential: credentialResponse.credential,
+  //     });
+
+  //     const payload = resp?.data?.data ?? resp?.data ?? resp;
+  //     const user = payload?.user;
+  //     const token = payload?.token;
+
+  //     if (!user || !token) {
+  //       throw new Error("Malformed signup response");
+  //     }
+
+  //     await new Promise((resolve) => setTimeout(resolve, 200));
+
+  //     toast.success("Sign up successful!");
+  //     navigate("/login", { replace: true });
+  //   } catch (e) {
+  //     console.error("Google signup error:", e);
+  //     toast.error(
+  //       e?.response?.data?.message || e?.message || "Google signup failed"
+  //     );
+  //   } finally {
+  //     setIsLoading(false);
+  //   }
+  // };
+
   const handleGoogleSignup = async (credentialResponse) => {
     setIsLoading(true);
     try {
@@ -77,7 +107,7 @@ const SignupPage = () => {
         credential: credentialResponse.credential,
       });
 
-      const payload = resp?.data?.data ?? resp?.data ?? resp;
+      const payload = resp?.data?.data;
       const user = payload?.user;
       const token = payload?.token;
 
@@ -85,19 +115,45 @@ const SignupPage = () => {
         throw new Error("Malformed signup response");
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 200));
+      const canonicalRole = normalizeRole(user.role);
+      const userForStore = {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: canonicalRole,
+        collegeId: user.collegeId,
+        departmentId: user.departmentId,
+      };
+
+      // ✅ SYNCHRONOUS localStorage save FIRST
+      localStorage.setItem("token", token);
+      localStorage.setItem("user_role", canonicalRole);
+      localStorage.setItem("user", JSON.stringify(userForStore));
+
+      // ✅ Update store
+      useAuthStore.getState().login(userForStore, token);
 
       toast.success("Sign up successful!");
-      navigate("/login", { replace: true });
+
+      const rolePath = {
+        [ROLE.INSTRUCTOR]: "/instructor",
+        [ROLE.ADMIN]: "/admin",
+        [ROLE.STUDENT]: "/dashboard"
+      }[canonicalRole] || "/dashboard";
+
+      // ✅ Navigate AFTER store update
+      setTimeout(() => {
+        navigate(rolePath, { replace: true });
+      }, 5000);
+
     } catch (e) {
       console.error("Google signup error:", e);
-      toast.error(
-        e?.response?.data?.message || e?.message || "Google signup failed"
-      );
+      toast.error(e?.response?.data?.message || "Signup failed");
     } finally {
       setIsLoading(false);
     }
   };
+
 
   const handleGoogleSignupError = () => {
     console.error("Google Signup Failed");
@@ -176,6 +232,9 @@ const SignupPage = () => {
                   text="signup_with"
                   shape="rectangular"
                   className="w-full"
+                
+                  ux_mode="popup"
+                  context="signup"
                 />
               </div>
 

@@ -3,7 +3,9 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 import { authAPI } from "../services/api";
-
+import { normalizeRole, ROLE } from "../store/useAuthStore";
+import useAuthStore from "../store/useAuthStore";
+import { setAuthToken } from "../services/token";
 const Register = () => {
   const navigate = useNavigate();
   const [role, setRole] = useState("");
@@ -52,9 +54,42 @@ const Register = () => {
     }
   }, [userData, setValue]);
 
+  // const onSubmit = async (formData) => {
+  //   try {
+
+  //     const registrationData = JSON.parse(localStorage.getItem("reg_data"));
+
+  //     if (!registrationData) {
+  //       toast.error("No registration data found. Please verify OTP first.");
+  //       navigate("/signup");
+  //       return;
+  //     }
+
+  //     formData.email = registrationData.email;
+  //     formData.collegeId = registrationData.collegeId;
+  //     if (registrationData.department?.id) {
+  //       formData.departmentId = registrationData.department.id;
+  //     }
+
+
+  //     const response = await authAPI.completeSignup(formData);
+
+  //     if (response.success) {
+  //       toast.success("Registration complete! Please log in.");
+  //       navigate("/login");
+  //     } else {
+  //       toast.error(response.message || "Registration failed");
+  //     }
+  //   } catch (error) {
+  //     console.error("Error during registration:", error);
+  //     toast.error(
+  //       error?.response?.data?.message || "Something went wrong. Please try again."
+  //     );
+  //   }
+  // };
+
   const onSubmit = async (formData) => {
     try {
-
       const registrationData = JSON.parse(localStorage.getItem("reg_data"));
 
       if (!registrationData) {
@@ -69,22 +104,64 @@ const Register = () => {
         formData.departmentId = registrationData.department.id;
       }
 
+      const resp = await authAPI.completeSignup(formData);
 
-      const response = await authAPI.completeSignup(formData);
+      // apiData IS { user, token }
+      const apiData = resp?.data;
+     
 
-      if (response.success) {
-        toast.success("Registration complete! Please log in.");
-        navigate("/login");
-      } else {
-        toast.error(response.message || "Registration failed");
+      const user = apiData?.user;
+      const token = apiData?.token;
+
+      if (!user || !token) {
+        console.warn("Signup failed shape:", {
+          user,
+          token,
+        });
+        toast.error("Registration failed");
+        return;
       }
+
+      const canonicalRole = normalizeRole(user.role);
+
+      const userForStore = {
+        id: user.id,
+        email: user.email,
+        fullName: user.fullName,
+        role: canonicalRole,
+        collegeId: user.collegeId,
+        departmentId: user.departmentId,
+        tokenVersion: user.tokenVersion,
+      };
+
+      localStorage.setItem("token", token);
+      localStorage.setItem("user_role", canonicalRole);
+      localStorage.setItem("user", JSON.stringify(userForStore));
+
+      setAuthToken(token);
+      useAuthStore.getState().login(userForStore, token);
+
+      toast.success("Registration complete! Logged in.");
+
+      const rolePath =
+        {
+          [ROLE.SUPERADMIN]: "/superadmin",
+          [ROLE.ADMIN]: "/admin",
+          [ROLE.INSTRUCTOR]: "/instructor",
+          [ROLE.STUDENT]: "/dashboard",
+        }[canonicalRole] || "/dashboard";
+
+      navigate(rolePath, { replace: true });
     } catch (error) {
       console.error("Error during registration:", error);
       toast.error(
-        error?.response?.data?.message || "Something went wrong. Please try again."
+        error?.response?.data?.message ||
+        error?.message ||
+        "Something went wrong. Please try again."
       );
     }
   };
+
 
   if (!userData) {
     return <div>Loading...</div>;

@@ -36,6 +36,7 @@ const useAuthStore = create()(
         isAuthenticated: false,
         userRole: null,
         hasHydrated: false,
+        isInitializing: true,
 
         login: (userData, token) => {
           const role = normalizeRole(userData?.role);
@@ -44,20 +45,24 @@ const useAuthStore = create()(
             token,
             userRole: role,
             isAuthenticated: Boolean(token),
+            hasHydrated: true,
+            isInitializing: false,
           });
           localStorage.setItem("user_role", role);
+          localStorage.setItem("token", token);
           setAuthToken(token);
         },
 
         logout: () => {
-          localStorage.removeItem("token"); 
-          localStorage.removeItem("user_role"); 
+          localStorage.removeItem("token");
+          localStorage.removeItem("user_role");
           setAuthToken(null);
           set({
             token: null,
             user: null,
             isAuthenticated: false,
             userRole: null,
+            isInitializing: false,
           });
         },
 
@@ -85,8 +90,23 @@ const useAuthStore = create()(
         isAuthenticated: s.isAuthenticated,
         userRole: s.userRole,
       }),
+
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name);
+          return str ? JSON.parse(str) : null;
+        },
+        setItem: (name, value) => {
+          localStorage.setItem(name, JSON.stringify(value));
+        },
+        removeItem: (name) => localStorage.removeItem(name),
+      },
+
       onRehydrateStorage: () => (state, error) => {
-        if (error) console.error("Auth rehydrate error:", error);
+        if (error) {
+          console.error("Auth rehydrate error:", error);
+          return;
+        }
 
         const token = state?.token ?? null;
         if (token) setAuthToken(token);
@@ -95,12 +115,24 @@ const useAuthStore = create()(
         const role = normalizeRole(state?.userRole);
 
         queueMicrotask(() => {
-          _set?.({
-            isAuthenticated: Boolean(token),
-            userRole: role,
-            user: state?.user ? { ...state.user, role } : null,
-            hasHydrated: true,
-          });
+          const currentState = useAuthStore.getState(); // ✅ Check current state
+
+          // ✅ CRITICAL: Don't overwrite if already authenticated from fresh login
+          if (!currentState.isAuthenticated) {
+            _set?.({
+              isAuthenticated: Boolean(token),
+              userRole: role,
+              user: state?.user ? { ...state.user, role } : null,
+              hasHydrated: true,
+              isInitializing: false,
+            });
+          } else {
+         
+            _set?.({
+              hasHydrated: true,
+              isInitializing: false,
+            });
+          }
         });
       },
     }

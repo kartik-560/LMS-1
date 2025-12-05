@@ -124,7 +124,7 @@ const LandingPage = () => {
         </p>
         
         {/* Secondary CTAs */}
-       {/* <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+        {/* <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
           <Link to="/signup">
             <Button size="lg" className="w-full sm:w-auto min-w-[200px]">
               Create Free Account
@@ -135,8 +135,8 @@ const LandingPage = () => {
               Explore Courses
             </Button>
           </Link> 
-        </div>
-      </div> */}
+        </div> */}
+      </div> 
     </section>
 
     {/* Footer */}

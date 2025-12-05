@@ -61,6 +61,10 @@ const InstructorDashboardPage = () => {
 
   const [students, setStudents] = useState([]);
 
+  const [loadingAction, setLoadingAction] = useState({
+    id: null,
+    type: null,
+  });
 
   const [stats, setStats] = useState({
     totalCourses: 0,
@@ -322,6 +326,8 @@ const InstructorDashboardPage = () => {
 
   const handleRequestAction = async (requestId, action) => {
     try {
+
+      setLoadingAction({ id: requestId, type: action });
       const next =
         action === "APPROVE" || action === "APPROVED" ? "APPROVED" : "REJECTED";
       await enrollmentsAPI.updateEnrollmentRequestStatus(requestId, next);
@@ -330,6 +336,8 @@ const InstructorDashboardPage = () => {
     } catch (err) {
       console.error("Failed to update request", err);
       toast.error(err?.response?.data?.error || "Failed to update request");
+    } finally {
+      setLoadingAction({ id: null, type: null });
     }
   };
 
@@ -461,7 +469,7 @@ const InstructorDashboardPage = () => {
           );
           return avg(scores);
         });
-       
+
         const globalTestAvg =
           perStudentTestAvg.length > 0 ? avg(perStudentTestAvg) : 0;
 
@@ -472,7 +480,7 @@ const InstructorDashboardPage = () => {
           testsGraded,
           averageTestScore: Math.round(globalTestAvg || 0),
         }));
-    
+
 
       } catch (err) {
         console.error("Error loading scores:", err);
@@ -750,15 +758,38 @@ const InstructorDashboardPage = () => {
                             <p className="text-xs text-gray-600 truncate">{req.courseTitle || "Course"}</p>
                           </div>
                           <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleRequestAction(req.id, "REJECT")}>
-                              <AlertCircle size={14} className="mr-1" />
-                              Reject
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={loadingAction.id === req.id}
+                              onClick={() => handleRequestAction(req.id, "REJECT")}
+                            >
+                              {loadingAction.id === req.id && loadingAction.type === "REJECT"
+                                ? "Rejecting..."
+                                : (
+                                  <>
+                                    <AlertCircle size={14} className="mr-1" />
+                                    Reject
+                                  </>
+                                )}
                             </Button>
-                            <Button size="sm" onClick={() => handleRequestAction(req.id, "APPROVE")}>
-                              <UserCheck size={14} className="mr-1" />
-                              Approve
+
+                            <Button
+                              size="sm"
+                              disabled={loadingAction.id === req.id}
+                              onClick={() => handleRequestAction(req.id, "APPROVE")}
+                            >
+                              {loadingAction.id === req.id && loadingAction.type === "APPROVE"
+                                ? "Approving..."
+                                : (
+                                  <>
+                                    <UserCheck size={14} className="mr-1" />
+                                    Approve
+                                  </>
+                                )}
                             </Button>
                           </div>
+
                         </div>
                       </div>
                     ))}
@@ -767,7 +798,6 @@ const InstructorDashboardPage = () => {
               </Card.Content>
             </Card>
 
-            {/* Student Progress Overview */}
             <Card>
               <Card.Header className="flex items-center justify-between">
                 <Card.Title className="flex items-center">

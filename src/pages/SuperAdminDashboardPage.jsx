@@ -108,6 +108,11 @@ export default function SuperAdminDashboardPage() {
   const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
   const [courseToAssign, setCourseToAssign] = useState(null);
   const [collegeDepartments, setCollegeDepartments] = useState([]);
+  const [deactivatedUsers, setDeactivatedUsers] = useState([]);
+  const [selectedRole, setSelectedRole] = useState(null);
+  const [loadingDeactivated, setLoadingDeactivated] = useState(false);
+
+
 
   const asArray = (p) => {
     if (Array.isArray(p)) return p;
@@ -419,6 +424,7 @@ export default function SuperAdminDashboardPage() {
                 : "Inactive",
           isActive: typeof a.isActive === "boolean" ? a.isActive : a.status === "Active",
         }))
+          .filter((a) => a.status === "Active")
       );
 
       setLoadedTabs((prev) => new Set([...prev, "admins"]));
@@ -455,7 +461,8 @@ export default function SuperAdminDashboardPage() {
               ? "Active"
               : "Inactive",
         isActive: typeof i.isActive === "boolean" ? i.isActive : i.status === "Active",
-      }));
+      }))
+        .filter((i) => i.status === "Active");
 
 
       setAllInstructors(normalizedInstructors);
@@ -502,6 +509,7 @@ export default function SuperAdminDashboardPage() {
             isActive: typeof s.isActive === "boolean" ? s.isActive : s.status === "Active",
           };
         })
+          .filter((s) => s.status === "Active")
       );
 
 
@@ -983,6 +991,34 @@ export default function SuperAdminDashboardPage() {
     }
   };
 
+  // const toggleUserStatus = async ({
+  //   userId,
+  //   currentStatus,
+  //   setUpdatingUserId,
+  //   setUsers,
+  //   users
+  // }) => {
+  //   setUpdatingUserId(userId);
+  //   try {
+  //     await authAPI.setActiveStatus(userId, currentStatus !== "Active");
+  //     if (setUsers && users) {
+  //       // Optimistically update the user status in the corresponding list
+  //       setUsers(prev =>
+  //         prev.map(user =>
+  //           user.id === userId
+  //             ? { ...user, status: currentStatus !== "Active" ? "Active" : "Inactive" }
+  //             : user
+  //         )
+  //       );
+  //     }
+  //     // Or trigger a re-fetch here if needed
+  //   } catch (error) {
+  //     console.error(error);
+  //     // Optional: Show toast/error message here
+  //   }
+  //   setUpdatingUserId(null);
+  // };
+
   const toggleUserStatus = async ({
     userId,
     currentStatus,
@@ -992,24 +1028,68 @@ export default function SuperAdminDashboardPage() {
   }) => {
     setUpdatingUserId(userId);
     try {
-      await authAPI.setActiveStatus(userId, currentStatus !== "Active");
-      if (setUsers && users) {
-        // Optimistically update the user status in the corresponding list
-        setUsers(prev =>
-          prev.map(user =>
-            user.id === userId
-              ? { ...user, status: currentStatus !== "Active" ? "Active" : "Inactive" }
-              : user
-          )
-        );
+      const newStatus = currentStatus !== "Active";
+      await authAPI.setActiveStatus(userId, newStatus);
+
+      const statusString = newStatus ? "Active" : "Inactive";
+      toast.success(`User ${statusString.toLowerCase()} successfully`);
+
+      // Reload based on CURRENT active tab
+      if (activeTab === "admins") {
+        setLoadedTabs((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete("admins");
+          return newSet;
+        });
+        await fetchAdmins(true);
+      } else if (activeTab === "instructors") {
+        setLoadedTabs((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete("instructors");
+          return newSet;
+        });
+        await fetchInstructors(true);
+      } else if (activeTab === "students") {
+        setLoadedTabs((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete("students");
+          return newSet;
+        });
+        await fetchStudents(true);
+      } else if (activeTab === "deactivated" && selectedRole) {
+        // Reload deactivated tab
+        await fetchDeactivatedByRole(selectedRole);
+
+        // ALSO clear the cache for the active tab of this role
+        if (selectedRole === "admin") {
+          setLoadedTabs((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete("admins");
+            return newSet;
+          });
+        } else if (selectedRole === "instructor") {
+          setLoadedTabs((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete("instructors");
+            return newSet;
+          });
+        } else if (selectedRole === "student") {
+          setLoadedTabs((prev) => {
+            const newSet = new Set(prev);
+            newSet.delete("students");
+            return newSet;
+          });
+        }
       }
-      // Or trigger a re-fetch here if needed
+
     } catch (error) {
       console.error(error);
-      // Optional: Show toast/error message here
+      handleApiError(error, "Failed to update user status");
+    } finally {
+      setUpdatingUserId(null);
     }
-    setUpdatingUserId(null);
   };
+
 
 
   const handleDelete = async (entityType, id = null, additionalPayload = {}) => {
@@ -1057,6 +1137,63 @@ export default function SuperAdminDashboardPage() {
       throw error;
     }
   };
+
+
+  const fetchDeactivatedByRole = async (role) => {
+    setLoadingDeactivated(true);
+    setSelectedRole(role);
+
+    try {
+      let deactivatedRaw = [];
+
+      // Call the appropriate API based on role
+      switch (role) {
+        case "admin":
+          deactivatedRaw = await superAdminAPI.getAdmins();
+          break;
+        case "instructor":
+          deactivatedRaw = await superAdminAPI.getInstructors();
+          break;
+        case "student":
+          deactivatedRaw = await superAdminAPI.getStudents();
+          break;
+        default:
+          return;
+      }
+
+      const allUsers = asArray(deactivatedRaw);
+      const normalizedUsers = normalizeUsers(allUsers);
+
+      // Filter only deactivated/inactive users
+      const deactivatedOnly = normalizedUsers
+        .map((user) => ({
+          ...user,
+          avatar:
+            user.avatar ||
+            `https://ui-avatars.com/api/?name=${encodeURIComponent(
+              user.name || role.charAt(0).toUpperCase() + role.slice(1)
+            )}&background=random`,
+          college: user.college || "N/A",
+          department: user.department || "N/A",
+          status:
+            typeof user.status === "string"
+              ? user.status
+              : user.isActive
+                ? "Active"
+                : "Inactive",
+          isActive: typeof user.isActive === "boolean" ? user.isActive : user.status === "Active",
+        }))
+        .filter((user) => user.status === "Inactive" || user.isActive === false);
+
+      setDeactivatedUsers(deactivatedOnly);
+
+    } catch (err) {
+      handleApiError(err, `Failed to load deactivated ${role}s`);
+    } finally {
+      setLoadingDeactivated(false);
+    }
+  };
+
 
 
   return (
@@ -1138,7 +1275,7 @@ export default function SuperAdminDashboardPage() {
           <Card
             className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === "colleges" ? "ring-2 ring-red-500 bg-red-50" : ""
               }`}
-            onClick={() => setActiveTab("colleges")}
+            onClick={() => handleTabChange("colleges")}
           >
             <div className="flex items-center">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-lg flex items-center justify-center flex-none">
@@ -1156,9 +1293,9 @@ export default function SuperAdminDashboardPage() {
           </Card>
 
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === "permissions" ? "ring-2 ring-red-500 bg-red-50" : ""
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === "admins" ? "ring-2 ring-red-500 bg-red-50" : ""
               }`}
-            onClick={() => setActiveTab("admins")}
+            onClick={() => handleTabChange("admins")}
           >
             <div className="flex items-center">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-red-100 rounded-lg flex items-center justify-center flex-none">
@@ -1176,11 +1313,11 @@ export default function SuperAdminDashboardPage() {
           </Card>
 
           <Card
-            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === "permissions"
+            className={`p-4 sm:p-6 cursor-pointer hover:shadow-lg hover:scale-105 transition-all duration-200 ${activeTab === "instructors"
               ? "ring-2 ring-green-500 bg-green-50"
               : ""
               }`}
-            onClick={() => setActiveTab("instructors")}
+            onClick={() => handleTabChange("instructors")}
           >
             <div className="flex items-center">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-100 rounded-lg flex items-center justify-center flex-none">
@@ -1202,7 +1339,7 @@ export default function SuperAdminDashboardPage() {
               ? "ring-2 ring-purple-500 bg-purple-50"
               : ""
               }`}
-            onClick={() => setActiveTab("students")}
+            onClick={() => handleTabChange("students")}
           >
             <div className="flex items-center">
               <div className="w-10 h-10 sm:w-12 sm:h-12 bg-purple-100 rounded-lg flex items-center justify-center flex-none">
@@ -1288,6 +1425,9 @@ export default function SuperAdminDashboardPage() {
                   className="whitespace-nowrap snap-start px-3 sm:px-4 py-2 text-xs sm:text-sm"
                 >
                   Departments
+                </TabsTrigger>
+                <TabsTrigger value="deactivated" className="whitespace-nowrap px-3 sm:px-4 py-2 text-xs sm:text-sm">
+                  Deactivated
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -2533,130 +2673,118 @@ export default function SuperAdminDashboardPage() {
                 <p>Loading students...</p>
               </div>
             ) : (
-              <div className="space-y-6">
-                {/* Filters and Search code remains unchanged */}
+              <Card className="p-5 sm:p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                  Student Directory
+                </h3>
 
-                {/* Student list */}
-                <Card className="p-5 sm:p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                    Student Directory
-                  </h3>
-
-                  <div className="divide-y divide-gray-200 border border-gray-200 rounded-lg">
-                    {/* Table header */}
-                    <div className="flex items-center justify-between p-4 font-semibold text-gray-900 bg-gray-50">
-                      <div className="flex-1">Student</div>
-                      <div className="w-32">College</div>
-                      <div className="w-48 ">Department</div>
-                      <div className="w-24 text-center">Status</div>
-                      <div className="w-24 text-center">Action</div>
-                      <div className="w-24 text-center">Delete</div>
-                    </div>
-
-                    {/* Student rows */}
-                    {getFilteredStudents().map((student) => (
-                      <div
-                        key={student.id}
-                        className="flex items-center justify-between p-4"
-                      >
-                        {/* Avatar + name + email */}
-                        <div className="flex items-center gap-4 min-w-0 flex-1">
-                          <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100 flex-none">
-                            <img
-                              src={student.avatar}
-                              alt={student.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div className="min-w-0">
-                            <h4 className="font-medium text-gray-900 truncate">
-                              {student.name || "Unnamed"}
-                            </h4>
-                            <p className="text-sm text-gray-600 truncate">
-                              {student.email}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* College */}
-                        <div className="w-32 text-gray-700">
-                          {student.college}
-                        </div>
-
-                        {/* Department */}
-                        <div className="w-48  text-gray-700 ">
-                          {student.department}
-                        </div>
-
-                        {/* Status Badge */}
-                        <div className="w-24 text-center">
-                          <Badge
-                            variant={
-                              student.status === "Active"
-                                ? "success"
-                                : "secondary"
-                            }
-                            size="sm"
-                          >
-                            {student.status}
-                          </Badge>
-                        </div>
-
-                        {/* Toggle button for status */}
-                        <div className="w-24 text-center">
-                          <button
-                            onClick={() =>
-                              toggleUserStatus({
-                                userId: student.id,
-                                currentStatus: student.status,
-                                setUpdatingUserId,
-                                setUsers: setStudents,
-                                users: students
-                              })
-                            }
-                            disabled={updatingUserId === student.id}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${student.status === "Active" ? "bg-green-600" : "bg-gray-300"
-                              } ${updatingUserId === student.id ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
-                            title={student.status === "Active" ? "Click to deactivate" : "Click to activate"}
-                          >
-                            <span
-                              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${student.status === "Active" ? "translate-x-6" : "translate-x-1"
-                                }`}
-                            />
-                          </button>
-
-
-                        </div>
-                        <div className="w-24 text-center">
-                          <button
-                            onClick={() => {
-                              if (window.confirm(`Are you sure you want to delete ${student.name || "this student"}?`)) {
-                                handleDelete("student", student.id);
-                              }
-                            }}
-                            className="text-red-600 hover:text-red-900 transition-colors"
-                            title="Delete student"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-
-                      </div>
-                    ))}
-
-
-                    {getFilteredStudents().length === 0 && (
-                      <p className="text-sm text-gray-500 italic mt-2">
+                <Card.Content>
+                  {getFilteredStudents().length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <Award size={48} className="mx-auto mb-4 opacity-50" />
+                      <p>
                         {allStudents.length === 0
                           ? "No students found."
                           : "No students match the current filters."}
                       </p>
-                    )}
-                  </div>
-                </Card>
-              </div>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avatar</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">College</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Delete</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {getFilteredStudents().map((student) => (
+                            <tr key={student.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100">
+                                  <img
+                                    src={student.avatar}
+                                    alt={student.name || "Student Avatar"}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {student.name || "Unnamed"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
+                                {student.email || "N/A"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {student.college || "N/A"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
+                                {student.department || "N/A"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                                <Badge
+                                  variant={
+                                    student.status === "Active"
+                                      ? "success"
+                                      : "secondary"
+                                  }
+                                  size="sm"
+                                >
+                                  {student.status || "Inactive"}
+                                </Badge>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                                <button
+                                  onClick={() =>
+                                    toggleUserStatus({
+                                      userId: student.id,
+                                      currentStatus: student.status,
+                                      setUpdatingUserId,
+                                      setUsers: setStudents,
+                                      users: students
+                                    })
+                                  }
+                                  disabled={updatingUserId === student.id}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 ${student.status === "Active" ? "bg-green-600" : "bg-gray-300"
+                                    } ${updatingUserId === student.id ? "opacity-60 cursor-not-allowed" : "cursor-pointer hover:shadow-sm"}`}
+                                  title={student.status === "Active" ? "Click to deactivate" : "Click to activate"}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200 ${student.status === "Active" ? "translate-x-6" : "translate-x-1"
+                                      }`}
+                                  />
+                                </button>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <button
+                                  onClick={() => {
+                                    if (window.confirm(`Are you sure you want to delete ${student.name || "this student"}?`)) {
+                                      handleDelete("student", student.id);
+                                    }
+                                  }}
+                                  className="text-red-600 hover:text-red-900 p-1 rounded-full hover:bg-red-50 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                  title="Delete student"
+                                >
+                                  <Trash2 size={18} />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Card.Content>
+              </Card>
             )}
           </TabsContent>
+
 
           <TabsContent value="admins">
             {loadingUsers ? (
@@ -2956,6 +3084,126 @@ export default function SuperAdminDashboardPage() {
               </Card>
             )}
           </TabsContent>
+
+          <TabsContent value="deactivated">
+            {loadingDeactivated ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4" />
+                <p>Loading deactivated users...</p>
+              </div>
+            ) : (
+              <Card>
+                <Card.Header>
+                  <div className="flex items-center justify-between">
+                    <Card.Title>Deactivated Users</Card.Title>
+                    <Badge variant="secondary">
+                      {deactivatedUsers.length} Total
+                    </Badge>
+                  </div>
+                </Card.Header>
+
+                <Card.Content>
+                  {/* Role selector cards */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    {["student", "instructor", "admin"].map((role) => (
+                      <button
+                        key={role}
+                        onClick={() => fetchDeactivatedByRole(role)}
+                        className={`p-4 rounded-lg border flex flex-col items-start cursor-pointer transition 
+                ${selectedRole === role ? "border-purple-500 bg-purple-50" : "border-gray-200 bg-white hover:bg-gray-50"}`}
+                      >
+                        <span className="text-sm font-medium capitalize">{role}</span>
+                        <span className="text-xs text-gray-500 mt-1">
+                          View deactivated {role}s
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedRole === null ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>Select a role card above to view deactivated users.</p>
+                    </div>
+                  ) : deactivatedUsers.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>No deactivated {selectedRole}s found.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avatar</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">College</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                            <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {deactivatedUsers.map((user) => (
+                            <tr key={user.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <img
+                                  src={user.avatar}
+                                  alt={user.name || "User Avatar"}
+                                  className="h-10 w-10 rounded-full object-cover"
+                                />
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {user.name || "N/A"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {user.email || "N/A"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {user.college?.name || user.college || "N/A"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                {user.department?.name || user.department || "N/A"}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                <Badge variant="secondary" size="sm">
+                                  {user.status || "Inactive"}
+                                </Badge>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                <button
+                                  onClick={() =>
+                                    toggleUserStatus({
+                                      userId: user.id,
+                                      currentStatus: user.status,
+                                      setUpdatingUserId,
+                                      // decide where you want to reflect this: either local deactivatedUsers
+                                      // or the main list by role (e.g. setAllInstructors / setStudents / setAllAdmins)
+                                      setUsers: setDeactivatedUsers,
+                                      users: deactivatedUsers,
+                                    })
+                                  }
+                                  disabled={updatingUserId === user.id}
+                                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${user.status === "Active" ? "bg-green-600" : "bg-gray-300"
+                                    } ${updatingUserId === user.id ? "opacity-60 cursor-not-allowed" : "cursor-pointer"}`}
+                                  title={user.status === "Active" ? "Click to deactivate" : "Click to activate"}
+                                >
+                                  <span
+                                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${user.status === "Active" ? "translate-x-6" : "translate-x-1"
+                                      }`}
+                                  />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </Card.Content>
+              </Card>
+            )}
+          </TabsContent>
+
 
         </Tabs>
 

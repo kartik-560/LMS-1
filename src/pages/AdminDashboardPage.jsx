@@ -338,24 +338,6 @@ export default function AdminDashboardPage() {
         setStudentStats(statsMap);
       }
 
-      // if (tabName === "courses") {
-      //   const cr = await api.courses();
-      //   const normCourses = (cr?.data || []).map((c) => ({
-      //     id: c.id,
-      //     title: c.title,
-      //     description: c.description || "",
-      //     thumbnail: c.thumbnail || FALLBACK_THUMB,
-      //     status: c.status || "draft",
-      //     level: c.level ?? null,
-      //     totalModules: c.totalModules ?? 0,
-      //     totalChapters: c.totalChapters ?? 0,
-      //     studentCount: c.studentCount || 0,
-      //     instructorNames: c.instructorNames || [],
-      //     instructorIds: c.instructorIds || (Array.isArray(c.instructors) ? c.instructors.map((x) => x.id) : []),
-      //   }));
-      //   setCourses(normCourses);
-      // }
-
       if (tabName === "courses") {
         const cr = await api.courses();
         const normCourses = (cr?.data || []).map((c) => ({
@@ -600,12 +582,44 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Top stats */}
-     
+
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
+          {/* Departments Card */}
+          <div
+            className={`h-full cursor-pointer transition-all duration-200 ${activeTab === "departments"
+              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80"
+              : "hover:shadow-lg hover:border-blue-300"
+              }`}
+            onClick={() => {
+              setActiveTab("departments");
+              setSelectedUsers([]);
+              handleTabChange("departments");
+            }}
+          >
+            <Card className="h-full p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none">
+              <div className="flex items-center">
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "departments"
+                  ? "bg-primary-500 shadow-lg shadow-primary-200/50"
+                  : "bg-yellow-100 hover:bg-yellow-200"
+                  }`}>
+                  <Building2
+                    className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-colors ${activeTab === "departments" ? "text-white" : "text-yellow-600"
+                      }`}
+                  />
+                </div>
+                <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
+                  <p className="text-xs sm:text-sm font-medium text-gray-600">Departments</p>
+                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                    {overview?.departments || 0}
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
           {/* Instructors Card */}
           <div
-            className={`cursor-pointer transition-all duration-200 hover:scale-105 ${activeTab === "instructors"
-              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80 scale-105"
+            className={`h-full cursor-pointer transition-all duration-200 ${activeTab === "instructors"
+              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80"
               : "hover:shadow-lg hover:border-blue-300"
               }`}
             onClick={() => {
@@ -614,7 +628,7 @@ export default function AdminDashboardPage() {
               handleTabChange("instructors");
             }}
           >
-            <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
+            <Card className="h-full p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none">
               <div className="flex items-center">
                 <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "instructors"
                   ? "bg-primary-500 shadow-lg shadow-primary-200/50"
@@ -636,8 +650,8 @@ export default function AdminDashboardPage() {
           </div>
           {/* Students Card */}
           <div
-            className={`cursor-pointer transition-all duration-200 hover:scale-105 ${activeTab === "students"
-              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80 scale-105"
+            className={`h-full cursor-pointer transition-all duration-200 ${activeTab === "students"
+              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80"
               : "hover:shadow-lg hover:border-blue-300"
               }`}
             onClick={() => {
@@ -646,7 +660,7 @@ export default function AdminDashboardPage() {
               handleTabChange("students");
             }}
           >
-            <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
+            <Card className="h-full p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none">
               <div className="flex items-center">
                 <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "students"
                   ? "bg-primary-500 shadow-lg shadow-primary-200/50"
@@ -669,8 +683,8 @@ export default function AdminDashboardPage() {
           {/* Courses Card */}
 
           <div
-            className={`cursor-pointer transition-all duration-200 hover:scale-105 ${activeTab === "courses"
-              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80 scale-105"
+            className={`h-full cursor-pointer transition-all duration-200 ${activeTab === "courses"
+              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80"
               : "hover:shadow-lg hover:border-blue-300"
               }`}
             onClick={() => {
@@ -679,7 +693,7 @@ export default function AdminDashboardPage() {
               handleTabChange("courses");
             }}
           >
-            <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
+            <Card className="h-full p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none">
               <div className="flex items-center">
                 <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "courses"
                   ? "bg-primary-500 shadow-lg shadow-primary-200/50"
@@ -699,40 +713,10 @@ export default function AdminDashboardPage() {
               </div>
             </Card>
           </div>
-          {/* Departments Card */}
-          <div
-            className={`cursor-pointer transition-all duration-200 hover:scale-105 ${activeTab === "departments"
-              ? "ring-2 ring-primary-500 shadow-xl border-primary-200 bg-primary-50/80 scale-105"
-              : "hover:shadow-lg hover:border-blue-300"
-              }`}
-            onClick={() => {
-               setActiveTab("departments");
-                setSelectedUsers([]);
-                handleTabChange("departments");
-            }}
-          >
-            <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
-              <div className="flex items-center">
-                <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "departments"
-                  ? "bg-primary-500 shadow-lg shadow-primary-200/50"
-                  : "bg-yellow-100 hover:bg-yellow-200"
-                  }`}>
-                  <Building2
-                    className={`w-4 h-4 sm:w-5 sm:h-5 lg:w-6 lg:h-6 transition-colors ${activeTab === "departments" ? "text-white" : "text-yellow-600"
-                      }`}
-                  />
-                </div>
-                <div className="ml-2 sm:ml-3 lg:ml-4 flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm font-medium text-gray-600">Departments</p>
-                  <p className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
-                    {overview?.departments || 0}
-                  </p>
-                </div>
-              </div>
-            </Card>
-          </div>
+
+
           {/* Certificates Card - Overview */}
-          <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
+          <Card className="h-full p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none">
             <div className="flex items-center">
               <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "overview"
                 ? "bg-primary-500 shadow-lg shadow-primary-200/50"
@@ -755,7 +739,7 @@ export default function AdminDashboardPage() {
           </Card>
 
           {/* Average Grade Card - Overview */}
-         <Card className="p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none hover:shadow-none">
+          <Card className="h-full p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none">
             <div className="flex items-center">
               <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "overview"
                 ? "bg-primary-500 shadow-lg shadow-primary-200/50"
@@ -775,9 +759,6 @@ export default function AdminDashboardPage() {
             </div>
           </Card>
         </div>
-
-
-
 
         {/* Tabs */}
         <div className="mb-6">

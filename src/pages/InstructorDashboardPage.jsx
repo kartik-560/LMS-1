@@ -5,12 +5,8 @@ import {
   Users,
   TrendingUp,
   Award,
-  BarChart3,
-  FileText,
-  Clock,
   BookMarked,
   Eye,
-  Download,
   AlertCircle,
   UserCheck,
 } from "lucide-react";
@@ -34,8 +30,7 @@ import {
 
 const InstructorDashboardPage = () => {
   const { user } = useAuthStore();
-  const departmentName = user?.department?.name || user?.departmentName || null;
-  const collegeName = user?.college?.name || user?.collegeName || null;
+  const departmentName = user?.departmentName
   const [assignedCourses, setAssignedCourses] = useState([]);
   const [myStudents, setMyStudents] = useState([]);
   const [courseModules, setCourseModules] = useState({});
@@ -490,8 +485,6 @@ const InstructorDashboardPage = () => {
     fetchScores();
   }, [courses, user, myStudents]);
 
-
-
   useEffect(() => {
     async function fetchStudents() {
       try {
@@ -535,14 +528,10 @@ const InstructorDashboardPage = () => {
                     </Badge>
                   )}
                 </div>
+
                 <p className="text-sm sm:text-base text-gray-600">
                   Manage your courses and track student progress.
                 </p>
-                {collegeName && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {collegeName}
-                  </p>
-                )}
               </div>
             </div>
           </div>

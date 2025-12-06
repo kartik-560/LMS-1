@@ -123,7 +123,8 @@ const SignupPage = () => {
         role: canonicalRole,
         collegeId: user.collegeId,
         departmentId: user.departmentId,
-      };
+        departmentName: user.departmentName || user.department?.name || null,
+      }
 
       // ✅ SYNCHRONOUS localStorage save FIRST
       localStorage.setItem("token", token);
@@ -232,7 +233,7 @@ const SignupPage = () => {
                   text="signup_with"
                   shape="rectangular"
                   className="w-full"
-                
+
                   ux_mode="popup"
                   context="signup"
                 />

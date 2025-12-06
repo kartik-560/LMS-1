@@ -86,6 +86,7 @@ const LoginPage = () => {
         role: canonicalRole,
         collegeId: user.collegeId,
         departmentId: user.departmentId,
+        departmentName: user.departmentName || user.department?.name || null,
         department: user.department || null,
         college: user.college || null
       };
@@ -153,6 +154,7 @@ const LoginPage = () => {
         role: canonicalRole,
         collegeId: user.collegeId,
         departmentId: user.departmentId,
+        departmentName: user.departmentName || user.department?.name || null,
       };
 
 

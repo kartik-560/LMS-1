@@ -140,9 +140,9 @@ export const authAPI = {
 
   removeUser: (userId, payload = {}) =>
   api
-    .delete(`/auth/me`, {
-      params: { targetId: userId },   // goes to req.query.targetId
-      data: payload,                  // optional body if you ever need it
+    .delete(`/auth/admin/users`, {
+      params: { userId },  
+      data: payload,       
     })
     .then((r) => r.data),
 };

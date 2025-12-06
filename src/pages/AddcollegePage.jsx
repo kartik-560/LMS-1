@@ -10,7 +10,7 @@ import { collegesAPI } from "../services/api";
 
 function AddCollegePage() {
   const [isLoading, setIsLoading] = useState(false);
-const navigate = useNavigate();
+  const navigate = useNavigate();
   const {
     register,
     handleSubmit,
@@ -120,15 +120,22 @@ const navigate = useNavigate();
               <Input
                 label="Mobile Number"
                 type="tel"
+                maxLength={10}   
                 error={errors.mobileNumber?.message}
                 {...register("mobileNumber", {
                   required: "Mobile number is required",
                   pattern: {
-                    value: /^\d{10}$/,
+                    value: /^[6-9]\d{9}$/,
                     message: "Invalid mobile number",
+                  },
+                  onChange: (e) => {
+               
+                    e.target.value = e.target.value.replace(/\D/g, "");
                   },
                 })}
               />
+
+
               <Input
                 label="Email"
                 type="email"

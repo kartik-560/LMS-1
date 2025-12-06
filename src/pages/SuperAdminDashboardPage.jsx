@@ -1090,8 +1090,6 @@ export default function SuperAdminDashboardPage() {
     }
   };
 
-
-
   const handleDelete = async (entityType, id = null, additionalPayload = {}) => {
     try {
       let response;
@@ -1138,15 +1136,13 @@ export default function SuperAdminDashboardPage() {
     }
   };
 
-
   const fetchDeactivatedByRole = async (role) => {
     setLoadingDeactivated(true);
     setSelectedRole(role);
 
     try {
-      let deactivatedRaw = [];
+      let deactivatedRaw = [];  
 
-      // Call the appropriate API based on role
       switch (role) {
         case "admin":
           deactivatedRaw = await superAdminAPI.getAdmins();
@@ -1164,37 +1160,32 @@ export default function SuperAdminDashboardPage() {
       const allUsers = asArray(deactivatedRaw);
       const normalizedUsers = normalizeUsers(allUsers);
 
-      // Filter only deactivated/inactive users
       const deactivatedOnly = normalizedUsers
-        .map((user) => ({
-          ...user,
-          avatar:
-            user.avatar ||
-            `https://ui-avatars.com/api/?name=${encodeURIComponent(
-              user.name || role.charAt(0).toUpperCase() + role.slice(1)
-            )}&background=random`,
-          college: user.college || "N/A",
-          department: user.department || "N/A",
-          status:
-            typeof user.status === "string"
-              ? user.status
-              : user.isActive
-                ? "Active"
-                : "Inactive",
-          isActive: typeof user.isActive === "boolean" ? user.isActive : user.status === "Active",
-        }))
-        .filter((user) => user.status === "Inactive" || user.isActive === false);
+        .map((user, idx) => {
+          // get deletedAt from original raw item if normalizeUsers dropped it
+          const raw = allUsers[idx] || {};
+          return {
+            ...user,
+            deletedAt: user.deletedAt ?? raw.deletedAt ?? null,
+            college: user.college || "N/A",
+            department: user.department || "N/A",
+            status: user.isActive ? "Active" : "Inactive",
+          };
+        })
+        .filter((user) => {
+          // 1) if deletedAt has value -> hide
+          if (user.deletedAt) return false;
+          // 2) only show inactive (isActive === false)
+          return !user.isActive;
+        });
 
       setDeactivatedUsers(deactivatedOnly);
-
     } catch (err) {
-      handleApiError(err, `Failed to load deactivated ${role}s`);
+      handleApiError(err, `Failed to load inactive ${role}s`);
     } finally {
       setLoadingDeactivated(false);
     }
   };
-
-
 
   return (
     <div className="min-h-screen bg-gray-50">

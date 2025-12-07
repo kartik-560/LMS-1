@@ -436,6 +436,7 @@ export default function CreateFinaltest({ initialLesson }) {
             <input
               type="number"
               min="1"
+              max="3"
               value={lesson.maxAttempts}
               onChange={(e) =>
                 updateLesson("maxAttempts", Number(e.target.value))

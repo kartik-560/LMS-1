@@ -6,18 +6,21 @@ import badge from "../assets/badge.png";
 const Certificate = forwardRef(({ studentName, courseName }, ref) => {
   return (
     <div
-  ref={ref}
-  style={{
-    width: "1123px",       
-    height: "784px",     
-    backgroundColor: "#fff",
-    fontFamily: "'Poppins', 'Segoe UI', sans-serif",
-    position: "relative",
-    overflow: "hidden",
-    boxSizing: "border-box",
-    padding: 0,
-  }}
->
+      ref={ref}
+       style={{
+        width: "100%",
+        height: "100%",
+        maxWidth: "1123px",        // A4 landscape width at ~96 dpi[web:13]
+        aspectRatio: "297 / 210",  // A4 landscape
+        backgroundColor: "#fff",
+        fontFamily: "'Poppins', 'Segoe UI', sans-serif",
+        position: "relative",
+        overflow: "hidden",
+        boxSizing: "border-box",
+        padding: 0,
+        margin: "0 auto",
+      }}
+    >
       <div
         style={{
           position: "absolute",
@@ -165,7 +168,7 @@ const Certificate = forwardRef(({ studentName, courseName }, ref) => {
           Presented By:
         </p>
         <img src={logo} alt="PugArch Technology" style={{ width: "180px" }} />
-        <b style={{fontSize:"10px"}}> T e c h n o l o g y</b>
+        <b style={{ fontSize: "10px" }}> T e c h n o l o g y</b>
       </div>
     </div>
   );

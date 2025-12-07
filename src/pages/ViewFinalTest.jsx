@@ -1,4 +1,4 @@
-import { Clock, CheckCircle, AlertCircle, ChevronLeft, ChevronRight } from "lucide-react";
+import { Clock, CheckCircle, AlertCircle, ChevronLeft, ChevronRight, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Button from "../components/ui/Button";
@@ -92,6 +92,39 @@ export default function ViewFinalTest() {
         } catch (err) {
             setError(err.response?.data?.error || err.message || "Failed to fetch assessment");
             setLoading(false);
+        }
+    };
+
+    const effectiveMaxAttempts =
+        result?.maxAttempts ?? assessment?.maxAttempts ?? 1;
+
+    const effectiveAttemptsRemaining =
+        result?.attemptsRemaining ?? assessment?.attemptsRemaining ?? 0;
+
+
+    const handleReattempt = async () => {
+        if (!result || result.attemptsRemaining <= 0) return;
+
+        try {
+            toast.info("Starting new attempt...");
+
+            // Reset states for new attempt
+            setIsSubmitted(false);
+            setAnswers({});
+            setCurrentQuestionIndex(0);
+            setTimeRemaining(assessment.timeLimitSeconds || 1800);
+            setResult(null);
+            setCertificateStatus("not_generated");
+            setCertificateError(null);
+            setShowWarning(false);
+
+            // Optionally reset selectedAnswers if needed
+            setSelectedAnswers({});
+
+            toast.success("New attempt started! You have fresh time to complete the test.");
+        } catch (err) {
+            console.error("Reattempt failed:", err);
+            toast.error("Failed to start new attempt. Please refresh the page.");
         }
     };
 
@@ -328,8 +361,62 @@ export default function ViewFinalTest() {
 
 
                             )}
+
+                            {/* Attempts line in summary (show even when maxAttempts = 1, if you want) */}
+                            {effectiveMaxAttempts >= 1 && (
+                                <div className="flex justify-between items-center pt-3">
+                                    <span className="text-gray-700 font-medium">Attempts:</span>
+                                    <span className={`text-xl font-bold ${effectiveAttemptsRemaining > 0 ? "text-blue-600" : "text-red-600"
+                                        }`}>
+                                        Attempt {result?.attemptNumber ?? (effectiveMaxAttempts - effectiveAttemptsRemaining)}
+                                        {" "}of {effectiveMaxAttempts}
+                                        {effectiveAttemptsRemaining > 0 && (
+                                            <span className="ml-1 text-sm">
+                                                ({effectiveAttemptsRemaining} remaining)
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     </div>
+
+                    {!isReadOnly && effectiveAttemptsRemaining > 0 && effectiveMaxAttempts > 1 && (
+                        <div className="mb-8 p-6 bg-blue-50 border-2 border-blue-200 rounded-xl">
+                            <div className="flex items-center gap-3 mb-4">
+                                <RefreshCw className="w-6 h-6 text-blue-600 animate-spin" />
+                                <h3 className="text-xl font-bold text-blue-900">
+                                    You can reattempt this test!
+                                </h3>
+                            </div>
+                            <p className="text-blue-800 mb-6">
+                                You have <strong>{result.attemptsRemaining}</strong> attempt(s) remaining.
+                                Click below to start a fresh attempt.
+                            </p>
+                            <Button
+                                variant="primary"
+                                onClick={handleReattempt}
+                                className="bg-blue-600 hover:bg-blue-700 text-lg px-8 py-3 min-w-[200px]"
+                            >
+                                <RefreshCw size={20} className="mr-2" />
+                                Reattempt Test ({result.attemptsRemaining} left)
+                            </Button>
+                        </div>
+                    )}
+
+                    {!isReadOnly && effectiveAttemptsRemaining === 0 && effectiveMaxAttempts >= 1 && (
+                        <div className="mb-8 p-6 bg-red-50 border-2 border-red-200 rounded-xl">
+                            <div className="flex items-center gap-3 mb-4">
+                                <AlertCircle className="w-6 h-6 text-red-600" />
+                                <h3 className="text-xl font-bold text-red-900">
+                                    No more attempts available
+                                </h3>
+                            </div>
+                            <p className="text-red-800">
+                                You have completed all {result.maxAttempts} allowed attempts for this test.
+                            </p>
+                        </div>
+                    )}
 
                     {/* ✅ Two-Step Certificate Flow */}
                     {result.score >= passingMark && (

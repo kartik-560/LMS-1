@@ -5,13 +5,19 @@ import Button from "../components/ui/Button";
 import { assessmentsAPI, authAPI } from "../services/api";
 import useAuthStore from "../store/useAuthStore";
 import { useLocation } from "react-router-dom";
+import { toast } from "sonner";
 export default function ViewFinalTest() {
-    const userRole = useAuthStore((state) => state.userRole);
+    const { user, userRole } = useAuthStore((state) => ({
+        user: state.user,
+        userRole: state.userRole,
+    }));
+    const userName =
+        user?.fullName || user?.name || user?.username || "Student";
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const location = useLocation();
     const { courseId, finalTestId } = location.state || {};
-   const assessmentId = finalTestId || searchParams.get('assessmentId');
+    const assessmentId = finalTestId || searchParams.get('assessmentId');
 
     const isReadOnly = userRole === "SUPERADMIN" || userRole === "ADMIN";
 
@@ -25,8 +31,6 @@ export default function ViewFinalTest() {
     const [error, setError] = useState(null);
     const [result, setResult] = useState(null);
     const [showWarning, setShowWarning] = useState(false);
-    const [userName, setUserName] = useState("Student");
-
     const [certificateStatus, setCertificateStatus] = useState("not_generated");
     const [certificateError, setCertificateError] = useState(null);
 
@@ -37,24 +41,32 @@ export default function ViewFinalTest() {
             return;
         }
         fetchAssessment();
-        fetchUserData();
     }, [assessmentId]);
 
+
     useEffect(() => {
-        if (timeRemaining <= 0 || isSubmitted) return;
+        if (isSubmitted || isReadOnly) return;
+
+
+        if (timeRemaining <= 0) return;
 
         const timer = setInterval(() => {
             setTimeRemaining((prev) => {
-                if (prev <= 1) {
-                    handleSubmit();
+                const newTime = prev - 1;
+
+                if (newTime <= 0) {
+                    clearInterval(timer);
+                    handleAutoSubmit();
                     return 0;
                 }
-                return prev - 1;
+
+                return newTime;
             });
         }, 1000);
 
+        // Cleanup function
         return () => clearInterval(timer);
-    }, [timeRemaining, isSubmitted]);
+    }, [timeRemaining, isSubmitted, isReadOnly]);
 
     const fetchAssessment = async () => {
         if (!assessmentId || assessmentId === 'null') {
@@ -80,15 +92,6 @@ export default function ViewFinalTest() {
         } catch (err) {
             setError(err.response?.data?.error || err.message || "Failed to fetch assessment");
             setLoading(false);
-        }
-    };
-
-    const fetchUserData = async () => {
-        try {
-            const user = await authAPI.me();
-            setUserName(user.fullName || user.name || user.username || "Student");
-        } catch (err) {
-            console.error("Failed to fetch user:", err);
         }
     };
 
@@ -124,17 +127,49 @@ export default function ViewFinalTest() {
         });
     };
 
-    const handleMatchPair = (questionId, pairIndex, value) => {
-        setAnswers((prev) => {
-            const currentPairs = prev[questionId] || {};
-            return {
-                ...prev,
-                [questionId]: {
-                    ...currentPairs,
-                    [pairIndex]: value,
-                },
-            };
-        });
+    // const handleMatchPair = (questionId, pairIndex, value) => {
+    //     setAnswers((prev) => {
+    //         const currentPairs = prev[questionId] || {};
+    //         return {
+    //             ...prev,
+    //             [questionId]: {
+    //                 ...currentPairs,
+    //                 [pairIndex]: value,
+    //             },
+    //         };
+    //     });
+    // };
+
+    // ✅ Auto-submit function (bypasses warning dialog)
+    const handleAutoSubmit = async () => {
+        if (isReadOnly || isSubmitted) return;
+
+        try {
+            setIsSubmitted(true);
+            const data = await assessmentsAPI.submitAttempt(assessmentId, answers);
+            setResult({
+                score: data.score,
+                submittedAt: data.submittedAt,
+                earnedPoints: data.earnedPoints,
+                totalPoints: data.totalPoints,
+                attemptNumber: data.attemptNumber,
+                attemptsRemaining: data.attemptsRemaining,
+                maxAttempts: data.maxAttempts,
+                certificateGenerated: data.certificateGenerated,
+            });
+
+            // Check if certificate was already generated during submission
+            if (data.certificateGenerated && data.score >= 70) {
+                setCertificateStatus("generated");
+            }
+
+            // Show toast notification for auto-submit
+            toast.success("Time expired! Your assessment has been submitted automatically.");
+        } catch (err) {
+            setError(err.response?.data?.error || err.message || "Failed to submit assessment");
+            setIsSubmitted(false);
+            toast.error("Auto-submit failed. Please try manually submitting.");
+        }
     };
 
     const handleSubmit = async () => {
@@ -248,6 +283,10 @@ export default function ViewFinalTest() {
     const currentQuestion = assessment.questions[currentQuestionIndex];
     const progress = ((currentQuestionIndex + 1) / assessment.questions.length) * 100;
     const answeredCount = getAnsweredQuestionsCount();
+    const passingMark = typeof assessment.passingMark === "number"
+        ? assessment.passingMark
+        : 70; // fallback for older data
+
 
     if (isSubmitted && result) {
         return (
@@ -279,13 +318,21 @@ export default function ViewFinalTest() {
                                     <span className="text-xl font-bold text-indigo-600">
                                         {result.earnedPoints} / {result.totalPoints}
                                     </span>
+                                    <div className="flex justify-between items-center pb-3 border-b">
+                                        <span className="text-gray-700 font-medium">Passing Mark:</span>
+                                        <span className="text-xl font-bold text-gray-900">
+                                            {passingMark}%
+                                        </span>
+                                    </div>
                                 </div>
+
+
                             )}
                         </div>
                     </div>
 
                     {/* ✅ Two-Step Certificate Flow */}
-                    {result.score >= 70 && (
+                    {result.score >= passingMark && (
                         <div className="mb-6">
                             <div className="bg-yellow-50 border-2 border-yellow-400 rounded-lg p-4 mb-4">
                                 <p className="text-yellow-800 font-medium">
@@ -371,6 +418,20 @@ export default function ViewFinalTest() {
 
     return (
         <div className="max-w-5xl mx-auto p-6">
+
+
+            {timeRemaining > 0 && timeRemaining <= 60 && !isSubmitted && !isReadOnly && (
+                <div className="mb-4 p-4 bg-red-100 border-2 border-red-500 rounded-lg">
+                    <div className="flex items-center gap-2">
+                        <AlertCircle className="w-5 h-5 text-red-600" />
+                        <p className="text-red-700 font-semibold">
+                            Warning: Less than 1 minute remaining! The test will auto-submit when time expires.
+                        </p>
+                    </div>
+                </div>
+            )}
+
+
             <div className="bg-white rounded-lg shadow-lg">
                 <div className="border-b p-6">
                     <div className="flex justify-between items-start mb-4">
@@ -385,17 +446,17 @@ export default function ViewFinalTest() {
                             </div>
                         </div>
                         {!(userRole === "SUPERADMIN" || userRole === "ADMIN") && (
-                        <div
-                            className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-lg font-bold ${timeRemaining < 60
-                                ? "bg-red-100 text-red-700 animate-pulse"
-                                : timeRemaining < 300
-                                    ? "bg-orange-100 text-orange-700"
-                                    : "bg-blue-100 text-blue-700"
-                                }`}
-                        >
-                            <Clock size={20} />
-                            {formatTime(timeRemaining)}                          
-                        </div>
+                            <div
+                                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-mono text-lg font-bold ${timeRemaining < 60
+                                    ? "bg-red-100 text-red-700 animate-pulse"
+                                    : timeRemaining < 300
+                                        ? "bg-orange-100 text-orange-700"
+                                        : "bg-blue-100 text-blue-700"
+                                    }`}
+                            >
+                                <Clock size={20} />
+                                {formatTime(timeRemaining)}
+                            </div>
                         )}
                     </div>
 
@@ -413,9 +474,9 @@ export default function ViewFinalTest() {
                             <span className="inline-flex items-center px-3 py-1 bg-purple-100 text-purple-800 text-sm font-medium rounded-full">
                                 {currentQuestion.type === "single" && "Single Choice"}
                                 {currentQuestion.type === "multiple" && "Multiple Choice"}
-                                {currentQuestion.type === "numerical" && "Numerical Answer"}
+                                {/* {currentQuestion.type === "numerical" && "Numerical Answer"}
                                 {currentQuestion.type === "match" && "Match the Column"}
-                                {currentQuestion.type === "subjective" && "Subjective"}
+                                {currentQuestion.type === "subjective" && "Subjective"} */}
                             </span>
                             <span className="text-sm text-gray-600">
                                 {currentQuestion.points || 1} {currentQuestion.points === 1 ? "point" : "points"}
@@ -484,7 +545,7 @@ export default function ViewFinalTest() {
                             </>
                         )}
 
-                        {currentQuestion.type === "numerical" && (
+                        {/* {currentQuestion.type === "numerical" && (
                             <input
                                 type="text"
                                 value={answers[currentQuestion.id] || ""}
@@ -527,7 +588,7 @@ export default function ViewFinalTest() {
                                 className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none resize-none"
                                 placeholder="Write your answer here..."
                             />
-                        )}
+                        )} */}
                     </div>
                 </div>
 
@@ -556,8 +617,9 @@ export default function ViewFinalTest() {
                                     variant="primary"
                                     onClick={handleSubmit}
                                     className="bg-green-600 hover:bg-green-700"
+                                    disabled={timeRemaining <= 0 || isSubmitted}
                                 >
-                                    Submit Assessment
+                                    {timeRemaining <= 0 ? "Time Expired" : "Submit Assessment"}
                                 </Button>
                             )
                         )}

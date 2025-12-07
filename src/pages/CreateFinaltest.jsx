@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import Button from "../components/ui/Button";
 import { assessmentsAPI } from "../services/api";
 import { coursesAPI } from "../services/api";
-
+import useAuthStore from "../store/useAuthStore";
 const createNewQuestion = () => ({
   id: crypto.randomUUID(),
   type: "single",
@@ -20,6 +20,7 @@ const createNewQuestion = () => ({
 });
 
 export default function CreateFinaltest({ initialLesson }) {
+  const userRole = useAuthStore((state) => state.userRole);
   const { courseId: urlCourseId } = useParams();
   const navigate = useNavigate();
 
@@ -32,6 +33,7 @@ export default function CreateFinaltest({ initialLesson }) {
       quizTitle: "",
       quizDurationMinutes: 60,
       maxAttempts: 1,
+      passingMark: 70,
       questions: [createNewQuestion()],
     }
   );
@@ -164,26 +166,26 @@ export default function CreateFinaltest({ initialLesson }) {
         };
       }
 
-      if (q.type === "numerical") {
-        return {
-          ...baseQuestion,
-          correctText: q.correctText,
-        };
-      }
+      // if (q.type === "numerical") {
+      //   return {
+      //     ...baseQuestion,
+      //     correctText: q.correctText,
+      //   };
+      // }
 
-      if (q.type === "match") {
-        return {
-          ...baseQuestion,
-          pairs: JSON.stringify(q.pairs),
-        };
-      }
+      // if (q.type === "match") {
+      //   return {
+      //     ...baseQuestion,
+      //     pairs: JSON.stringify(q.pairs),
+      //   };
+      // }
 
-      if (q.type === "subjective") {
-        return {
-          ...baseQuestion,
-          sampleAnswer: q.sampleAnswer,
-        };
-      }
+      // if (q.type === "subjective") {
+      //   return {
+      //     ...baseQuestion,
+      //     sampleAnswer: q.sampleAnswer,
+      //   };
+      // }
 
       return baseQuestion;
     });
@@ -202,6 +204,19 @@ export default function CreateFinaltest({ initialLesson }) {
 
     if (lesson.quizDurationMinutes < 1) {
       setError("Duration must be at least 1 minute");
+      return false;
+    }
+
+    if (lesson.passingMark === undefined || lesson.passingMark === null) {
+      setError("Please enter a passing mark");
+      return false;
+    }
+    if (
+      Number.isNaN(Number(lesson.passingMark)) ||
+      lesson.passingMark < 0 ||
+      lesson.passingMark > 100
+    ) {
+      setError("Passing mark must be a number between 0 and 100");
       return false;
     }
 
@@ -237,20 +252,20 @@ export default function CreateFinaltest({ initialLesson }) {
         }
       }
 
-      if (q.type === "numerical" && !q.correctText.trim()) {
-        setError(`Question ${i + 1}: Please provide the correct answer`);
-        return false;
-      }
+      // if (q.type === "numerical" && !q.correctText.trim()) {
+      //   setError(`Question ${i + 1}: Please provide the correct answer`);
+      //   return false;
+      // }
 
-      if (q.type === "match" && (!q.pairs || q.pairs.length === 0)) {
-        setError(`Question ${i + 1}: Please add at least one match pair`);
-        return false;
-      }
+      // if (q.type === "match" && (!q.pairs || q.pairs.length === 0)) {
+      //   setError(`Question ${i + 1}: Please add at least one match pair`);
+      //   return false;
+      // }
 
-      if (q.type === "subjective" && !q.sampleAnswer.trim()) {
-        setError(`Question ${i + 1}: Please provide a sample answer`);
-        return false;
-      }
+      // if (q.type === "subjective" && !q.sampleAnswer.trim()) {
+      //   setError(`Question ${i + 1}: Please provide a sample answer`);
+      //   return false;
+      // }
     }
 
     return true;
@@ -273,6 +288,7 @@ export default function CreateFinaltest({ initialLesson }) {
         title: lesson.quizTitle,
         timeLimitSeconds: lesson.quizDurationMinutes * 60,
         maxAttempts: lesson.maxAttempts || 1,
+        passingMark: lesson.passingMark,
         isPublished: true,
         questions: transformedQuestions,
       };
@@ -283,7 +299,13 @@ export default function CreateFinaltest({ initialLesson }) {
       setSuccess(true);
 
       setTimeout(() => {
-        navigate(`/courses/${selectedCourseId}`);
+        if (userRole === "SUPERADMIN") {
+          navigate(`/superadmin`);
+        } else if (userRole === "ADMIN") {
+          navigate(`/admin`);
+        } else {
+          navigate(`/`);
+        }
       }, 2000);
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Failed to save final test");
@@ -293,16 +315,40 @@ export default function CreateFinaltest({ initialLesson }) {
     }
   };
 
+  const getDashboardPath = () => {
+    if (!userRole) return "/";
+
+    const normalized = String(userRole).toUpperCase();
+
+    if (normalized === "SUPERADMIN") return "/superadmin";
+    if (normalized === "ADMIN") return "/admin";
+    if (normalized === "INSTRUCTOR") return "/instructor"; // if you have one
+    if (normalized === "STUDENT") return "/dashboard";     // or "/student"
+
+    return "/"; // fallback
+  };
+
+
   return (
     <div className="max-w-6xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Create Final Test
-        </h1>
-        <p className="text-gray-600">
-          Create a comprehensive final test for the entire course
-        </p>
+      <div className="mb-6 flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Create Final Test
+          </h1>
+          <p className="text-gray-600">
+            Create a comprehensive final test for the entire course
+          </p>
+        </div>
+
+        <Button
+          variant="outline"
+          onClick={() => navigate(getDashboardPath())}
+        >
+          Back to Dashboard
+        </Button>
       </div>
+
 
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -398,6 +444,22 @@ export default function CreateFinaltest({ initialLesson }) {
               placeholder="1"
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Passing Mark (%) *
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="100"
+              value={lesson.passingMark}
+              onChange={(e) =>
+                updateLesson("passingMark", Number(e.target.value))
+              }
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              placeholder="e.g., 70"
+            />
+          </div>
         </div>
 
         <div className="space-y-4">
@@ -449,9 +511,9 @@ export default function CreateFinaltest({ initialLesson }) {
                   >
                     <option value="single">Single Choice</option>
                     <option value="multiple">Multiple Choice</option>
-                    <option value="numerical">Numerical</option>
+                    {/* <option value="numerical">Numerical</option>
                     <option value="match">Match the Column</option>
-                    <option value="subjective">Subjective</option>
+                    <option value="subjective">Subjective</option> */}
                   </select>
                 </div>
                 <div className="md:col-span-2">
@@ -539,7 +601,7 @@ export default function CreateFinaltest({ initialLesson }) {
                 </div>
               )}
 
-              {q.type === "numerical" && (
+              {/* {q.type === "numerical" && (
                 <div className="mt-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Correct Answer *
@@ -644,7 +706,7 @@ export default function CreateFinaltest({ initialLesson }) {
                     placeholder="Provide a sample answer for reference"
                   />
                 </div>
-              )}
+              )} */}
             </div>
           ))}
         </div>

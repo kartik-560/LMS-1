@@ -150,7 +150,7 @@ export default function AdminDashboardPage() {
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState(null);
-
+  const [canCreateCourses, setCanCreateCourses] = useState(false);
   const [overview, setOverview] = useState({
     courses: 0,
     students: 0,
@@ -513,6 +513,24 @@ export default function AdminDashboardPage() {
     // navigate(`/admin?tab=${tab}`);
   };
 
+  useEffect(() => {
+    (async () => {
+      try {
+        const raw = await authAPI.me();
+        const me = raw?.data?.user || raw.user || raw;
+
+        const perms = me?.collegePermissions || me?.college?.permissions || {};
+        const adminToggles = perms.adminToggles || {};
+        const adminPerms = me ? adminToggles[me.id] || {} : {};
+
+        setCanCreateCourses(!!adminPerms.canCreateCourses);
+      } catch (e) {
+        console.error("Failed to fetch /auth/me", e);
+        setCanCreateCourses(false);
+      }
+    })();
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
@@ -558,12 +576,14 @@ export default function AdminDashboardPage() {
             <div className="flex flex-wrap gap-2 sm:gap-3">
 
 
-              <Link to="/courses/create">
-                <Button size="sm" className="w-full sm:w-auto">
-                  <Plus size={16} className="mr-2" />
-                  Create Course
-                </Button>
-              </Link>
+              {canCreateCourses && (
+                <Link to="/courses/create">
+                  <Button size="sm" className="w-full sm:w-auto">
+                    <Plus size={16} className="mr-2" />
+                    Create Course
+                  </Button>
+                </Link>
+              )}
 
               <Link to="/register" state={{ allowWhenLoggedIn: true }}>
                 <Button size="sm" className="w-full sm:w-auto">

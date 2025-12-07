@@ -36,6 +36,7 @@ export default function EditFinalTest() {
         quizTitle: "",
         quizDurationMinutes: 60,
         maxAttempts: 1,
+        passingMark: 70,
         questions: [createNewQuestion()],
     });
 
@@ -84,6 +85,10 @@ export default function EditFinalTest() {
                     ? Math.floor(assessmentData.timeLimitSeconds / 60)
                     : 60,
                 maxAttempts: assessmentData.maxAttempts || 1,
+                passingMark:
+                    typeof assessmentData.passingMark === "number"
+                        ? assessmentData.passingMark
+                        : 70,
                 questions: transformQuestionsFromAPI(assessmentData.questions || []),
             };
 
@@ -130,30 +135,30 @@ export default function EditFinalTest() {
                 }));
             }
 
-            if (q.type === "numerical") {
-                baseQuestion.correctText = q.correctText || "";
-            }
+            // if (q.type === "numerical") {
+            //     baseQuestion.correctText = q.correctText || "";
+            // }
 
-            if (q.type === "match") {
-                try {
-                    baseQuestion.pairs = typeof q.pairs === "string"
-                        ? JSON.parse(q.pairs)
-                        : (q.pairs || []);
+            // if (q.type === "match") {
+            //     try {
+            //         baseQuestion.pairs = typeof q.pairs === "string"
+            //             ? JSON.parse(q.pairs)
+            //             : (q.pairs || []);
 
-                    // Ensure each pair has an id
-                    baseQuestion.pairs = baseQuestion.pairs.map(pair => ({
-                        ...pair,
-                        id: pair.id || crypto.randomUUID()
-                    }));
-                } catch (e) {
-                    console.error("Failed to parse pairs:", e);
-                    baseQuestion.pairs = [];
-                }
-            }
+            //         // Ensure each pair has an id
+            //         baseQuestion.pairs = baseQuestion.pairs.map(pair => ({
+            //             ...pair,
+            //             id: pair.id || crypto.randomUUID()
+            //         }));
+            //     } catch (e) {
+            //         console.error("Failed to parse pairs:", e);
+            //         baseQuestion.pairs = [];
+            //     }
+            // }
 
-            if (q.type === "subjective") {
-                baseQuestion.sampleAnswer = q.sampleAnswer || "";
-            }
+            // if (q.type === "subjective") {
+            //     baseQuestion.sampleAnswer = q.sampleAnswer || "";
+            // }
 
             return baseQuestion;
         });
@@ -300,6 +305,19 @@ export default function EditFinalTest() {
             return false;
         }
 
+        if (
+            lesson.passingMark === undefined ||
+            lesson.passingMark === null ||
+            Number.isNaN(Number(lesson.passingMark))
+        ) {
+            setError("Please enter a valid passing mark");
+            return false;
+        }
+        if (lesson.passingMark < 0 || lesson.passingMark > 100) {
+            setError("Passing mark must be between 0 and 100");
+            return false;
+        }
+
         if (lesson.questions.length === 0) {
             setError("Please add at least one question");
             return false;
@@ -368,6 +386,7 @@ export default function EditFinalTest() {
                 title: lesson.quizTitle,
                 timeLimitSeconds: lesson.quizDurationMinutes * 60,
                 maxAttempts: lesson.maxAttempts || 1,
+                passingMark: lesson.passingMark,
                 isPublished: true,
                 questions: transformedQuestions,
             };
@@ -398,6 +417,19 @@ export default function EditFinalTest() {
         }
     };
 
+    const getDashboardPath = () => {
+        if (!userRole) return "/";
+
+        const normalized = String(userRole).toUpperCase();
+
+        if (normalized === "SUPERADMIN") return "/superadmin";
+        if (normalized === "ADMIN") return "/admin";
+        if (normalized === "INSTRUCTOR") return "/instructor"; // if you have one
+        if (normalized === "STUDENT") return "/dashboard";     // or "/student"
+
+        return "/"; // fallback
+    };
+
     if (loadingAssessment || loadingCourses) {
         return (
             <div className="max-w-6xl mx-auto p-6">
@@ -413,14 +445,25 @@ export default function EditFinalTest() {
 
     return (
         <div className="max-w-6xl mx-auto p-6">
-            <div className="mb-6">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                    Edit Final Test
-                </h1>
-                <p className="text-gray-600">
-                    Update the final test for this course
-                </p>
+        
+            <div className="mb-6 flex items-center justify-between">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                        Edit Final Test
+                    </h1>
+                    <p className="text-gray-600">
+                        Update the final test for this course
+                    </p>
+                </div>
+
+                <Button
+                    variant="outline"
+                    onClick={() => navigate(getDashboardPath())}
+                >
+                    Back to Dashboard
+                </Button>
             </div>
+
 
             {error && (
                 <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -507,6 +550,23 @@ export default function EditFinalTest() {
                             placeholder="1"
                         />
                     </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Passing Mark (%) *
+                        </label>
+                        <input
+                            type="number"
+                            min="0"
+                            max="100"
+                            value={lesson.passingMark}
+                            onChange={(e) =>
+                                updateLesson("passingMark", Number(e.target.value))
+                            }
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            placeholder="e.g., 70"
+                        />
+                    </div>
                 </div>
 
                 <div className="space-y-4">
@@ -557,9 +617,9 @@ export default function EditFinalTest() {
                                     >
                                         <option value="single">Single Choice</option>
                                         <option value="multiple">Multiple Choice</option>
-                                        <option value="numerical">Numerical</option>
+                                        {/* <option value="numerical">Numerical</option>
                                         <option value="match">Match the Column</option>
-                                        <option value="subjective">Subjective</option>
+                                        <option value="subjective">Subjective</option> */}
                                     </select>
                                 </div>
                                 <div className="md:col-span-2">
@@ -647,7 +707,7 @@ export default function EditFinalTest() {
                                 </div>
                             )}
 
-                            {q.type === "numerical" && (
+                            {/* {q.type === "numerical" && (
                                 <div className="mt-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Correct Answer *
@@ -752,7 +812,7 @@ export default function EditFinalTest() {
                                         placeholder="Provide a sample answer for reference"
                                     />
                                 </div>
-                            )}
+                            )} */}
                         </div>
                     ))}
                 </div>

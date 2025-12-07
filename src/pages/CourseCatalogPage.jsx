@@ -6,13 +6,7 @@ import {
   Grid as Grid3X3,
   List,
   SlidersHorizontal,
-  X,
-  Star,
-  Clock,
-  Users,
   Play,
-  Share2,
-  Heart,
   Eye,
 } from "lucide-react";
 import { useRef } from "react";
@@ -151,6 +145,7 @@ const CourseCatalogPage = () => {
       const buildParams = (view) => ({
         view,
         collegeId: effectiveCollegeId || undefined,
+       
         search: searchTerm || undefined,
         category: selectedCategory !== "all" ? selectedCategory : undefined,
         page: 1,
@@ -517,7 +512,7 @@ const CourseCatalogPage = () => {
               </div>
             </div>
 
-            
+
           </div>
 
           {/* Inline filters panel (no external Card dependency) */}
@@ -796,7 +791,7 @@ const CourseListItem = ({
                 >
                   {course.level}
                 </span>
-                
+
               </div>
 
               <h3 className="text-lg font-semibold text-gray-900 mb-2 hover:text-primary-600 transition-colors line-clamp-2">
@@ -809,14 +804,14 @@ const CourseListItem = ({
                 </p>
               )}
 
-              
+
             </div>
 
             <div className="flex flex-col items-end space-y-3 mt-4 sm:mt-0">
-              
+
 
               <div className="text-right">
-                
+
 
                 <div>
                   {course.progress !== undefined ? (

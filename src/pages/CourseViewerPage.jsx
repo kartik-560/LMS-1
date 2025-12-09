@@ -320,6 +320,12 @@ const CourseViewerPage = () => {
     return Math.round((completed / chapters.length) * 100);
   };
 
+  const isCourseCompleted = () => {
+    if (!chapters.length) return false;
+    return chapters.every((ch) => completedChapterIds.includes(ch.id));
+  };
+
+
   const isChapterCompleted = (id) => completedChapterIds.includes(id);
 
 
@@ -477,6 +483,27 @@ const CourseViewerPage = () => {
     }
   };
 
+  const goToFinalTest = async () => {
+    try {
+      const finalTestResp = await assessmentsAPI.getFinalTestByCourse(courseId);
+      const finalTest = finalTestResp?.data ?? finalTestResp;
+
+      if (!finalTest || !finalTest.id) {
+        toast.error("Final test not available for this course");
+        return;
+      }
+
+      // Navigate with query param (same as student dashboard)
+      navigate(`/view_finaltest?assessmentId=${finalTest.id}`, {
+        state: { courseId: courseId }
+      });
+    } catch (error) {
+      console.error("Failed to fetch final test:", error);
+      toast.error("Failed to load final test");
+    }
+  };
+
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -514,284 +541,293 @@ const CourseViewerPage = () => {
   }
 
   return (
-  <div className="min-h-screen bg-gray-100 flex">
-    {/* Mobile overlay */}
-    {sidebarOpen && (
-      <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-        onClick={() => setSidebarOpen(false)}
-      />
-    )}
+    <div className="min-h-screen bg-gray-100 flex">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-    {/* Sidebar - Hide progress for staff + Mobile responsive */}
-    <aside className={`transition-all duration-300 bg-white border-r border-gray-200 flex-shrink-0 
+      {/* Sidebar - Hide progress for staff + Mobile responsive */}
+      <aside className={`transition-all duration-300 bg-white border-r border-gray-200 flex-shrink-0 
       ${sidebarOpen ? 'w-80 fixed inset-y-0 left-0 z-50 md:relative md:w-80' : 'w-0'} 
       overflow-hidden`}>
-      {sidebarOpen && (
-        <>
-          <div className="p-4 border-b">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3 flex-1 min-w-0">
-                <img src={course.thumbnail} alt="thumb" className="w-10 h-10 rounded-md object-cover flex-shrink-0" />
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold truncate">{course.title}</div>
-                </div>
-              </div>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="ml-2 p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
-                title="Hide sidebar"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <Badge variant="info" size="sm" className="mb-3">{course.level}</Badge>
-
-            {/* Only show progress for students */}
-            {!isStaff && (
-              <div className="mt-4">
-                <div className="flex items-center justify-between text-xs text-gray-600">
-                  <span>Progress</span>
-                  <span className="font-medium">{getCourseProgress()}%</span>
-                </div>
-                <Progress value={getCourseProgress()} size="sm" />
-                <div className="text-xs text-gray-500 mt-1">
-                  {completedChapterIds.length} / {chapters.length} chapters
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="overflow-y-auto h-[calc(100vh-200px)] p-3">
-            <div className="space-y-2">
-              <div className="text-xs text-gray-500 font-medium px-2">Course Content</div>
-              <div className="border rounded-lg bg-white">
-                <button
-                  onClick={() => setExpanded(x => !x)}
-                  className="w-full p-3 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
-                >
-                  <div className="text-sm font-medium">Chapters</div>
-                  {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                </button>
-
-                {expanded && (
-                  <div className="divide-y">
-                    {chapters.map((chapter) => {
-                      // Show lock icon for quiz chapters that are locked (students only)
-                      const isLocked = !isStaff && chapter.hasQuiz && !isQuizUnlocked(chapter);
-
-                      return (
-                        <button
-                          key={chapter.id}
-                          onClick={() => {
-                            setCurrentChapter(chapter);
-                            setPageIndex(0);
-                            if (!chapter.content) hydrateChapter(chapter.id);
-                            // Close sidebar on mobile after selection
-                            if (window.innerWidth < 768) setSidebarOpen(false);
-                          }}
-                          className={`w-full p-3 text-left flex items-start space-x-3 hover:bg-gray-50 transition-colors ${
-                            currentChapter?.id === chapter.id ? 'bg-primary-50 ring-1 ring-primary-200' : ''
-                          }`}
-                        >
-                          <div className="mt-1 flex-shrink-0">
-                            {/* Only show completion status for students */}
-                            {!isStaff && isChapterCompleted(chapter.id) ? (
-                              <CheckCircle size={16} className="text-green-500" />
-                            ) : isLocked ? (
-                              <Lock size={16} className="text-gray-400" />
-                            ) : (
-                              <div className="w-3 h-3 border border-gray-300 rounded-full" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm font-medium truncate">{chapter.title}</div>
-                            <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
-                              <Clock size={12} />
-                              <span>{chapter.duration}</span>
-                              <span>•</span>
-                              <span>{chapter.type}</span>
-                              {isLocked && <span className="text-amber-600">• Locked</span>}
-                            </div>
-                          </div>
-                        </button>
-                      );
-                    })}
+        {sidebarOpen && (
+          <>
+            <div className="p-4 border-b">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3 flex-1 min-w-0">
+                  <img src={course.thumbnail} alt="thumb" className="w-10 h-10 rounded-md object-cover flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold truncate">{course.title}</div>
                   </div>
-                )}
+                </div>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="ml-2 p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+                  title="Hide sidebar"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <Badge variant="info" size="sm" className="mb-3">{course.level}</Badge>
+
+              {/* Only show progress for students */}
+              {!isStaff && (
+                <div className="mt-4">
+                  <div className="flex items-center justify-between text-xs text-gray-600">
+                    <span>Progress</span>
+                    <span className="font-medium">{getCourseProgress()}%</span>
+                  </div>
+                  <Progress value={getCourseProgress()} size="sm" />
+                  <div className="text-xs text-gray-500 mt-1">
+                    {completedChapterIds.length} / {chapters.length} chapters
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="overflow-y-auto h-[calc(100vh-200px)] p-3">
+              <div className="space-y-2">
+                <div className="text-xs text-gray-500 font-medium px-2">Course Content</div>
+                <div className="border rounded-lg bg-white">
+                  <button
+                    onClick={() => setExpanded(x => !x)}
+                    className="w-full p-3 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="text-sm font-medium">Chapters</div>
+                    {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+
+                  {expanded && (
+                    <div className="divide-y">
+                      {chapters.map((chapter) => {
+                        // Show lock icon for quiz chapters that are locked (students only)
+                        const isLocked = !isStaff && chapter.hasQuiz && !isQuizUnlocked(chapter);
+
+                        return (
+                          <button
+                            key={chapter.id}
+                            onClick={() => {
+                              setCurrentChapter(chapter);
+                              setPageIndex(0);
+                              if (!chapter.content) hydrateChapter(chapter.id);
+                              // Close sidebar on mobile after selection
+                              if (window.innerWidth < 768) setSidebarOpen(false);
+                            }}
+                            className={`w-full p-3 text-left flex items-start space-x-3 hover:bg-gray-50 transition-colors ${currentChapter?.id === chapter.id ? 'bg-primary-50 ring-1 ring-primary-200' : ''
+                              }`}
+                          >
+                            <div className="mt-1 flex-shrink-0">
+                              {/* Only show completion status for students */}
+                              {!isStaff && isChapterCompleted(chapter.id) ? (
+                                <CheckCircle size={16} className="text-green-500" />
+                              ) : isLocked ? (
+                                <Lock size={16} className="text-gray-400" />
+                              ) : (
+                                <div className="w-3 h-3 border border-gray-300 rounded-full" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium truncate">{chapter.title}</div>
+                              <div className="flex items-center space-x-2 text-xs text-gray-500 mt-1">
+                                <Clock size={12} />
+                                <span>{chapter.duration}</span>
+                                <span>•</span>
+                                <span>{chapter.type}</span>
+                                {isLocked && <span className="text-amber-600">• Locked</span>}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
 
-          <div className="p-4 border-t text-xs text-gray-500">
-            <div>Course status: <span className="font-medium text-gray-900">{course.status || 'Published'}</span></div>
-          </div>
-        </>
-      )}
-    </aside>
+            <div className="p-4 border-t text-xs text-gray-500">
+              <div>Course status: <span className="font-medium text-gray-900">{course.status || 'Published'}</span></div>
+            </div>
+          </>
+        )}
+      </aside>
 
-    {/* Main panel */}
-    <main className="flex-1 p-4 md:p-6 min-w-0">
-      {/* Sticky header - Hide progress for staff + Mobile responsive */}
-      <div className="sticky top-2 md:top-6 bg-transparent z-10 mb-4 md:mb-6">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white border rounded-lg p-3 md:p-4 shadow-sm">
-          <div className="flex items-center space-x-2 sm:space-x-4 flex-1 min-w-0 w-full sm:w-auto">
-            {!sidebarOpen && (
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-shrink-0"
-                title="Show sidebar"
-              >
-                <Menu size={18} />
-                <span className="text-sm font-medium hidden sm:inline">Course Content</span>
-                <span className="text-sm font-medium sm:hidden">Menu</span>
-              </button>
-            )}
+      {/* Main panel */}
+      <main className="flex-1 p-4 md:p-6 min-w-0">
+        {/* Sticky header - Hide progress for staff + Mobile responsive */}
+        <div className="sticky top-2 md:top-6 bg-transparent z-10 mb-4 md:mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white border rounded-lg p-3 md:p-4 shadow-sm">
+            <div className="flex items-center space-x-2 sm:space-x-4 flex-1 min-w-0 w-full sm:w-auto">
+              {!sidebarOpen && (
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="flex items-center space-x-2 px-3 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors flex-shrink-0"
+                  title="Show sidebar"
+                >
+                  <Menu size={18} />
+                  <span className="text-sm font-medium hidden sm:inline">Course Content</span>
+                  <span className="text-sm font-medium sm:hidden">Menu</span>
+                </button>
+              )}
 
-            <Button variant="ghost" size="sm" onClick={handleBackNavigation} className="flex-shrink-0">
-              <ArrowLeft size={14} className="mr-2" />
-            </Button>
+              <Button variant="ghost" size="sm" onClick={handleBackNavigation} className="flex-shrink-0">
+                <ArrowLeft size={14} className="mr-2" />
+              </Button>
 
-            {currentChapter && (
-              <div className="min-w-0 flex-1">
-                <h2 className="text-base md:text-lg font-semibold truncate">{currentChapter.title}</h2>
-                <div className="text-xs md:text-sm text-gray-500 truncate">{course.title}</div>
-              </div>
-            )}
-          </div>
+              {currentChapter && (
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-base md:text-lg font-semibold truncate">{currentChapter.title}</h2>
+                  <div className="text-xs md:text-sm text-gray-500 truncate">{course.title}</div>
+                </div>
+              )}
+            </div>
 
-          <div className="flex items-center space-x-3 flex-shrink-0 w-full sm:w-auto justify-between sm:justify-end">
-            {/* Only show progress percentage for students */}
-            {!isStaff && (
-              <div className="text-sm text-gray-600">{getCourseProgress()}% complete</div>
-            )}
+            <div className="flex items-center space-x-3 flex-shrink-0 w-full sm:w-auto justify-between sm:justify-end">
+              {/* Only show progress percentage for students */}
+              {!isStaff && (
+                <div className="text-sm text-gray-600">{getCourseProgress()}% complete</div>
+              )}
 
-            {/* Only show completion status for students */}
-            {!isStaff && currentChapter && isChapterCompleted(currentChapter.id) && (
-              <div className="flex items-center space-x-2 text-green-600 text-sm font-medium">
-                <CheckCircle size={16} />
-                <span className="hidden sm:inline">Completed</span>
-              </div>
-            )}
+              {/* Only show completion status for students */}
+              {!isStaff && currentChapter && isChapterCompleted(currentChapter.id) && (
+                <div className="flex items-center space-x-2 text-green-600 text-sm font-medium">
+                  <CheckCircle size={16} />
+                  <span className="hidden sm:inline">Completed</span>
+                </div>
+              )}
+
+              {!isStaff && isCourseCompleted() && (
+                <Button
+                  size="sm"
+                  className="ml-2"
+                  onClick={goToFinalTest}
+                >
+                  Take Final Test
+                </Button>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Content card - Modified for staff viewing + Mobile responsive */}
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white border rounded-lg md:rounded-2xl shadow p-4 md:p-6">
-          {!currentChapter ? (
-            <EmptyPrompt />
-          ) : currentChapter.hasQuiz ? (
-            // Quizzes always unlocked for staff
-            isQuizUnlocked(currentChapter) ? (
-              <QuizView
-                quiz={quiz}
-                quizLoading={quizLoading}
-                quizSubmitted={quizSubmitted}
-                quizScore={quizScore}
-                quizAnswers={quizAnswers}
-                onAnswerChange={handleAnswerChange}
-                onSubmit={submitQuiz}
-                completed={isChapterCompleted(currentChapter.id)}
-                onMarkComplete={() => markChapterComplete({ advance: false })}
-                isStaff={isStaff}
-              />
+        {/* Content card - Modified for staff viewing + Mobile responsive */}
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white border rounded-lg md:rounded-2xl shadow p-4 md:p-6">
+            {!currentChapter ? (
+              <EmptyPrompt />
+            ) : currentChapter.hasQuiz ? (
+              // Quizzes always unlocked for staff
+              isQuizUnlocked(currentChapter) ? (
+                <QuizView
+                  quiz={quiz}
+                  quizLoading={quizLoading}
+                  quizSubmitted={quizSubmitted}
+                  quizScore={quizScore}
+                  quizAnswers={quizAnswers}
+                  onAnswerChange={handleAnswerChange}
+                  onSubmit={submitQuiz}
+                  completed={isChapterCompleted(currentChapter.id)}
+                  onMarkComplete={() => markChapterComplete({ advance: false })}
+                  isStaff={isStaff}
+                />
+              ) : (
+                <LockedQuizNote />
+              )
             ) : (
-              <LockedQuizNote />
-            )
-          ) : (
-            <div>
-              <div className="flex items-start justify-between mb-4">
-                <div className="flex-1 min-w-0">
-                  <div className="text-xl md:text-2xl font-bold">{currentChapter.type}</div>
+              <div>
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xl md:text-2xl font-bold">{currentChapter.type}</div>
+                  </div>
+
+                  {/* Only show completion status for students */}
+                  {!isStaff && (
+                    <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
+                      {isChapterCompleted(currentChapter.id) ? (
+                        <div className="flex items-center space-x-2 text-green-600 text-sm font-medium">
+                          <CheckCircle size={16} />
+                          <span className="hidden sm:inline">Completed</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-amber-600 font-medium hidden sm:inline">In progress</span>
+                      )}
+                    </div>
+                  )}
                 </div>
 
-                {/* Only show completion status for students */}
-                {!isStaff && (
-                  <div className="flex items-center space-x-2 ml-4 flex-shrink-0">
-                    {isChapterCompleted(currentChapter.id) ? (
-                      <div className="flex items-center space-x-2 text-green-600 text-sm font-medium">
-                        <CheckCircle size={16} />
-                        <span className="hidden sm:inline">Completed</span>
+                <div className="prose max-w-none mb-4">
+                  <div className="h-64 md:h-72 overflow-y-auto border rounded-lg p-3 md:p-4 bg-gray-50">
+                    {contentPages.length > 0 ? (
+                      <div className="whitespace-pre-line text-sm md:text-base">
+                        {contentPages[pageIndex]}
                       </div>
                     ) : (
-                      <span className="text-sm text-amber-600 font-medium hidden sm:inline">In progress</span>
+                      <div className="text-gray-600 text-sm md:text-base">{currentChapter.content || 'Chapter content goes here.'}</div>
                     )}
                   </div>
-                )}
-              </div>
-
-              <div className="prose max-w-none mb-4">
-                <div className="h-64 md:h-72 overflow-y-auto border rounded-lg p-3 md:p-4 bg-gray-50">
-                  {contentPages.length > 0 ? (
-                    <div className="whitespace-pre-line text-sm md:text-base">
-                      {contentPages[pageIndex]}
-                    </div>
-                  ) : (
-                    <div className="text-gray-600 text-sm md:text-base">{currentChapter.content || 'Chapter content goes here.'}</div>
-                  )}
                 </div>
-              </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mt-6">
-                {contentPages.length > 1 && (
-                  <div className="flex items-center space-x-2 w-full sm:w-auto">
-                    <Button
-                      onClick={() => setPageIndex(i => Math.max(0, i - 1))}
-                      disabled={pageIndex === 0}
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 sm:flex-initial"
-                    >
-                      <span className="hidden sm:inline">Prev Page</span>
-                      <span className="sm:hidden">Prev</span>
-                    </Button>
-                    <Button
-                      onClick={() => setPageIndex(i => Math.min(contentPages.length - 1, i + 1))}
-                      disabled={pageIndex === contentPages.length - 1}
-                      size="sm"
-                      className="flex-1 sm:flex-initial"
-                    >
-                      <span className="hidden sm:inline">Next Page</span>
-                      <span className="sm:hidden">Next</span>
-                    </Button>
-                    <div className="text-xs md:text-sm text-gray-500 whitespace-nowrap">
-                      Page {pageIndex + 1} of {contentPages.length}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mt-6">
+                  {contentPages.length > 1 && (
+                    <div className="flex items-center space-x-2 w-full sm:w-auto">
+                      <Button
+                        onClick={() => setPageIndex(i => Math.max(0, i - 1))}
+                        disabled={pageIndex === 0}
+                        variant="outline"
+                        size="sm"
+                        className="flex-1 sm:flex-initial"
+                      >
+                        <span className="hidden sm:inline">Prev Page</span>
+                        <span className="sm:hidden">Prev</span>
+                      </Button>
+                      <Button
+                        onClick={() => setPageIndex(i => Math.min(contentPages.length - 1, i + 1))}
+                        disabled={pageIndex === contentPages.length - 1}
+                        size="sm"
+                        className="flex-1 sm:flex-initial"
+                      >
+                        <span className="hidden sm:inline">Next Page</span>
+                        <span className="sm:hidden">Next</span>
+                      </Button>
+                      <div className="text-xs md:text-sm text-gray-500 whitespace-nowrap">
+                        Page {pageIndex + 1} of {contentPages.length}
+                      </div>
                     </div>
+                  )}
+
+                  {contentPages.length <= 1 && <div className="hidden sm:block" />}
+
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                    {/* Only show complete button for students */}
+                    {!isStaff && !isChapterCompleted(currentChapter.id) && isOnLastPage() && (
+                      <Button onClick={() => markChapterComplete({ advance: true })} size="sm" className="w-full sm:w-auto">
+                        <CheckCircle size={16} className="mr-2" />
+                        Complete & Continue
+                      </Button>
+                    )}
+
+                    {currentChapter.attachments && currentChapter.attachments.length > 0 && (
+                      <a
+                        className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 w-full sm:w-auto"
+                        href={currentChapter.attachments[0]}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <FileText size={16} className="mr-2" /> Download
+                      </a>
+                    )}
                   </div>
-                )}
-
-                {contentPages.length <= 1 && <div className="hidden sm:block" />}
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                  {/* Only show complete button for students */}
-                  {!isStaff && !isChapterCompleted(currentChapter.id) && isOnLastPage() && (
-                    <Button onClick={() => markChapterComplete({ advance: true })} size="sm" className="w-full sm:w-auto">
-                      <CheckCircle size={16} className="mr-2" />
-                      Complete & Continue
-                    </Button>
-                  )}
-
-                  {currentChapter.attachments && currentChapter.attachments.length > 0 && (
-                    <a
-                      className="inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md text-sm hover:bg-gray-50 w-full sm:w-auto"
-                      href={currentChapter.attachments[0]}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <FileText size={16} className="mr-2" /> Download
-                    </a>
-                  )}
                 </div>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
-    </main>
-  </div>
+      </main>
+    </div>
   );
 };
 

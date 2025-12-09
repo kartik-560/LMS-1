@@ -49,9 +49,11 @@ export function AssignCourseModal({
       }
     };
 
+     if (isOpen) {
     fetchDepartments();
+  }
     // For admins, collegeId is fixed; for superadmin, it's selectedCollegeId
-  }, [isSuperadmin ? selectedCollegeId : collegeId, isSuperadmin, collegeId]);
+  }, [isOpen, isSuperadmin ? selectedCollegeId : collegeId, isSuperadmin, collegeId]);
 
   // On modal open, reset college selection for superadmin
   useEffect(() => {

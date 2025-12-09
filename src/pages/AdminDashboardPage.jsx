@@ -163,7 +163,7 @@ export default function AdminDashboardPage() {
   const [courses, setCourses] = useState([]);
   const [studentStats, setStudentStats] = useState({});
   const [loadingStats, setLoadingStats] = useState(false);
-  const [loadedTabs, setLoadedTabs] = useState(new Set(["overview"]));
+  const [loadedTabs, setLoadedTabs] = useState(new Set());
   const [departments, setDepartments] = useState([]);
 
   const [loadingStates, setLoadingStates] = useState({
@@ -269,7 +269,7 @@ export default function AdminDashboardPage() {
   }, [overview, instructors, students, courses]);
 
 
-  useEffect(() => {
+ useEffect(() => {
     (async () => {
       try {
         setLoading(true);
@@ -285,6 +285,8 @@ export default function AdminDashboardPage() {
       }
     })();
   }, []);
+
+
 
   const handleTabChange = async (tabName) => {
     // Skip if already loaded
@@ -357,7 +359,6 @@ export default function AdminDashboardPage() {
         setCourses(normCourses);
       }
 
-
       if (tabName === "departments") {
         const user = useAuthStore.getState().user;
         const collegeId = user?.collegeId;
@@ -383,9 +384,9 @@ export default function AdminDashboardPage() {
           id: d.id,
           name: d.name,
           description: d.description || "",
-          instructorCount: d.instructorCount || 0,  // ✅ From API
-          studentCount: d.studentCount || 0,        // ✅ From API
-          courseCount: d.courseCount || 0,          // ✅ From API
+          instructorCount: d.instructorCount || 0,
+          studentCount: d.studentCount || 0,
+          courseCount: d.courseCount || 0,
         }));
 
         setDepartments(normDepartments);
@@ -501,7 +502,6 @@ export default function AdminDashboardPage() {
     }
   };
 
-
   const goEdit = useCallback(
     (course) => navigate(`/courses/${course.id}/edit`, { state: { course } }),
     [navigate]
@@ -530,6 +530,95 @@ export default function AdminDashboardPage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    const fetchOverviewData = async () => {
+      if (activeTab !== "overview") return;
+
+      // Skip if already loaded
+      if (loadedTabs.has("overview")) return;
+
+      try {
+        setLoadingStates(prev => ({ ...prev, overview: true }));
+        const api = await makeAdminAdapter();
+
+        // Get user and collegeId for departments
+        const user = useAuthStore.getState().user;
+        const collegeId = user?.collegeId;
+
+        // Fetch all APIs in parallel
+        const [insResponse, crResponse,deptResponse] = await Promise.all([
+          api.instructors(),
+          api.courses(),
+          collegeId ? collegesAPI.getDepartmentsForCollege(collegeId) : Promise.resolve(null)
+        ]);
+
+        // Process instructors - get latest 3
+        const normInstructors = (insResponse?.data || [])
+          .slice(0, 3)
+          .map((i) => ({
+            id: i.id,
+            fullName: i.fullName || i.name || "Instructor",
+            email: i.email,
+            isActive: !!i.isActive,
+            lastLogin: i.lastLogin,
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(i.fullName || i.name || "I")}&background=random`,
+            assignedCourses: i.assignedCourses || null,
+            department: i.department,
+          }));
+        setInstructors(normInstructors);
+        // Process courses - get latest 3
+        const normCourses = (crResponse?.data || [])
+          .slice(0, 3)
+          .map((c) => ({
+            id: c.id,
+            title: c.title,
+            description: c.description || "",
+            thumbnail: c.thumbnail || FALLBACK_THUMB,
+            status: c.status || "draft",
+            level: c.level ?? null,
+            totalModules: c.totalModules ?? 0,
+            totalChapters: c.totalChapters ?? 0,
+            studentCount: c.studentCount || 0,
+            madeBySuperAdmin: c.madeBySuperAdmin || false,
+            instructorNames: c.instructorNames || [],
+            instructorIds: c.instructorIds || (Array.isArray(c.instructors) ? c.instructors.map((x) => x.id) : []),
+          }));
+        setCourses(normCourses);
+
+        // Process departments - get latest 3
+        if (deptResponse) {
+          const rawData = deptResponse?.data?.data?.items
+            || deptResponse?.data?.data
+            || deptResponse?.data?.items
+            || deptResponse?.data?.departments
+            || deptResponse?.data
+            || [];
+
+          const departmentsArray = Array.isArray(rawData) ? rawData : [];
+
+          const normDepartments = departmentsArray
+            .slice(0, 3)
+            .map((d) => ({
+              id: d.id,
+              name: d.name,
+            }));
+
+          setDepartments(normDepartments);
+        }
+
+        setLoadedTabs(prev => new Set([...prev, "overview"]));
+      } catch (e) {
+        console.error('Error loading overview:', e);
+        toast.error('Failed to load overview data.');
+      } finally {
+        setLoadingStates(prev => ({ ...prev, overview: false }));
+      }
+    };
+
+    fetchOverviewData();
+  }, [activeTab]);
+
 
   if (loading) {
     return (
@@ -734,7 +823,6 @@ export default function AdminDashboardPage() {
             </Card>
           </div>
 
-
           {/* Certificates Card - Overview */}
           <Card className="h-full p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none">
             <div className="flex items-center">
@@ -759,7 +847,7 @@ export default function AdminDashboardPage() {
           </Card>
 
           {/* Average Grade Card - Overview */}
-          <Card className="h-full p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none">
+          {/* <Card className="h-full p-3 sm:p-4 lg:p-6 bg-white border-none shadow-none">
             <div className="flex items-center">
               <div className={`w-8 h-8 sm:w-10 sm:h-10 lg:w-12 lg:h-12 rounded-lg flex items-center justify-center flex-shrink-0 transition-all duration-200 ${activeTab === "overview"
                 ? "bg-primary-500 shadow-lg shadow-primary-200/50"
@@ -777,7 +865,7 @@ export default function AdminDashboardPage() {
                 </p>
               </div>
             </div>
-          </Card>
+          </Card> */}
         </div>
 
         {/* Tabs */}
@@ -816,145 +904,156 @@ export default function AdminDashboardPage() {
         {/* Overview Tab */}
         {activeTab === "overview" && (
           <div className="space-y-6">
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Department Breakdown */}
-              <Card>
-                <Card.Header>
-                  <Card.Title>Department Distribution</Card.Title>
-                </Card.Header>
-                <Card.Content>
-                  {departments.length > 0 ? (
-                    <div className="space-y-4">
-                      {departments.slice(0, 5).map((dept) => (
-                        <div key={dept.id} className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
-                            <Building2 size={16} className="text-gray-400" />
-                            <span className="text-sm font-medium text-gray-900">
-                              {dept.name}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-4">
-                            <span className="text-xs text-gray-500">
-                              {dept.instructorCount}I / {dept.studentCount}S
-                            </span>
-                            <Badge variant="info" size="sm">
-                              {dept.courseCount} courses
-                            </Badge>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Building2 size={32} className="mx-auto text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-500">No departments yet</p>
-                    </div>
-                  )}
-                </Card.Content>
-              </Card>
-
-              {/* Recent Courses */}
-              <Card>
-                <Card.Header>
-                  <div className="flex items-center justify-between">
-                    <Card.Title>Recent Courses</Card.Title>
-                    <Link to="/courses">
-                      <Button variant="ghost" size="sm">View All</Button>
-                    </Link>
-                  </div>
-                </Card.Header>
-                <Card.Content>
-                  {courses.length > 0 ? (
-                    <div className="space-y-3">
-                      {courses.slice(0, 5).map((course) => (
-                        <div key={course.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg">
-                          <img
-                            src={course.thumbnail || FALLBACK_THUMB}
-                            alt={course.title}
-                            className="w-12 h-12 rounded object-cover"
-                            onError={(e) => (e.currentTarget.src = FALLBACK_THUMB)}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {course.title}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              {course.studentCount} students
-                            </p>
-                          </div>
-                          <Badge
-                            variant={course.status === 'published' ? 'success' : 'warning'}
-                            size="sm"
-                          >
-                            {course.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <BookOpen size={32} className="mx-auto text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-500">No courses available</p>
-                    </div>
-                  )}
-                </Card.Content>
-              </Card>
-
-              {/* Top Instructors */}
-              <Card>
-                <Card.Header>
-                  <Card.Title>Top Instructors</Card.Title>
-                </Card.Header>
-                <Card.Content>
-                  {instructors.length > 0 ? (
-                    <div className="space-y-3">
-                      {instructors
-                        .sort((a, b) => {
-                          const countA = instructorCourseIndex[a.id]?.count || 0;
-                          const countB = instructorCourseIndex[b.id]?.count || 0;
-                          return countB - countA;
-                        })
-                        .slice(0, 5)
-                        .map((instructor) => (
-                          <div key={instructor.id} className="flex items-center justify-between">
-                            <div className="flex items-center space-x-3">
-                              <img
-                                src={instructor.avatar}
-                                alt={instructor.fullName}
-                                className="w-10 h-10 rounded-full"
-                              />
-                              <div>
-                                <p className="text-sm font-medium text-gray-900">
-                                  {instructor.fullName}
-                                </p>
-                                <p className="text-xs text-gray-500">
-                                  {instructorCourseIndex[instructor.id]?.count || 0} courses
-                                </p>
+            {loadingStates.overview ? (
+              // Loading state - show spinner or skeleton
+              <div className="flex items-center justify-center min-h-[400px]">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                  <p className="text-gray-500">Loading overview...</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Department Breakdown */}
+                  <Card>
+                    <Card.Header>
+                      <Card.Title>Department Distribution</Card.Title>
+                    </Card.Header>
+                    <Card.Content>
+                      {departments.length > 0 ? (
+                        <div className="space-y-4">
+                          {departments.slice(0, 3).map((dept) => (
+                            <div key={dept.id} className="flex items-center justify-between">
+                              <div className="flex items-center space-x-3">
+                                <Building2 size={16} className="text-gray-400" />
+                                <span className="text-sm font-medium text-gray-900">
+                                  {dept.name}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-4">
+                                <span className="text-xs text-gray-500">
+                                  {dept.instructorCount}I / {dept.studentCount}S
+                                </span>
+                                <Badge variant="info" size="sm">
+                                  {dept.courseCount} courses
+                                </Badge>
                               </div>
                             </div>
-                            <Badge
-                              variant={instructor.isActive ? 'success' : 'danger'}
-                              size="sm"
-                            >
-                              {instructor.isActive ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </div>
-                        ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-8">
-                      <Users size={32} className="mx-auto text-gray-400 mb-2" />
-                      <p className="text-sm text-gray-500">No instructors yet</p>
-                    </div>
-                  )}
-                </Card.Content>
-              </Card>
-            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Building2 size={32} className="mx-auto text-gray-400 mb-2" />
+                          <p className="text-sm text-gray-500">No departments yet</p>
+                        </div>
+                      )}
+                    </Card.Content>
+                  </Card>
 
-            {/* Action Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            </div>
+                  {/* Recent Courses */}
+                  <Card>
+                    <Card.Header>
+                      <div className="flex items-center justify-between">
+                        <Card.Title>Recent Courses</Card.Title>
+                        <Link to="/courses">
+                          <Button variant="ghost" size="sm">View All</Button>
+                        </Link>
+                      </div>
+                    </Card.Header>
+                    <Card.Content>
+                      {courses.length > 0 ? (
+                        <div className="space-y-3">
+                          {courses.slice(0, 3).map((course) => (
+                            <div key={course.id} className="flex items-center space-x-3 p-2 hover:bg-gray-50 rounded-lg">
+                              <img
+                                src={course.thumbnail || FALLBACK_THUMB}
+                                alt={course.title}
+                                className="w-12 h-12 rounded object-cover"
+                                onError={(e) => (e.currentTarget.src = FALLBACK_THUMB)}
+                              />
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {course.title}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {course.studentCount} students
+                                </p>
+                              </div>
+                              <Badge
+                                variant={course.status === 'published' ? 'success' : 'warning'}
+                                size="sm"
+                              >
+                                {course.status}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <BookOpen size={32} className="mx-auto text-gray-400 mb-2" />
+                          <p className="text-sm text-gray-500">No courses available</p>
+                        </div>
+                      )}
+                    </Card.Content>
+                  </Card>
+
+                  {/* Top Instructors */}
+                  <Card>
+                    <Card.Header>
+                      <Card.Title>Top Instructors</Card.Title>
+                    </Card.Header>
+                    <Card.Content>
+                      {instructors.length > 0 ? (
+                        <div className="space-y-3">
+                          {instructors
+                            .sort((a, b) => {
+                              const countA = instructorCourseIndex[a.id]?.count || 0;
+                              const countB = instructorCourseIndex[b.id]?.count || 0;
+                              return countB - countA;
+                            })
+                            .slice(0, 3)
+                            .map((instructor) => (
+                              <div key={instructor.id} className="flex items-center justify-between">
+                                <div className="flex items-center space-x-3">
+                                  <img
+                                    src={instructor.avatar}
+                                    alt={instructor.fullName}
+                                    className="w-10 h-10 rounded-full"
+                                  />
+                                  <div>
+                                    <p className="text-sm font-medium text-gray-900">
+                                      {instructor.fullName}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {instructorCourseIndex[instructor.id]?.count || 0} courses
+                                    </p>
+                                  </div>
+                                </div>
+                                <Badge
+                                  variant={instructor.isActive ? 'success' : 'danger'}
+                                  size="sm"
+                                >
+                                  {instructor.isActive ? 'Active' : 'Inactive'}
+                                </Badge>
+                              </div>
+                            ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8">
+                          <Users size={32} className="mx-auto text-gray-400 mb-2" />
+                          <p className="text-sm text-gray-500">No instructors yet</p>
+                        </div>
+                      )}
+                    </Card.Content>
+                  </Card>
+                </div>
+
+                {/* Action Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                </div>
+              </>
+            )}
           </div>
         )}
 
@@ -1517,19 +1616,18 @@ export default function AdminDashboardPage() {
         )}
 
       </div>
-
-      <AssignCourseModal
-        course={selectedCourseForAssign}
-        role={user.role}
-        collegeId={user.collegeId}
-        isOpen={showAssignCourseModal}
-        onClose={() => setShowAssignCourseModal(false)}
-        onSuccess={() => {
-          setShowAssignCourseModal(false);
-          // Optionally refresh or update courses/assignments
-        }}
-      />
-
+      {showAssignCourseModal && (
+        <AssignCourseModal
+          course={selectedCourseForAssign}
+          role={user.role}
+          collegeId={user.collegeId}
+          isOpen={showAssignCourseModal}
+          onClose={() => setShowAssignCourseModal(false)}
+          onSuccess={() => {
+            setShowAssignCourseModal(false);
+            // Optionally refresh or update courses/assignments
+          }}
+        />)}
 
       {/* User Modal */}
       <Modal

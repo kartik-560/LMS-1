@@ -45,7 +45,7 @@ const InstructorDashboardPage = () => {
   const [showCourseModal, setShowCourseModal] = useState(false);
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
-
+  const navigate = useNavigate();
   // NEW: chapters for selected course
   const [selectedCourseChapters, setSelectedCourseChapters] = useState([]);
   const [loadingChapters, setLoadingChapters] = useState(false);
@@ -163,7 +163,10 @@ const InstructorDashboardPage = () => {
 
 
       // 3) Enrollments (gives you real students + progress)
-      const enrollmentLists = await batchFetchEnrollments(normalized);
+      const enrollmentLists = await batchFetchEnrollments(
+        normalized,
+        user?.departmentId  // ✅ Add this parameter
+      );
 
 
       const studentMap = new Map();
@@ -175,7 +178,7 @@ const InstructorDashboardPage = () => {
         const courseIdStr = String(course.id);
 
         for (const e of enrollments) {
-          // IMPORTANT: use real user/student id (matches AssessmentAttempt.studentId)
+
           const sid =
             e.student?.id ||
             e.user?.id ||
@@ -236,6 +239,8 @@ const InstructorDashboardPage = () => {
       setStudentProgress(progressByStudent);
 
 
+      const studentsFromEnrollments = Array.from(studentMap.values());
+      setMyStudents(studentsFromEnrollments);
 
       // 4) Instructor enrollment requests
       const instrReqs = await fetchInstructorRequests(normalized);
@@ -300,13 +305,16 @@ const InstructorDashboardPage = () => {
     return results;
   };
 
-  const batchFetchEnrollments = async (courses) => {
+  const batchFetchEnrollments = async (courses, departmentId) => {
     const results = new Array(courses.length);
     for (let i = 0; i < courses.length; i += 5) {
       const batch = courses.slice(i, i + 5);
       const batchPromises = batch.map((course, idx) =>
         enrollmentsAPI
-          .list({ courseId: course.id })
+          .list({
+            courseId: course.id,
+            ...(departmentId && { departmentId }) // ✅ Include only if departmentId exists
+          })
           .then((res) => {
             results[i + idx] = Array.isArray(res) ? res : res?.data ?? res ?? [];
           })
@@ -370,18 +378,21 @@ const InstructorDashboardPage = () => {
     try {
       switch (action) {
         case "view": {
-          const course = assignedCourses.find((c) => String(c.id) === String(courseId));
-          await viewCourseDetails(course);
+          navigate(`/courses/${courseId}`);
           break;
         }
         case "analytics":
           setSelectedCourse(assignedCourses.find((c) => String(c.id) === String(courseId)));
           setShowAnalyticsModal(true);
           break;
-        case "students":
-          setSelectedCourse(assignedCourses.find((c) => String(c.id) === String(courseId)));
+        case "students": {
+          const course = assignedCourses.find(
+            (c) => String(c.id) === String(courseId)
+          );
+          setSelectedCourse(course);        // ✅ sets context
           setShowStudentModal(true);
           break;
+        }
         default:
           break;
       }
@@ -496,6 +507,22 @@ const InstructorDashboardPage = () => {
     }
     fetchStudents();
   }, []);
+
+  const baseStudentsForModal = selectedCourse
+    ? myStudents.filter((student) =>
+      (student.assignedCourses || []).includes(String(selectedCourse.id))
+    )
+    : students;
+
+  const filteredStudentsForModal = baseStudentsForModal.filter((student) => {
+    const name = (student?.fullName || student?.name || "").toLowerCase();
+    return name.includes(studentSearchTerm.toLowerCase());
+  });
+
+  const openAllStudentsModal = () => {
+    setSelectedCourse(null);
+    setShowStudentModal(true);
+  };
 
   if (loading) {
     return (
@@ -794,7 +821,7 @@ const InstructorDashboardPage = () => {
                   Enrolled Student
                 </Card.Title>
                 <div className="flex items-center gap-2">
-                  <Button size="sm" variant="outline" onClick={() => setShowStudentModal(true)}>
+                  <Button size="sm" variant="outline" onClick={openAllStudentsModal}>
                     View All
                   </Button>
 
@@ -828,189 +855,150 @@ const InstructorDashboardPage = () => {
                 )}
               </Card.Content>
             </Card>
-
-            {/* Recent Test Results */}
-            {/* <Card>
-              <Card.Header>
-                <Card.Title className="flex items-center">
-                  <FileText size={20} className="mr-2 text-orange-500" />
-                  Recent Test Results
-                </Card.Title>
-              </Card.Header>
-              <Card.Content>
-                {testResults.length === 0 ? (
-                  <p className="text-gray-500 text-center py-4">No test results yet</p>
-                ) : (
-                  <div className="space-y-3">
-                    {testResults.slice(0, 5).map((result) => {
-                      const student = myStudents.find((s) => String(s.id) === String(result.studentId));
-                      const course = assignedCourses.find((c) => String(c.id) === String(result.courseId));
-                      return (
-                        <div key={result.id} className="p-3 bg-gray-50 rounded-lg">
-                          <div className="flex items-center justify-between mb-1">
-                            <h4 className="text-sm font-medium text-gray-900">{student?.name}</h4>
-                            <Badge variant={result.passed ? "success" : "danger"} size="sm">
-                              {result.score}%
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-gray-600">{course?.title}</p>
-                          <p className="text-xs text-gray-500">
-                            {result.testType === "module" ? "Module Test" : "Course Test"} •{" "}
-                            {new Date(result.submittedAt).toLocaleDateString()}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </Card.Content>
-            </Card> */}
           </div>
         </div>
       </div>
 
       {/* Course Details Modal */}
-      <Modal isOpen={showCourseModal} onClose={() => setShowCourseModal(false)} title={selectedCourse?.title} size="lg">
-        {selectedCourse && (
-          <div className="space-y-6">
-            <div className="flex items-center space-x-4">
-              <img src={selectedCourse.thumbnail || FALLBACK_THUMB} alt={selectedCourse.title} className="w-20 h-20 rounded-lg object-cover" />
+      {/* <Modal isOpen={showCourseModal} onClose={() => setShowCourseModal(false)} title={selectedCourse?.title} size="lg">
+          {selectedCourse && (
+            <div className="space-y-6">
+              <div className="flex items-center space-x-4">
+                <img src={selectedCourse.thumbnail || FALLBACK_THUMB} alt={selectedCourse.title} className="w-20 h-20 rounded-lg object-cover" />
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">{selectedCourse.title}</h3>
+                  <p className="text-gray-600">{selectedCourse.description}</p>
+                  <div className="flex items-center space-x-2 mt-2">
+                    <Badge variant="info">{selectedCourse.level || "—"}</Badge>
+                    <Badge variant="default">{selectedCourse.category || "—"}</Badge>
+                    <Badge variant={(selectedCourse.status || "draft") === "published" ? "success" : "warning"}>
+                      {selectedCourse.status || "draft"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+                
+                <div className="p-3 bg-green-50 rounded-lg">
+                  <div className="text-xl font-bold text-green-600">{selectedCourse.totalChapters ?? (courseModules[selectedCourse.id] || []).length}</div>
+                  <div className="text-sm text-green-800">Chapters</div>
+                </div>
+                <div className="p-3 bg-purple-50 rounded-lg">
+                  <div className="text-xl font-bold text-purple-600">{myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length}</div>
+                  <div className="text-sm text-purple-800">Students</div>
+                </div>
+                <div className="p-3 bg-yellow-50 rounded-lg">
+                  <div className="text-xl font-bold text-yellow-600">
+                    {Math.round(
+                      myStudents
+                        .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
+                        .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
+                      Math.max(
+                        1,
+                        myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                      )
+                    )}
+                    %
+                  </div>
+                  <div className="text-sm text-yellow-800">Avg. Progress</div>
+                </div>
+              </div>
+
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">{selectedCourse.title}</h3>
-                <p className="text-gray-600">{selectedCourse.description}</p>
-                <div className="flex items-center space-x-2 mt-2">
-                  <Badge variant="info">{selectedCourse.level || "—"}</Badge>
-                  <Badge variant="default">{selectedCourse.category || "—"}</Badge>
-                  <Badge variant={(selectedCourse.status || "draft") === "published" ? "success" : "warning"}>
-                    {selectedCourse.status || "draft"}
-                  </Badge>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span className="text-gray-600">Average Student Progress</span>
+                  <span className="font-medium text-gray-900">
+                    {Math.round(
+                      myStudents
+                        .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
+                        .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
+                      Math.max(
+                        1,
+                        myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                      )
+                    )}
+                    %
+                  </span>
                 </div>
+                <Progress
+                  value={
+                    myStudents.length === 0
+                      ? 0
+                      : myStudents
+                        .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
+                        .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
+                      Math.max(
+                        1,
+                        myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                      )
+                  }
+                />
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <div className="text-xl font-bold text-blue-600">{(courseModules[selectedCourse.id] || []).length}</div>
-                <div className="text-sm text-blue-800">Modules</div>
-              </div>
-              <div className="p-3 bg-green-50 rounded-lg">
-                <div className="text-xl font-bold text-green-600">{selectedCourse.totalChapters ?? (courseModules[selectedCourse.id] || []).length}</div>
-                <div className="text-sm text-green-800">Chapters</div>
-              </div>
-              <div className="p-3 bg-purple-50 rounded-lg">
-                <div className="text-xl font-bold text-purple-600">{myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length}</div>
-                <div className="text-sm text-purple-800">Students</div>
-              </div>
-              <div className="p-3 bg-yellow-50 rounded-lg">
-                <div className="text-xl font-bold text-yellow-600">
-                  {Math.round(
-                    myStudents
-                      .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
-                      .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
-                    Math.max(
-                      1,
-                      myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
-                    )
-                  )}
-                  %
-                </div>
-                <div className="text-sm text-yellow-800">Avg. Progress</div>
-              </div>
-            </div>
+              <div>
+                <h4 className="font-medium text-gray-900 mb-3">Course Modules & Chapters</h4>
 
-            <div>
-              <div className="flex items-center justify-between text-sm mb-1">
-                <span className="text-gray-600">Average Student Progress</span>
-                <span className="font-medium text-gray-900">
-                  {Math.round(
-                    myStudents
-                      .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
-                      .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
-                    Math.max(
-                      1,
-                      myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
-                    )
-                  )}
-                  %
-                </span>
-              </div>
-              <Progress
-                value={
-                  myStudents.length === 0
-                    ? 0
-                    : myStudents
-                      .filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id)))
-                      .reduce((sum, s) => sum + getStudentCourseProgress(s.id, selectedCourse.id), 0) /
-                    Math.max(
-                      1,
-                      myStudents.filter((s) => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
-                    )
-                }
-              />
-            </div>
-
-            <div>
-              <h4 className="font-medium text-gray-900 mb-3">Course Modules & Chapters</h4>
-
-              {/* Chapters list (with content) */}
-              {loadingChapters ? (
-                <div className="text-center py-6 text-gray-600">Loading chapters…</div>
-              ) : selectedCourseChapters.length === 0 ? (
-                <div className="text-sm text-gray-500">No chapters available for this course.</div>
-              ) : (
-                <div className="space-y-3">
-                  {selectedCourseChapters.map((chapter, idx) => {
-                    const isOpen = openChapterId === chapter.id;
-                    // Try to find safe text content fields
-                    const htmlContent = chapter.contentHtml ?? chapter.html ?? chapter.bodyHtml;
-                    const textContent = chapter.content ?? chapter.text ?? chapter.body ?? chapter.description ?? "";
-                    return (
-                      <div key={chapter.id || `${selectedCourse.id}-ch-${idx}`} className="border border-gray-200 rounded-lg overflow-hidden">
-                        <button
-                          type="button"
-                          onClick={() => setOpenChapterId(isOpen ? null : chapter.id)}
-                          className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100"
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-medium text-primary-600">{idx + 1}</span>
+              
+                {loadingChapters ? (
+                  <div className="text-center py-6 text-gray-600">Loading chapters…</div>
+                ) : selectedCourseChapters.length === 0 ? (
+                  <div className="text-sm text-gray-500">No chapters available for this course.</div>
+                ) : (
+                  <div className="space-y-3">
+                    {selectedCourseChapters.map((chapter, idx) => {
+                      const isOpen = openChapterId === chapter.id;
+                
+                      const htmlContent = chapter.contentHtml ?? chapter.html ?? chapter.bodyHtml;
+                      const textContent = chapter.content ?? chapter.text ?? chapter.body ?? chapter.description ?? "";
+                      return (
+                        <div key={chapter.id || `${selectedCourse.id}-ch-${idx}`} className="border border-gray-200 rounded-lg overflow-hidden">
+                          <button
+                            type="button"
+                            onClick={() => setOpenChapterId(isOpen ? null : chapter.id)}
+                            className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100"
+                          >
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
+                                <span className="text-sm font-medium text-primary-600">{idx + 1}</span>
+                              </div>
+                              <div className="text-left">
+                                <div className="text-sm font-medium text-gray-900">{chapter.title || `Chapter ${idx + 1}`}</div>
+                                <div className="text-xs text-gray-500">{chapter.estimatedDuration || "—"}</div>
+                              </div>
                             </div>
-                            <div className="text-left">
-                              <div className="text-sm font-medium text-gray-900">{chapter.title || `Chapter ${idx + 1}`}</div>
-                              <div className="text-xs text-gray-500">{chapter.estimatedDuration || "—"}</div>
+                            <div className="text-xs text-gray-500">{isOpen ? "Hide" : "View"}</div>
+                          </button>
+
+                          {isOpen && (
+                            <div className="p-4 bg-white text-sm text-gray-800">
+                              {htmlContent ? (
+                                <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
+                              ) : textContent ? (
+                                <pre className="whitespace-pre-wrap break-words">{textContent}</pre>
+                              ) : (
+                                <div className="text-xs text-gray-500">No content for this chapter.</div>
+                              )}
                             </div>
-                          </div>
-                          <div className="text-xs text-gray-500">{isOpen ? "Hide" : "View"}</div>
-                        </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
 
-                        {isOpen && (
-                          <div className="p-4 bg-white text-sm text-gray-800">
-                            {htmlContent ? (
-                              // We render HTML if present. Ensure your backend provides only safe HTML.
-                              <div dangerouslySetInnerHTML={{ __html: htmlContent }} />
-                            ) : textContent ? (
-                              <pre className="whitespace-pre-wrap break-words">{textContent}</pre>
-                            ) : (
-                              <div className="text-xs text-gray-500">No content for this chapter.</div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="flex space-x-3">
+              </div>
             </div>
+          )}
+        </Modal> */}
 
-            <div className="flex space-x-3">
-              {/* analytics button could live here */}
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* Student Management Modal */}
-      <Modal isOpen={showStudentModal} onClose={() => setShowStudentModal(false)} title="Enrolled Students" size="xl">
+      <Modal isOpen={showStudentModal} onClose={() => setShowStudentModal(false)} title={
+        selectedCourse
+          ? `Enrolled – ${selectedCourse.title}`
+          : "All Enrolled Students"
+      } size="xl">
         <div className="space-y-4">
           <div className="flex items-center space-x-4">
             <div className="flex-1">
@@ -1024,12 +1012,12 @@ const InstructorDashboardPage = () => {
           </div>
 
           <div className="space-y-3 max-h-96 overflow-y-auto">
-            {filteredStudents.length === 0 ? (
+            {filteredStudentsForModal.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 No students found
               </div>
             ) : (
-              filteredStudents.map((student) => (
+              filteredStudentsForModal.map((student) => (
                 <div key={student.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">

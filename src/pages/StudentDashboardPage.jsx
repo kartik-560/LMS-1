@@ -19,7 +19,8 @@ import {
   coursesAPI,
   chaptersAPI,
   FALLBACK_THUMB,
-  assessmentsAPI
+  assessmentsAPI,
+  enrollmentsAPI
 } from "../services/api";
 import useAuthStore from "../store/useAuthStore";
 import Progress from "../components/ui/Progress";
@@ -89,6 +90,7 @@ const StudentDashboardPage = () => {
         resetState();
         return () => abort.abort();
       }
+
       if (!role.includes("STUDENT")) {
         toast.error(
           "This page is for students. Please log in with a student account."
@@ -125,10 +127,8 @@ const StudentDashboardPage = () => {
       }
 
       const normalizeCourse = (c) => {
-        // ✅ Log to debug
 
 
-        // ✅ If it's an enrollment object with nested course
         if (c.course && typeof c.course === 'object') {
 
           return {
@@ -150,7 +150,7 @@ const StudentDashboardPage = () => {
       };
 
 
-      myCourses = myCourses.map(normalizeCourse); 
+      myCourses = myCourses.map(normalizeCourse);
 
       if (!Array.isArray(myCourses) || myCourses.length === 0) {
         resetState();
@@ -178,7 +178,7 @@ const StudentDashboardPage = () => {
       }
 
       // Fetch all necessary data in parallel
-      const [chaptersList, completedChaptersList, summaries, certificatesData] = await Promise.all([
+      const [chaptersList, completedChaptersList, summaries, certificatesData, assessmentAttempts] = await Promise.all([
         // 1. Get total chapters for each displayed course
         Promise.all(
           myCourses.map((c) =>
@@ -239,7 +239,7 @@ const StudentDashboardPage = () => {
 
               if (certificate && (certificate.certificateId || certificate.id)) {
 
-                return { courseId, certificate };
+                return { courseId, certificate, finalTest };
               }
 
               return null;
@@ -248,15 +248,58 @@ const StudentDashboardPage = () => {
             }
           })
         ),
+
+        Promise.all(
+          myCourses.map(async (c) => {
+            try {
+              const courseId = c.courseId ?? c.id;
+
+              // Get all assessments for this course
+              const assessmentsResp = await assessmentsAPI
+                .listByCourse(courseId)
+                .catch(() => null);
+
+              const assessments = assessmentsResp?.data ?? assessmentsResp ?? [];
+
+              if (!Array.isArray(assessments) || assessments.length === 0) {
+                return [];
+              }
+
+              // Get attempts for each assessment
+              const attemptsPromises = assessments.map(async (assessment) => {
+                try {
+                  const attemptsResp = await assessmentsAPI
+                    .getAttempts(assessment.id)
+                    .catch(() => null);
+
+                  const attempts = attemptsResp?.data ?? attemptsResp ?? [];
+                  return Array.isArray(attempts) ? attempts : [];
+                } catch {
+                  return [];
+                }
+              });
+
+              const allAttempts = await Promise.all(attemptsPromises);
+              return allAttempts.flat();
+            } catch (err) {
+              console.warn(`Failed to fetch assessment attempts for course ${c.id}:`, err);
+              return [];
+            }
+          })
+        ),
+
       ]);
 
       const validCertificates = certificatesData.filter(c => c !== null);
       const totalCertsEarned = validCertificates.length;
 
       const certificateMap = new Map();
+      const finalTestMap = new Map();
       validCertificates.forEach(({ courseId, certificate }) => {
         certificateMap.set(courseId, certificate);
       });
+
+
 
       const nextProgressData = {};
       const nextAiStatusData = {};
@@ -265,7 +308,7 @@ const StudentDashboardPage = () => {
       let totalChaptersDone = 0;
       let weightedScoreSum = 0;
       let totalTestsTaken = 0;
-      let totalTimeSpentMinutes = 0;
+
 
       myCourses.forEach((course, i) => {
         const totalCourseChapters = chaptersList[i] || [];
@@ -294,9 +337,8 @@ const StudentDashboardPage = () => {
           (progressData.courseTestResult.passed ? 1 : 0) +
           (progressData.aiInterviewResult.completed ? 1 : 0);
 
-        const courseProgress = totalSteps > 0
-          ? Math.round((completedSteps / totalSteps) * 100)
-          : 0;
+        const courseProgress =
+          totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
 
         // Pre-calculate Next Action
         const allChaptersDone = done >= total;
@@ -313,41 +355,57 @@ const StudentDashboardPage = () => {
         nextCourseWithData.push({
           ...course,
           totalChapters: total,
-          courseProgress: courseProgress,
-          nextAction: nextAction,
-          hasCertificate: hasCertificate,
+          courseProgress,
+          nextAction,
+          hasCertificate,
         });
 
         nextProgressData[course.id] = progressData;
-        nextAiStatusData[course.id] = { completed: progressData.aiInterviewResult.completed };
+        nextAiStatusData[course.id] = {
+          completed: progressData.aiInterviewResult.completed,
+        };
         totalChaptersDone += done;
 
-        // Aggregate test scores from summary
+        // Use summary tests data for global average
         const taken = Number(sum.tests?.taken ?? 0);
         const avg = Number(sum.tests?.averagePercent ?? 0);
+
         weightedScoreSum += avg * taken;
         totalTestsTaken += taken;
-
-        // Aggregate time spent from course summary
-        const courseTimeSpent = Number(sum.timeSpent ?? 0);
-        totalTimeSpentMinutes += courseTimeSpent;
       });
+
+
+      const nextAvailableTests = [];
+
+      nextCourseWithData.forEach((course) => {
+        const test = finalTestMap.get(course.id);
+        const progress = nextProgressData[course.id];
+
+        // Consider it "available" if course test not passed yet and a final test exists
+        if (test && !progress.courseTestResult.passed) {
+          nextAvailableTests.push({
+            id: test.id,
+            title: test.title || "Final Test",
+            courseTitle: course.title,
+          });
+        }
+      });
+
 
       // Single state commit
       setAssignedCourses(nextCourseWithData);
       setCurrentProgress(nextProgressData);
       setAiInterviewStatus(nextAiStatusData);
       setCompletedTests([]);
-      setAvailableTests([]);
+      setAvailableTests(nextAvailableTests);
 
       setStats({
-        totalCourses: allEnrolledCourses.length, // Use all enrolled courses count
+        totalCourses: allEnrolledCourses.length,
         completedChapters: totalChaptersDone,
         averageTestScore: totalTestsTaken
           ? Math.round(weightedScoreSum / totalTestsTaken)
           : 0,
-        totalTimeSpent: totalTimeSpentMinutes,
-        certificatesEarned: totalCertsEarned, // Actual certificate count
+        certificatesEarned: totalCertsEarned,
       });
 
     } catch (error) {
@@ -443,7 +501,6 @@ const StudentDashboardPage = () => {
     setShowTestModal(true);
   };
 
-
   const formatTimeSpent = (minutes) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -533,7 +590,7 @@ const StudentDashboardPage = () => {
             </div>
           </Card>
 
-          <Card className="p-6">
+          {/* <Card className="p-6">
             <div className="flex items-center">
               <div className="w-10 sm:w-12 h-10 sm:h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
                 <Clock size={24} className="text-indigo-600" />
@@ -547,7 +604,7 @@ const StudentDashboardPage = () => {
                 </p>
               </div>
             </div>
-          </Card>
+          </Card> */}
 
           <Card className="p-6">
             <div className="flex items-center">
@@ -734,7 +791,7 @@ const StudentDashboardPage = () => {
           {/* Right Sidebar */}
           <div className="space-y-4 lg:space-y-6">
             {/* Available Tests */}
-            <Card>
+            {/* <Card>
               <Card.Header>
                 <Card.Title className="flex items-center">
                   <FileText size={20} className="mr-2 text-blue-500" />
@@ -763,51 +820,29 @@ const StudentDashboardPage = () => {
                     {availableTests.map((test) => (
                       <div
                         key={test.id}
-                        className="p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200"
+                        className="p-3 sm:p-4 bg-blue-50 rounded-lg border border-blue-200 flex items-center justify-between"
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-2 sm:space-y-0 mb-2">
-                          <div>
-                            <h4 className="text-sm sm:text-base font-medium text-gray-900">
-                              {test.title}
-                            </h4>
-                            <p className="text-xs text-gray-600">
-                              {test.courseTitle}
-                            </p>
-                            {test.moduleTitle && (
-                              <p className="text-xs text-gray-500">
-                                Section: {test.moduleTitle}
-                              </p>
-                            )}
-                          </div>
-                          <Badge
-                            variant="warning"
-                            size="sm"
-                            className="self-start"
-                          >
-                            test
-                          </Badge>
+                        <div>
+                          <h4 className="text-sm sm:text-base font-medium text-gray-900">
+                            {test.title}
+                          </h4>
+                          {test.courseTitle && (
+                            <p className="text-xs text-gray-600">{test.courseTitle}</p>
+                          )}
                         </div>
-                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
-                          <div className="text-xs text-gray-500 flex-1">
-                            {test.questions} questions • {test.duration} min •{" "}
-                            {test.passingScore}% to pass
-                          </div>
-                          <Button
-                            size="sm"
-                            onClick={() => startTest(test)}
-                            className="w-full sm:w-auto"
-                          >
-                            Start Test
-                          </Button>
-                        </div>
+                        <Button
+                          size="sm"
+                          onClick={() => startTest(test)}
+                          className="w-auto"
+                        >
+                          Start Test
+                        </Button>
                       </div>
                     ))}
                   </div>
                 )}
               </Card.Content>
-            </Card>
-
-
+            </Card> */}
           </div>
         </div>
       </div>

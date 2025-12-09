@@ -10,7 +10,8 @@ const Register = () => {
   const navigate = useNavigate();
   const [role, setRole] = useState("");
   const [userData, setUserData] = useState(null);
-
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   useEffect(() => {
     const storedData = localStorage.getItem("reg_data");
@@ -108,7 +109,7 @@ const Register = () => {
 
       // apiData IS { user, token }
       const apiData = resp?.data;
-     
+
 
       const user = apiData?.user;
       const token = apiData?.token;
@@ -199,7 +200,12 @@ const Register = () => {
           <label className="block text-sm font-medium mb-1">Mobile</label>
           <input
             type="text"
-            {...register("mobile", { required: "Mobile is required" })}
+            {...register("mobile", {
+              required: "Mobile is required",
+              maxLength: { value: 10, message: "Mobile number must be 10 digits" },
+              minLength: { value: 10, message: "Mobile number must be 10 digits" },
+              pattern: { value: /^[0-9]+$/, message: "Only numbers allowed" },
+            })}
             className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
           />
           {errors.mobile && (
@@ -209,11 +215,20 @@ const Register = () => {
 
         <div>
           <label className="block text-sm font-medium mb-1">Password</label>
-          <input
-            type="password"
-            {...register("password", { required: "Password is required" })}
-            className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              {...register("password", { required: "Password is required" })}
+              className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((p) => !p)}
+              className="absolute right-3 top-2 text-sm"
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
           {errors.password && (
             <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>
           )}
@@ -221,15 +236,24 @@ const Register = () => {
 
         <div>
           <label className="block text-sm font-medium mb-1">Confirm Password</label>
-          <input
-            type="password"
-            {...register("confirmPassword", {
-              required: "Confirm password is required",
-              validate: (value) =>
-                value === getValues("password") || "Passwords do not match",
-            })}
-            className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500"
-          />
+          <div className="relative">
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              {...register("confirmPassword", {
+                required: "Confirm password is required",
+                validate: (value) =>
+                  value === getValues("password") || "Passwords do not match",
+              })}
+              className="w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 pr-10"
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((p) => !p)}
+              className="absolute right-3 top-2 text-sm"
+            >
+              {showConfirmPassword ? "Hide" : "Show"}
+            </button>
+          </div>
           {errors.confirmPassword && (
             <p className="text-red-500 text-xs mt-1">
               {errors.confirmPassword.message}

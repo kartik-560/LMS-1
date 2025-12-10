@@ -92,6 +92,8 @@ export default function SuperAdminDashboardPage() {
   const [updatingCollegeId, setUpdatingCollegeId] = useState(null);
   const [updatingUserId, setUpdatingUserId] = useState(null);
   const [students, setStudents] = useState([]);
+  const [instructors, setInstructors] = useState([]);
+  const [admins, setAdmins] = useState([]);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -111,7 +113,15 @@ export default function SuperAdminDashboardPage() {
   const [deactivatedUsers, setDeactivatedUsers] = useState([]);
   const [selectedRole, setSelectedRole] = useState(null);
   const [loadingDeactivated, setLoadingDeactivated] = useState(false);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [bulkUpdating, setBulkUpdating] = useState(false);
 
+  const [selectedDeactivatedUsers, setSelectedDeactivatedUsers] = useState([]);
+  const [bulkActivating, setBulkActivating] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedStudents, setSelectedStudents] = useState([]);
+  const [selectedAdmins, setSelectedAdmins] = useState([]);
+  const [selectedInstructors, setSelectedInstructors] = useState([]);
 
 
   const asArray = (p) => {
@@ -227,7 +237,6 @@ export default function SuperAdminDashboardPage() {
 
   async function saveLimits() {
     try {
-      console.log('Saving limits:', permLimits);
       await collegesAPI.updateLimits(collegeDetailVM.college.id, permLimits);
       toast.success("Limits saved");
     } catch (e) {
@@ -399,8 +408,8 @@ export default function SuperAdminDashboardPage() {
   };
 
   // Fetch admins data
-  const fetchAdmins = async () => {
-    if (loadedTabs.has("admins")) return; // Already loaded
+  const fetchAdmins = async (force = false) => {
+    if (!force && loadedTabs.has("admins")) return; // Already loaded
 
     try {
       setLoadingUsers(true);
@@ -436,8 +445,8 @@ export default function SuperAdminDashboardPage() {
   };
 
   // Fetch instructors data
-  const fetchInstructors = async () => {
-    if (loadedTabs.has("instructors")) return; // Already loaded
+  const fetchInstructors = async (force = false) => {
+    if (!force && loadedTabs.has("instructors")) return; // Already loaded
 
     try {
       setLoadingUsers(true);
@@ -475,17 +484,15 @@ export default function SuperAdminDashboardPage() {
   };
 
   // Fetch students data
-  const fetchStudents = async () => {
-    if (loadedTabs.has("students")) return;
+  const fetchStudents = async (force = false) => {
+    if (!force && loadedTabs.has("students")) return;
+    // if (loadedTabs.has("students")) return;
 
     try {
       setLoadingUsers(true);
       const studentsRaw = await superAdminAPI.getStudents();
       const students = asArray(studentsRaw);
       const normalizedStudents = normalizeUsers(students);
-
-      console.log("Normalized students before mapping:", normalizedStudents);
-
 
       setAllStudents(
         normalizedStudents.map((s) => {
@@ -873,6 +880,29 @@ export default function SuperAdminDashboardPage() {
     return filtered;
   }, [allStudents, studentSearch, studentFilter, selectedFilterValue]);
 
+  const getFilteredAdmins = () => {
+    if (!searchQuery.trim()) return allAdmins; // use allAdmins, not admins
+    const query = searchQuery.toLowerCase();
+    return allAdmins.filter(
+      (a) =>
+        a.fullName?.toLowerCase().includes(query) ||
+        a.name?.toLowerCase().includes(query) ||
+        a.email?.toLowerCase().includes(query)
+    );
+  };
+
+  const getFilteredInstructors = () => {
+    if (!searchQuery.trim()) return instructors;
+    const query = searchQuery.toLowerCase();
+    return instructors.filter(
+      (i) =>
+        i.name?.toLowerCase().includes(query) ||
+        i.email?.toLowerCase().includes(query) ||
+        i.college?.toLowerCase().includes(query) ||
+        i.department?.toLowerCase().includes(query)
+    );
+  };
+
   const savePermissions = async () => {
     try {
       await superAdminAPI.updateUserPermissions(
@@ -976,8 +1006,7 @@ export default function SuperAdminDashboardPage() {
       await collegesAPI.updateCollegeStatus(college.id, { status: newStatus });
 
       toast.success(`College ${newStatus === 1 ? 'activated' : 'deactivated'} successfully`);
-      console.log('toggle', college.id, 'before:', college.status, 'currentStatus:', currentStatus, 'newStatus:', newStatus);
-
+      
     } catch (err) {
       setColleges(prev => prev.map(c => c.id === college.id ? { ...c, status: currentStatus } : c));
 
@@ -990,34 +1019,6 @@ export default function SuperAdminDashboardPage() {
       setUpdatingCollegeId(null);
     }
   };
-
-  // const toggleUserStatus = async ({
-  //   userId,
-  //   currentStatus,
-  //   setUpdatingUserId,
-  //   setUsers,
-  //   users
-  // }) => {
-  //   setUpdatingUserId(userId);
-  //   try {
-  //     await authAPI.setActiveStatus(userId, currentStatus !== "Active");
-  //     if (setUsers && users) {
-  //       // Optimistically update the user status in the corresponding list
-  //       setUsers(prev =>
-  //         prev.map(user =>
-  //           user.id === userId
-  //             ? { ...user, status: currentStatus !== "Active" ? "Active" : "Inactive" }
-  //             : user
-  //         )
-  //       );
-  //     }
-  //     // Or trigger a re-fetch here if needed
-  //   } catch (error) {
-  //     console.error(error);
-  //     // Optional: Show toast/error message here
-  //   }
-  //   setUpdatingUserId(null);
-  // };
 
   const toggleUserStatus = async ({
     userId,
@@ -1141,7 +1142,7 @@ export default function SuperAdminDashboardPage() {
     setSelectedRole(role);
 
     try {
-      let deactivatedRaw = [];  
+      let deactivatedRaw = [];
 
       switch (role) {
         case "admin":
@@ -1184,6 +1185,177 @@ export default function SuperAdminDashboardPage() {
       handleApiError(err, `Failed to load inactive ${role}s`);
     } finally {
       setLoadingDeactivated(false);
+    }
+  };
+
+  const handleStudentSelection = (id) => {
+    setSelectedStudents((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllStudents = (e) => {
+    const list = getFilteredStudents();
+    const ids = list.map((u) => u.id);
+    if (e.target.checked) {
+      setSelectedStudents(ids);
+    } else {
+      setSelectedStudents([]);
+    }
+  };
+
+  const allStudentsSelected = (() => {
+    const list = getFilteredStudents();
+    return (
+      list.length > 0 &&
+      list.every((u) => selectedStudents.includes(u.id))
+    );
+  })();
+
+  const handleAdminSelection = (id) => {
+    setSelectedAdmins((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllAdmins = (e) => {
+    const list = getFilteredAdmins();
+    const ids = list.map((u) => u.id);
+    if (e.target.checked) {
+      setSelectedAdmins(ids);
+    } else {
+      setSelectedAdmins([]);
+    }
+  };
+
+  // 4. Compute header checkbox state
+  const filteredAdminsList = getFilteredAdmins();
+  const allAdminsSelected =
+    filteredAdminsList.length > 0 &&
+    filteredAdminsList.every((u) => selectedAdmins.includes(u.id));
+
+  const handleInstructorSelection = (id) => {
+    setSelectedInstructors(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllInstructors = (e) => {
+    if (e.target.checked) {
+      setSelectedInstructors(allInstructors.map(i => i.id));
+    } else {
+      setSelectedInstructors([]);
+    }
+  };
+
+  const allInstructorsSelected =
+    allInstructors.length > 0 &&
+    allInstructors.every(i => selectedInstructors.includes(i.id));
+
+  const handleBulkDeactivate = async () => {
+    const ids =
+      activeTab === "students"
+        ? selectedStudents
+        : activeTab === "admins"
+          ? selectedAdmins
+          : selectedInstructors;
+
+    if (ids.length === 0) return;
+    if (!window.confirm(`Deactivate ${ids.length} user(s)?`)) return;
+
+    setBulkUpdating(true);
+
+    try {
+      await authAPI.setBulkActiveStatus(ids, false);
+      toast.success(`${ids.length} user(s) deactivated successfully`);
+
+      // Clear selections
+      if (activeTab === "students") setSelectedStudents([]);
+      else if (activeTab === "admins") setSelectedAdmins([]);
+      else setSelectedInstructors([]);
+
+      // Clear the cache for the active tab
+      setLoadedTabs(prev => {
+        const next = new Set(prev);
+        next.delete(activeTab);
+        return next;
+      });
+
+      // Trigger reload by calling fetch (tab effect will see loadedTabs change)
+      if (activeTab === "students") {
+        await fetchStudents(true);
+      } else if (activeTab === "instructors") {
+        await fetchInstructors(true);
+      } else if (activeTab === "admins") {
+        await fetchAdmins(true);
+      }
+    } catch (error) {
+      console.error('Bulk deactivate failed:', error);
+      handleApiError(error, "Failed to deactivate users");
+    } finally {
+      setBulkUpdating(false);
+    }
+  };
+
+  const handleDeactivatedUserSelection = (userId) => {
+    setSelectedDeactivatedUsers(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const handleSelectAllDeactivated = (e) => {
+    if (e.target.checked) {
+      setSelectedDeactivatedUsers(deactivatedUsers.map(user => user.id));
+    } else {
+      setSelectedDeactivatedUsers([]);
+    }
+  };
+
+  const handleBulkActivate = async () => {
+    if (selectedDeactivatedUsers.length === 0) return;
+
+    if (!window.confirm(`Activate ${selectedDeactivatedUsers.length} ${selectedRole}(s)?`)) return;
+
+    setBulkActivating(true);
+    const currentSelection = [...selectedDeactivatedUsers];
+    setSelectedDeactivatedUsers([]);
+
+    try {
+      // Single API call for bulk activation
+      await authAPI.setBulkActiveStatus(currentSelection, true);
+
+      toast.success(`${currentSelection.length} ${selectedRole}(s) activated successfully`);
+
+      // Reload current role's deactivated users
+      await fetchDeactivatedByRole(selectedRole);
+
+      // Clear the cache for the active tab of this role
+      if (selectedRole === "admin") {
+        setLoadedTabs(prev => {
+          const next = new Set(prev);
+          next.delete("admins");
+          return next;
+        });
+      } else if (selectedRole === "instructor") {
+        setLoadedTabs(prev => {
+          const next = new Set(prev);
+          next.delete("instructors");
+          return next;
+        });
+      } else if (selectedRole === "student") {
+        setLoadedTabs(prev => {
+          const next = new Set(prev);
+          next.delete("students");
+          return next;
+        });
+      }
+    } catch (error) {
+      console.error('Bulk activate failed:', error);
+      handleApiError(error, `Failed to activate ${selectedRole}s`);
+    } finally {
+      setBulkActivating(false);
     }
   };
 
@@ -2665,9 +2837,24 @@ export default function SuperAdminDashboardPage() {
               </div>
             ) : (
               <Card className="p-5 sm:p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">
-                  Student Directory
-                </h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Student Directory
+                  </h3>
+                  {selectedStudents.length > 0 && (
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-sm text-gray-600">{selectedStudents.length} selected</span>
+                      <button
+                        onClick={handleBulkDeactivate}
+                        disabled={bulkUpdating}
+                        className={`px-3 py-1 rounded-md text-sm ${bulkUpdating ? 'bg-gray-300 text-gray-500 cursor-not-allowed' : 'bg-red-600 text-white hover:bg-red-700'
+                          }`}
+                      >
+                        {bulkUpdating ? 'Deactivating...' : 'Deactivate Selected'}
+                      </button>
+                    </div>
+                  )}
+                </div>
 
                 <Card.Content>
                   {getFilteredStudents().length === 0 ? (
@@ -2684,7 +2871,13 @@ export default function SuperAdminDashboardPage() {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avatar</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              <input
+                                type="checkbox"
+                                checked={allStudentsSelected}
+                                onChange={handleSelectAllStudents}
+                              />
+                            </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">College</th>
@@ -2696,15 +2889,14 @@ export default function SuperAdminDashboardPage() {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                           {getFilteredStudents().map((student) => (
-                            <tr key={student.id} className="hover:bg-gray-50">
+                            <tr key={student.id} className={`hover:bg-gray-50 ${selectedUsers.includes(student.id) ? 'bg-blue-50 border-2 border-blue-200' : ''}`}>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-100">
-                                  <img
-                                    src={student.avatar}
-                                    alt={student.name || "Student Avatar"}
-                                    className="w-full h-full object-cover"
-                                  />
-                                </div>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedStudents.includes(student.id)}
+                                  onChange={() => handleStudentSelection(student.id)}
+                                />
+
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {student.name || "Unnamed"}
@@ -2789,10 +2981,19 @@ export default function SuperAdminDashboardPage() {
                   <div className="flex items-center justify-between">
                     <Card.Title>Admins List</Card.Title>
                     <Badge variant="info">{allAdmins.length} Total</Badge>
+                    {selectedAdmins.length > 0 && (
+                      <button
+                        onClick={handleBulkDeactivate}
+                        className="px-3 py-1 text-xs font-medium rounded-md bg-red-600 text-white hover:bg-red-700"
+                        disabled={bulkUpdating}
+                      >
+                        Deactivate {selectedAdmins.length} selected
+                      </button>
+                    )}
                   </div>
                 </Card.Header>
                 <Card.Content>
-                  {allAdmins.length === 0 ? (
+                  {getFilteredAdmins().length === 0 ? (
                     <div className="text-center py-8 text-gray-500">
                       <Shield size={48} className="mx-auto mb-4 opacity-50" />
                       <p>No admins found</p>
@@ -2802,7 +3003,14 @@ export default function SuperAdminDashboardPage() {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avatar</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                              <input
+                                type="checkbox"
+                                checked={allAdminsSelected}
+                                onChange={handleSelectAllAdmins}
+                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                              />
+                            </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">College</th>
@@ -2812,13 +3020,20 @@ export default function SuperAdminDashboardPage() {
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
-                          {allAdmins.map((admin) => (
-                            <tr key={admin.id} className="hover:bg-gray-50">
+                          {getFilteredAdmins().map((admin) => (
+                            <tr
+                              key={admin.id}
+                              className={`hover:bg-gray-50 ${selectedAdmins.includes(admin.id)
+                                ? "bg-blue-50 border-2 border-blue-200"
+                                : ""
+                                }`}
+                            >
                               <td className="px-6 py-4 whitespace-nowrap">
-                                <img
-                                  src={admin.avatar}
-                                  alt={admin.name}
-                                  className="h-10 w-10 rounded-full object-cover"
+                                <input
+                                  type="checkbox"
+                                  checked={selectedAdmins.includes(admin.id)}
+                                  onChange={() => handleAdminSelection(admin.id)}
+                                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
                                 />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -2905,6 +3120,15 @@ export default function SuperAdminDashboardPage() {
                     <Badge variant="success">
                       {allInstructors.length} Total
                     </Badge>
+                    {selectedInstructors.length > 0 && (
+                      <button
+                        onClick={handleBulkDeactivate}
+                        disabled={bulkUpdating}
+                        className="mt-2 px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                      >
+                        Deactivate {selectedInstructors.length} selected
+                      </button>
+                    )}
                   </div>
                 </Card.Header>
                 <Card.Content>
@@ -2918,7 +3142,14 @@ export default function SuperAdminDashboardPage() {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avatar</th>
+                            <th className="px-6 py-3 text-left">
+                              <input
+                                type="checkbox"
+                                checked={allInstructorsSelected}
+                                onChange={handleSelectAllInstructors}
+                                className="h-4 w-4"
+                              />
+                            </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">College</th>
@@ -2931,11 +3162,12 @@ export default function SuperAdminDashboardPage() {
                         <tbody className="bg-white divide-y divide-gray-200">
                           {allInstructors.map((instructor) => (
                             <tr key={instructor.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <img
-                                  src={instructor.avatar}
-                                  alt={instructor.name || "Instructor Avatar"}
-                                  className="h-10 w-10 rounded-full object-cover"
+                              <td className="px-6 py-4">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedInstructors.includes(instructor.id)}
+                                  onChange={() => handleInstructorSelection(instructor.id)}
+                                  className="h-4 w-4"
                                 />
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
@@ -3094,6 +3326,25 @@ export default function SuperAdminDashboardPage() {
                 </Card.Header>
 
                 <Card.Content>
+                  {/* Bulk Action Toolbar */}
+                  {selectedDeactivatedUsers.length > 0 && (
+                    <div className="flex items-center justify-between mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <span className="text-sm text-gray-700">
+                        {selectedDeactivatedUsers.length} selected
+                      </span>
+                      <button
+                        onClick={handleBulkActivate}
+                        disabled={bulkActivating}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${bulkActivating
+                          ? 'bg-green-300 text-green-700 cursor-not-allowed'
+                          : 'bg-green-600 text-white hover:bg-green-700'
+                          }`}
+                      >
+                        {bulkActivating ? 'Activating...' : 'Activate Selected'}
+                      </button>
+                    </div>
+                  )}
+
                   {/* Role selector cards */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                     {["student", "instructor", "admin"].map((role) => (
@@ -3124,7 +3375,15 @@ export default function SuperAdminDashboardPage() {
                       <table className="min-w-full divide-y divide-gray-200">
                         <thead className="bg-gray-50">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Avatar</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-12">
+                              <input
+                                type="checkbox"
+                                checked={selectedDeactivatedUsers.length === deactivatedUsers.length && deactivatedUsers.length > 0}
+                                onChange={handleSelectAllDeactivated}
+                                className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
+                              />
+                            </th>
+
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">College</th>
@@ -3135,14 +3394,16 @@ export default function SuperAdminDashboardPage() {
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                           {deactivatedUsers.map((user) => (
-                            <tr key={user.id} className="hover:bg-gray-50">
-                              <td className="px-6 py-4 whitespace-nowrap">
-                                <img
-                                  src={user.avatar}
-                                  alt={user.name || "User Avatar"}
-                                  className="h-10 w-10 rounded-full object-cover"
+                            <tr key={user.id} className={`hover:bg-gray-50 ${selectedDeactivatedUsers.includes(user.id) ? 'bg-blue-50 border-2 border-blue-200' : ''}`}>
+                              <td className="px-4 py-4 whitespace-nowrap">
+                                <input
+                                  type="checkbox"
+                                  checked={selectedDeactivatedUsers.includes(user.id)}
+                                  onChange={() => handleDeactivatedUserSelection(user.id)}
+                                  className="rounded border-gray-300 text-purple-600 focus:ring-purple-500 h-4 w-4"
                                 />
                               </td>
+
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                 {user.name || "N/A"}
                               </td>
@@ -3167,8 +3428,6 @@ export default function SuperAdminDashboardPage() {
                                       userId: user.id,
                                       currentStatus: user.status,
                                       setUpdatingUserId,
-                                      // decide where you want to reflect this: either local deactivatedUsers
-                                      // or the main list by role (e.g. setAllInstructors / setStudents / setAllAdmins)
                                       setUsers: setDeactivatedUsers,
                                       users: deactivatedUsers,
                                     })
@@ -3194,7 +3453,6 @@ export default function SuperAdminDashboardPage() {
               </Card>
             )}
           </TabsContent>
-
 
         </Tabs>
 

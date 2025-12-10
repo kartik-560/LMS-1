@@ -108,6 +108,12 @@ export const authAPI = {
     api
       .patch(`/auth/users/${userId}/active`, { isActive })
       .then((res) => res.data),
+
+  setBulkActiveStatus: (userIds, isActive) =>
+    api
+      .patch(`/auth/users/bulk/active`, { userIds, isActive })
+      .then((res) => res.data),
+
   logout: () => {
     useAuthStore.getState().logout();
     localStorage.removeItem("auth_token");
@@ -139,12 +145,12 @@ export const authAPI = {
     api.post("/auth/password/reset-with-token", payload).then((r) => r.data),
 
   removeUser: (userId, payload = {}) =>
-  api
-    .delete(`/auth/admin/users`, {
-      params: { userId },  
-      data: payload,       
-    })
-    .then((r) => r.data),
+    api
+      .delete(`/auth/admin/users`, {
+        params: { userId },
+        data: payload,
+      })
+      .then((r) => r.data),
 };
 
 export const superAdminAPI = {

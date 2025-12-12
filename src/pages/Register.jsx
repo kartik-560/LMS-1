@@ -200,9 +200,9 @@ const Register = () => {
           <label className="block text-sm font-medium mb-1">Mobile</label>
           <input
             type="text"
+            maxLength={10}
             {...register("mobile", {
               required: "Mobile is required",
-              maxLength: { value: 10, message: "Mobile number must be 10 digits" },
               minLength: { value: 10, message: "Mobile number must be 10 digits" },
               pattern: { value: /^[0-9]+$/, message: "Only numbers allowed" },
             })}

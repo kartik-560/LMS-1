@@ -46,15 +46,12 @@ const InstructorDashboardPage = () => {
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [showAnalyticsModal, setShowAnalyticsModal] = useState(false);
   const navigate = useNavigate();
-  // NEW: chapters for selected course
   const [selectedCourseChapters, setSelectedCourseChapters] = useState([]);
   const [loadingChapters, setLoadingChapters] = useState(false);
   const [openChapterId, setOpenChapterId] = useState(null);
-
+  const [studentViewMode, setStudentViewMode] = useState('course');
   const [studentSearchTerm, setStudentSearchTerm] = useState("");
   const [testScoresByStudent, setTestScoresByStudent] = useState({});
-
-  const [students, setStudents] = useState([]);
 
   const [loadingAction, setLoadingAction] = useState({
     id: null,
@@ -188,10 +185,8 @@ const InstructorDashboardPage = () => {
 
           if (!sid) continue;
 
-          const studentName =
-            e.fullName ?? e.name ?? e.student?.name ?? e.user?.name ?? "";
-          const studentEmail =
-            e.studentEmail ?? e.email ?? e.student?.email ?? e.user?.email ?? "";
+          const studentName = e.student?.fullName ?? e.fullName ?? e.name ?? e.student?.name ?? e.user?.name ?? "";
+          const studentEmail = e.student?.email ?? e.studentEmail ?? e.email ?? e.user?.email ?? "";
 
           const existing =
             studentMap.get(sid) || {
@@ -409,11 +404,12 @@ const InstructorDashboardPage = () => {
     return Math.max(0, Math.min(100, n));
   };
 
-  const filteredStudents = students.filter((student) => {
-    const studentName = (student?.fullName || student?.name || '').toLowerCase();
+  const filteredStudents = myStudents.filter((student) => {  // ✅ CORRECT
+    const studentName = (student?.fullName || student?.name || "").toLowerCase();
     const matchesSearch = studentName.includes(studentSearchTerm.toLowerCase());
     return matchesSearch;
   });
+
 
   useEffect(() => {
     const fetchScores = async () => {
@@ -496,23 +492,12 @@ const InstructorDashboardPage = () => {
     fetchScores();
   }, [courses, user, myStudents]);
 
-  useEffect(() => {
-    async function fetchStudents() {
-      try {
-        const response = await enrollmentsAPI.listInstructorDepartmentStudents();
-        setStudents(response.data || []);
-      } catch (error) {
-        console.error("Failed to load students", error);
-      }
-    }
-    fetchStudents();
-  }, []);
-
   const baseStudentsForModal = selectedCourse
     ? myStudents.filter((student) =>
       (student.assignedCourses || []).includes(String(selectedCourse.id))
     )
-    : students;
+    : myStudents;  // ✅ CORRECT
+
 
   const filteredStudentsForModal = baseStudentsForModal.filter((student) => {
     const name = (student?.fullName || student?.name || "").toLowerCase();
@@ -846,9 +831,9 @@ const InstructorDashboardPage = () => {
                             {student.fullName}
                           </p>
                         </div>
-                        <div className="text-xs sm:text-sm font-medium text-gray-400 flex-shrink-0">
+                        {/* <div className="text-xs sm:text-sm font-medium text-gray-400 flex-shrink-0">
                           View
-                        </div>
+                        </div> */}
                       </div>
                     ))}
                   </div>
@@ -994,44 +979,92 @@ const InstructorDashboardPage = () => {
           )}
         </Modal> */}
 
-      <Modal isOpen={showStudentModal} onClose={() => setShowStudentModal(false)} title={
-        selectedCourse
-          ? `Enrolled – ${selectedCourse.title}`
-          : "All Enrolled Students"
-      } size="xl">
+      <Modal
+        isOpen={showStudentModal}
+        onClose={() => setShowStudentModal(false)}
+        title={selectedCourse ? `${selectedCourse.title}` : "All Students"}
+        size="xl"
+      >
         <div className="space-y-4">
-          <div className="flex items-center space-x-4">
-            <div className="flex-1">
-              <Input
-                placeholder="Search students..."
-                value={studentSearchTerm}
-                onChange={(e) => setStudentSearchTerm(e.target.value)}
-                className="w-full"
-              />
+          {/* Toggle buttons */}
+          <div className="flex items-center justify-between">
+            <div className="flex gap-2 border border-gray-200 rounded-lg p-1">
+              <button
+                onClick={() => setStudentViewMode('course')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${studentViewMode === 'course'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                disabled={!selectedCourse}
+              >
+                Course Students ({selectedCourse ?
+                  myStudents.filter(s => (s.assignedCourses || []).includes(String(selectedCourse.id))).length
+                  : 0})
+              </button>
+              <button
+                onClick={() => setStudentViewMode('all')}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${studentViewMode === 'all'
+                  ? 'bg-blue-600 text-white'
+                  : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+              >
+                All Students ({myStudents.length})
+              </button>
             </div>
           </div>
 
-          <div className="space-y-3 max-h-96 overflow-y-auto">
-            {filteredStudentsForModal.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No students found
-              </div>
-            ) : (
-              filteredStudentsForModal.map((student) => (
-                <div key={student.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-xl">👨‍🎓</span>
-                    </div>
-                    <div>
-                      <h4 className="font-medium text-gray-900">{student.fullName}</h4>
+          {/* Search input */}
+          <Input
+            placeholder="Search students..."
+            value={studentSearchTerm}
+            onChange={(e) => setStudentSearchTerm(e.target.value)}
+            className="w-full"
+          />
 
+          {/* Student list with conditional filtering */}
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {(() => {
+              const baseStudents = studentViewMode === 'course' && selectedCourse
+                ? myStudents.filter(s => (s.assignedCourses || []).includes(String(selectedCourse.id)))
+                : myStudents;
+
+
+
+              const filtered = baseStudents.filter(s => {
+                console.log('Student properties:', Object.keys(s)); // Debug: See all property names
+                const name = (s.fullName || s.name || '').toLowerCase();
+                return name.includes(studentSearchTerm.toLowerCase());
+              });
+
+              console.log('Filtered students:', filtered);
+
+              return filtered.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  No students found
+                </div>
+              ) : (
+                filtered.map((student) => (
+                  <div key={student.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                        <span className="text-xl">👨‍🎓</span>
+                      </div>
+                      <div>
+                        <h4 className="font-medium text-gray-900">
+                          {student.fullName}
+                        </h4>
+                        <p className="text-xs text-gray-500">
+                          {student.email}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+
+              );
+            })()}
           </div>
+
         </div>
       </Modal>
 

@@ -21,6 +21,7 @@ function AddCollegePage() {
       studentLimit: 100,
       adminLimit: 5,
       instructorLimit: 5,
+      departmentLimit: 10,
     },
   });
 
@@ -36,6 +37,7 @@ function AddCollegePage() {
         email: data.email,
         adminLimit: parseInt(data.adminLimit, 10),
         instructorLimit: parseInt(data.instructorLimit, 10),
+        departmentLimit: parseInt(data.departmentLimit, 10),
       };
 
       await collegesAPI.createCollege(payload);
@@ -120,7 +122,7 @@ function AddCollegePage() {
               <Input
                 label="Mobile Number"
                 type="tel"
-                maxLength={10}   
+                maxLength={10}
                 error={errors.mobileNumber?.message}
                 {...register("mobileNumber", {
                   required: "Mobile number is required",
@@ -129,7 +131,7 @@ function AddCollegePage() {
                     message: "Invalid mobile number",
                   },
                   onChange: (e) => {
-               
+
                     e.target.value = e.target.value.replace(/\D/g, "");
                   },
                 })}
@@ -193,6 +195,21 @@ function AddCollegePage() {
                   max: {
                     value: 5,
                     message: "Instructor limit cannot exceed 5",
+                  },
+                })}
+              />
+              
+              <Input
+                label="Department Limit"
+                type="number"
+                max={10}
+                error={errors.departmentLimit?.message}
+                {...register("departmentLimit", {
+                  required: "Department limit is required",
+                  min: { value: 0, message: "Limit cannot be negative" },
+                  max: {
+                    value: 10,
+                    message: "Department limit cannot exceed 10",
                   },
                 })}
               />

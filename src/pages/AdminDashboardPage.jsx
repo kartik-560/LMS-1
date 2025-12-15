@@ -23,7 +23,8 @@ import toast from "react-hot-toast";
 import {
   adminScopedAPI,
   FALLBACK_THUMB,
-  collegesAPI, authAPI
+  collegesAPI, authAPI,
+  assessmentsAPI
 } from "../services/api";
 import useAuthStore from "../store/useAuthStore";
 
@@ -151,6 +152,7 @@ export default function AdminDashboardPage() {
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [canCreateCourses, setCanCreateCourses] = useState(false);
+  const [canCreateTests, setCanCreateFinalTest] = useState(false);
   const [overview, setOverview] = useState({
     courses: 0,
     students: 0,
@@ -165,12 +167,13 @@ export default function AdminDashboardPage() {
   const [loadingStats, setLoadingStats] = useState(false);
   const [loadedTabs, setLoadedTabs] = useState(new Set());
   const [departments, setDepartments] = useState([]);
-
+  const [finalTests, setFinalTests] = useState([]);
   const [loadingStates, setLoadingStates] = useState({
     overview: false,
     instructors: false,
     students: false,
     courses: false,
+    finaltests: false,
   });
   const [showAssignCourseModal, setShowAssignCourseModal] = useState(false);
   const [selectedCourseForAssign, setSelectedCourseForAssign] = useState(null);
@@ -218,6 +221,12 @@ export default function AdminDashboardPage() {
         const data = await adminScopedAPI.courses(collegeId);
         console.log("Course data :", data) // { data: [...] }
         return Array.isArray(data) ? { data } : { data: data?.data ?? [] };
+      },
+
+
+      finalTests: async () => {
+        const data = await assessmentsAPI.getAllFinalTests(collegeId);
+        return Array.isArray(data) ? data : (data?.data ?? []);
       },
     };
   }
@@ -269,7 +278,7 @@ export default function AdminDashboardPage() {
   }, [overview, instructors, students, courses]);
 
 
- useEffect(() => {
+  useEffect(() => {
     (async () => {
       try {
         setLoading(true);
@@ -285,7 +294,6 @@ export default function AdminDashboardPage() {
       }
     })();
   }, []);
-
 
 
   const handleTabChange = async (tabName) => {
@@ -392,6 +400,49 @@ export default function AdminDashboardPage() {
         setDepartments(normDepartments);
       }
 
+      if (tabName === "finaltests") {
+        // First, get all courses
+        const coursesData = await adminScopedAPI.courses();
+        const allCourses = coursesData?.data || [];
+
+        // Filter only admin-created courses (not assigned)
+        const adminCreatedCourses = allCourses.filter(c => !c.madeBySuperAdmin);
+
+        // Fetch final tests for each admin-created course
+        const finalTestsPromises = adminCreatedCourses.map(async (course) => {
+          try {
+            const testData = await assessmentsAPI.getFinalTestByCourse(course.id);
+            // If test exists for this course
+            if (testData) {
+              const totalSeconds = testData.timeLimitSeconds || 0;
+
+              const minutes = Math.floor(totalSeconds / 60);
+              const seconds = totalSeconds % 60;
+              return {
+                id: testData.id,
+                title: testData.title || "Untitled Test",
+                courseName: course.title,
+                courseId: course.id,
+                duration: `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`,
+                createdAt: testData.createdAt,
+                madeBySuperAdmin: false,
+              };
+            }
+            return null;
+          } catch (error) {
+            // Course might not have a final test yet
+            return null;
+          }
+        });
+
+        const finalTestsResults = await Promise.all(finalTestsPromises);
+        // Filter out null values (courses without final tests)
+        const normFinalTests = finalTestsResults.filter(test => test !== null);
+
+        setFinalTests(normFinalTests);
+      }
+
+
       setLoadedTabs(prev => new Set([...prev, tabName]));
     } catch (e) {
       console.error(`Error loading ${tabName}:`, e);
@@ -444,6 +495,17 @@ export default function AdminDashboardPage() {
       return matchesSearch && matchesFilter;
     });
   }, [courses, searchTerm, courseFilter]);
+
+  const filteredFinalTests = useMemo(() => {
+    const q = searchTerm.toLowerCase();
+    return finalTests.filter((test) => {
+      const matchesSearch =
+        test.title.toLowerCase().includes(q) ||
+        test.courseName.toLowerCase().includes(q);
+      return matchesSearch;
+    });
+  }, [finalTests, searchTerm]);
+
 
   // const handleUserAction = async (userId, action) => {
   //   try {
@@ -524,9 +586,11 @@ export default function AdminDashboardPage() {
         const adminPerms = me ? adminToggles[me.id] || {} : {};
 
         setCanCreateCourses(!!adminPerms.canCreateCourses);
+        setCanCreateFinalTest(!!adminPerms.canCreateTests);
       } catch (e) {
         console.error("Failed to fetch /auth/me", e);
         setCanCreateCourses(false);
+        setCanCreateFinalTest(false);
       }
     })();
   }, []);
@@ -547,7 +611,7 @@ export default function AdminDashboardPage() {
         const collegeId = user?.collegeId;
 
         // Fetch all APIs in parallel
-        const [insResponse, crResponse,deptResponse] = await Promise.all([
+        const [insResponse, crResponse, deptResponse] = await Promise.all([
           api.instructors(),
           api.courses(),
           collegeId ? collegesAPI.getDepartmentsForCollege(collegeId) : Promise.resolve(null)
@@ -878,6 +942,7 @@ export default function AdminDashboardPage() {
                 { id: "instructors", name: "Instructors", icon: Users },
                 { id: "students", name: "Students", icon: GraduationCap },
                 { id: "courses", name: "Courses", icon: BookOpen },
+                { id: "finaltests", name: "Final Tests", icon: Target },
 
               ].map((tab) => (
                 <button
@@ -1510,17 +1575,31 @@ export default function AdminDashboardPage() {
                             </Button>
                           </Link>
                           {!course.madeBySuperAdmin && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => goEdit(course)}
-                              className="w-full sm:w-auto"
-                            >
-                              <Edit size={16} className="mr-1" />
-                              Edit
-                            </Button>
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => goEdit(course)}
+                                className="w-full sm:w-auto"
+                              >
+                                <Edit size={16} className="mr-1" />
+                                Edit
+                              </Button>
 
+                              {canCreateTests && (
+                                <Button
+                                  variant="primary"
+                                  size="sm"
+                                  onClick={() => navigate(`/create_finaltest/${course.id}`)}
+                                  className="w-full sm:w-auto"
+                                >
+                                  <Target size={16} className="mr-1" />
+                                  Final Test
+                                </Button>
+                              )}
+                            </>
                           )}
+
 
                           <Button
                             variant="outline"
@@ -1614,6 +1693,115 @@ export default function AdminDashboardPage() {
             )}
           </div>
         )}
+
+        {activeTab === "finaltests" && (
+          <div>
+            {loadingStates[activeTab] ? (
+              <SimpleLoader />
+            ) : (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 mb-6">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-3 sm:space-y-0 sm:space-x-4">
+                    <div className="relative">
+                      <Search
+                        size={20}
+                        className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400"
+                      />
+                      <input
+                        type="text"
+                        placeholder="Search final tests..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full sm:w-auto pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {filteredFinalTests.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Target size={48} className="mx-auto text-gray-400 mb-4" />
+                    <p className="text-gray-500">No final tests created yet</p>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                              Test Title
+                            </th>
+                            <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                              Course Name
+                            </th>
+
+                            <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                              Duration (min)
+                            </th>
+                            <th className="px-6 py-3 text-center text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                              Created
+                            </th>
+                            <th className="px-6 py-3 text-right text-sm font-semibold text-gray-700 uppercase tracking-wider">
+                              Actions
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {filteredFinalTests.map((test) => (
+                            <tr key={test.id} className="hover:bg-gray-50">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center">
+                                  <Target size={16} className="text-primary-600 mr-2 flex-shrink-0" />
+                                  <span className="text-sm font-medium text-gray-900">
+                                    {test.title}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4">
+                                <span className="text-sm text-gray-700">
+                                  {test.courseName}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <span className="text-sm text-gray-900">
+                                  {test.duration}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                                {fmtDate(test.createdAt)}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <div className="flex items-center justify-end space-x-2">
+                                  <button
+                                    onClick={() => navigate(`/view_finaltest?assessmentId=${test.id}&courseId=${test.courseId}`)}
+                                    className="text-blue-600 hover:text-blue-900"
+                                    title="View"
+                                  >
+                                    <Eye size={16} />
+                                  </button>
+                                  <button
+                                    onClick={() => navigate(`/courses/${test.courseId}/final-test/edit/${test.id}`)}
+                                    className="text-green-600 hover:text-green-900"
+                                    title="Edit"
+                                  >
+                                    <Edit size={16} />
+                                  </button>
+
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
 
       </div>
       {showAssignCourseModal && (

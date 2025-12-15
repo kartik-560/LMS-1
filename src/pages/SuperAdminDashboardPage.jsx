@@ -139,6 +139,9 @@ export default function SuperAdminDashboardPage() {
   };
 
   async function fetchPermissions(collegeId) {
+    if (!collegeId) return;
+    if (isFetchingPermissions.current) return;
+    isFetchingPermissions.current = true;
     setPermLoading(true);
     try {
       const { data } = await collegesAPI.getPermissions(collegeId);
@@ -222,18 +225,25 @@ export default function SuperAdminDashboardPage() {
   }
 
   useEffect(() => {
-    if (!selectedCollegeId || collegeDetailTab !== "permissions") return;
+    const collegeId = selectedCollegeId || collegeDetailVM?.college?.id;
 
-    const id = collegeDetailVM?.college?.id;
-    if (id) {
-      fetchPermissions(id);
+    if (collegeDetailTab === "permissions" && collegeId) {
+      fetchPermissions(collegeId);
     }
+
+    // Cleanup: reset ref when unmounting or tab changes
+    return () => {
+      isFetchingPermissions.current = false;
+    };
   }, [collegeDetailTab, selectedCollegeId, collegeDetailVM?.college?.id]);
 
   useEffect(() => {
-    const vmAdmins = collegeDetailVM?.lists?.admins ?? [];
-    setPermAdmins(hydrateAdminPerms(permRaw, vmAdmins));
-  }, [collegeDetailVM?.lists?.admins, permRaw]);
+    if (permRaw.length > 0) {
+      const vmAdmins = collegeDetailVM?.lists?.admins ?? [];
+      setPermAdmins(hydrateAdminPerms(permRaw, vmAdmins));
+    }
+  }, [collegeDetailVM?.lists?.admins]);
+
 
   async function saveLimits() {
     try {
@@ -248,15 +258,24 @@ export default function SuperAdminDashboardPage() {
 
   async function saveAdminToggle(userId, patch) {
     try {
+      // Send only the changed permission field(s)
       await collegesAPI.updateAdminPermissions(
         collegeDetailVM.college.id,
         userId,
-        patch
+        patch // e.g., { canCreateCourses: true }
       );
+
+      // Update local state by merging with existing permissions
       setPermAdmins((prev) =>
         prev.map((a) =>
           a.id === userId
-            ? { ...a, permissions: { ...a.permissions, ...patch } }
+            ? {
+              ...a,
+              permissions: {
+                ...a.permissions, // Keep existing permissions
+                ...patch          // Update only the changed field
+              }
+            }
             : a
         )
       );
@@ -265,8 +284,16 @@ export default function SuperAdminDashboardPage() {
     } catch (e) {
       console.error("Error updating permission:", e);
       toast.error(e?.response?.data?.error || e.message || "Failed to update");
+
+      // Optionally refetch to ensure consistency
+      const collegeId = collegeDetailVM?.college?.id;
+      if (collegeId) {
+        fetchPermissions(collegeId);
+      }
     }
   }
+
+
 
   const isFetchingPermissions = useRef(false);
   const fetchCollegePermissions = async () => {
@@ -1006,7 +1033,7 @@ export default function SuperAdminDashboardPage() {
       await collegesAPI.updateCollegeStatus(college.id, { status: newStatus });
 
       toast.success(`College ${newStatus === 1 ? 'activated' : 'deactivated'} successfully`);
-      
+
     } catch (err) {
       setColleges(prev => prev.map(c => c.id === college.id ? { ...c, status: currentStatus } : c));
 

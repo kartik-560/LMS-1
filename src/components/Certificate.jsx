@@ -1,6 +1,6 @@
 import React, { forwardRef } from "react";
 import Badge from "../assets/badge.png";
-import Logo from "../assets/Logo.png";
+import Logo from "../assets/logo.png";
 import BackgroundImage from "../assets/certificate_BG.png"; // Add this background image to your assets
 import Signature from "../assets/Sign.png"; // Handwritten signature image
 const Certificate = forwardRef(

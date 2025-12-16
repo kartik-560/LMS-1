@@ -526,22 +526,38 @@ const CertificatePreviewPage = () => {
                             <h4 className="text-lg sm:text-xl font-semibold text-gray-900">
                                 Certificate preview
                             </h4>
+
                             <p className="text-sm sm:text-base text-gray-600">
                                 This is exactly how your certificate will appear when downloaded.
                             </p>
 
                             <div className="mt-4 bg-gray-100 rounded-xl border border-gray-200 overflow-hidden">
-                                <div className="w-full max-w-5xl mx-auto p-4">
-                                    <Certificate
-                                        studentName={displayData.studentName}
-                                        courseName={displayData.courseName}
-                                    />
+                                {/* Aspect-ratio wrapper */}
+                                <div
+                                    className="relative mx-auto"
+                                    style={{
+                                        width: "100%",
+                                        maxWidth: "1000px",
+                                        aspectRatio: "1200 / 850",
+                                    }}
+                                >
+                                    {/* Scaled certificate */}
+                                    <div
+                                        style={{
+                                            transform: "scale(0.83)",   // 🔥 preview scale
+                                            transformOrigin: "top left",
+                                            width: "1200px",
+                                            height: "850px",
+                                        }}
+                                    >
+                                        <Certificate
+                                            studentName={displayData.studentName}
+                                            courseName={displayData.courseName}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </section>
-
-
-
 
                     </div>
                 )}

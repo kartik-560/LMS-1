@@ -16,7 +16,8 @@ import {
   Edit,
   Plus,
   X,
-  Building2
+  Building2,
+  Trash2
 } from "lucide-react";
 import { AssignCourseModal } from "./AssignCourseModal";
 import toast from "react-hot-toast";
@@ -24,7 +25,8 @@ import {
   adminScopedAPI,
   FALLBACK_THUMB,
   collegesAPI, authAPI,
-  assessmentsAPI
+  assessmentsAPI,
+  coursesAPI
 } from "../services/api";
 import useAuthStore from "../store/useAuthStore";
 
@@ -153,6 +155,7 @@ export default function AdminDashboardPage() {
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [canCreateCourses, setCanCreateCourses] = useState(false);
   const [canCreateTests, setCanCreateFinalTest] = useState(false);
+  const [canManageTests, setCanManageTests] = useState(false);
   const [overview, setOverview] = useState({
     courses: 0,
     students: 0,
@@ -569,12 +572,6 @@ export default function AdminDashboardPage() {
     [navigate]
   );
 
-  const goToTab = (tab) => {
-    setActiveTab(tab);
-    // if you also use route segments, add:
-    // navigate(`/admin?tab=${tab}`);
-  };
-
   useEffect(() => {
     (async () => {
       try {
@@ -587,10 +584,12 @@ export default function AdminDashboardPage() {
 
         setCanCreateCourses(!!adminPerms.canCreateCourses);
         setCanCreateFinalTest(!!adminPerms.canCreateTests);
+        setCanManageTests(!!adminPerms.canManageTests);
       } catch (e) {
         console.error("Failed to fetch /auth/me", e);
         setCanCreateCourses(false);
         setCanCreateFinalTest(false);
+        setCanManageTests(false);
       }
     })();
   }, []);
@@ -682,6 +681,33 @@ export default function AdminDashboardPage() {
 
     fetchOverviewData();
   }, [activeTab]);
+
+
+  const handleDeleteCourse = async (course) => {
+    // Show confirmation dialog
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${course.title}"?\n\nThis action cannot be undone and will remove all course data, modules, and chapters.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // Call the API to delete the course
+      await coursesAPI.remove(course.id);
+
+      // Remove from local state
+      setCourses((prev) => prev.filter((c) => c.id !== course.id));
+
+      toast.success(`Course "${course.title}" deleted successfully`);
+    } catch (error) {
+      console.error('Failed to delete course:', error);
+      toast.error(
+        error?.response?.data?.error ||
+        error.message ||
+        'Failed to delete course. Please try again.'
+      );
+    }
+  };
 
 
   if (loading) {
@@ -1567,40 +1593,29 @@ export default function AdminDashboardPage() {
                           <span>{course.studentCount} students</span>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
-                          <Link to={`/courses/${course.id}`}>
-                            <Button size="sm" variant="outline">
+                        <div className="flex flex-wrap gap-2">
+                          {/* View Button - Always visible */}
+                          <Link to={`/courses/${course.id}`} className="flex-1 min-w-[80px]">
+                            <Button size="sm" variant="outline" className="w-full">
                               <Eye size={16} className="mr-1" />
                               View
                             </Button>
                           </Link>
-                          {!course.madeBySuperAdmin && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => goEdit(course)}
-                                className="w-full sm:w-auto"
-                              >
-                                <Edit size={16} className="mr-1" />
-                                Edit
-                              </Button>
 
-                              {canCreateTests && (
-                                <Button
-                                  variant="primary"
-                                  size="sm"
-                                  onClick={() => navigate(`/create_finaltest/${course.id}`)}
-                                  className="w-full sm:w-auto"
-                                >
-                                  <Target size={16} className="mr-1" />
-                                  Final Test
-                                </Button>
-                              )}
-                            </>
+                          {/* Edit Button - Only for created courses */}
+                          {!course.madeBySuperAdmin && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => goEdit(course)}
+                              className="flex-1 min-w-[80px]"
+                            >
+                              <Edit size={16} className="mr-1" />
+                              Edit
+                            </Button>
                           )}
 
-
+                          {/* Assign Button - Always visible */}
                           <Button
                             variant="outline"
                             size="sm"
@@ -1608,13 +1623,36 @@ export default function AdminDashboardPage() {
                               setSelectedCourseForAssign(course);
                               setShowAssignCourseModal(true);
                             }}
-                            className="w-full sm:w-auto"
+                            className="flex-1 min-w-[80px]"
                           >
                             <Plus size={16} className="mr-1" />
                             Assign
                           </Button>
-
+                          {!course.madeBySuperAdmin && canCreateTests && (
+                            <>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => navigate(`/create_finaltest/${course.id}`)}
+                                className="flex-1 min-w-[100px] bg-blue-600 hover:bg-blue-700"
+                              >
+                                <Target size={16} className="mr-1" />
+                                Final Test
+                              </Button>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={() => handleDeleteCourse(course)}
+                                className="flex-1 min-w-[100px] bg-red-600 hover:bg-red-700"
+                              >
+                                <Trash2 size={16} className="mr-1" />
+                                Delete Course
+                              </Button>
+                            </>
+                          )}
                         </div>
+
+
                       </Card.Content>
                     </Card>
                   ))}
@@ -1780,14 +1818,15 @@ export default function AdminDashboardPage() {
                                   >
                                     <Eye size={16} />
                                   </button>
-                                  <button
-                                    onClick={() => navigate(`/courses/${test.courseId}/final-test/edit/${test.id}`)}
-                                    className="text-green-600 hover:text-green-900"
-                                    title="Edit"
-                                  >
-                                    <Edit size={16} />
-                                  </button>
-
+                                  {canManageTests && (
+                                    <button
+                                      onClick={() => navigate(`/courses/${test.courseId}/final-test/edit/${test.id}`)}
+                                      className="text-green-600 hover:text-green-900"
+                                      title="Edit"
+                                    >
+                                      <Edit size={16} />
+                                    </button>
+                                  )}
                                 </div>
                               </td>
                             </tr>

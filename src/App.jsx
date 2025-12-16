@@ -19,15 +19,14 @@ import Terms from "./pages/TermsPage";
 import Privacy from "./pages/PrivacyPage";
 import Signup from "./pages/Signup";
 import AddcollegePage from "./pages/AddcollegePage";
-import CertificateTestPage from "./pages/CertificateTestPage";
-import Certificate from "./components/Certificate";
+// import CertificateTestPage from "./pages/CertificateTestPage";
+// import Certificate from "./components/Certificate";
 import CourseListPage from "./pages/CourseListPage";
 import CertificatePreviewPage from "./pages/CertificatePreviewPage";
 import ViewFinalTest from "./pages/ViewFinalTest";
 import AddDepartments from "./pages/AddDepartments";
 import DepartmentAnalyticsDashboard from "./pages/DepartmentAnalyticsDashboard";
 import EditFinalTest from "./pages/EditFinalTest";
-// import ChapterViewPage from "./pages/ChapterViewPage";
 
 const ROLE = {
   SUPERADMIN: "SUPERADMIN",
@@ -108,7 +107,7 @@ const App = () => {
         <Route path="/" element={<LandingPage />} />
 
 
-        <Route path="/test-certificate" element={<Certificate />} />
+        {/* <Route path="/test-certificate" element={<Certificate />} /> */}
         <Route
           path="/certificate/:assessmentId"
           element={

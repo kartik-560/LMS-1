@@ -1,177 +1,224 @@
-// src/components/Certificate.jsx
 import React, { forwardRef } from "react";
-import logo from "../assets/logo.png";
-import badge from "../assets/badge.png";
-
-const Certificate = forwardRef(({ studentName, courseName }, ref) => {
-  return (
-    <div
-      ref={ref}
-       style={{
-        width: "100%",
-        height: "100%",
-        maxWidth: "1123px",        // A4 landscape width at ~96 dpi[web:13]
-        aspectRatio: "297 / 210",  // A4 landscape
-        backgroundColor: "#fff",
-        fontFamily: "'Poppins', 'Segoe UI', sans-serif",
-        position: "relative",
-        overflow: "hidden",
-        boxSizing: "border-box",
-        padding: 0,
-        margin: "0 auto",
-      }}
-    >
+import Badge from "../assets/badge.png";
+import Logo from "../assets/Logo.png";
+import BackgroundImage from "../assets/certificate_BG.png"; // Add this background image to your assets
+import Signature from "../assets/Sign.png"; // Handwritten signature image
+const Certificate = forwardRef(
+  ({ studentName, courseName, signerName = "Authorized Signatory",
+    signerDesignation = "Director", }, ref) => {
+    return (
       <div
+        ref={ref}
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "100%",
-          height: "340px",
-          overflow: "hidden",
-          zIndex: 1,
-        }}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 1440 320"
-          preserveAspectRatio="none"
-          style={{
-            width: "100%",
-            height: "100%",
-            position: "absolute",
-            top: 0,
-            left: 0,
-          }}
-        >
-
-          <path
-            fill="#4B2C7D"
-            d="M0,160 C480,240 960,80 1440,160 L1440,0 L0,0 Z"
-          />
-
-          <path
-            fill="#D4AF37"
-            d="M0,160 C480,240 960,80 1440,160 L1440,170 C960,90 480,250 0,170 Z"
-          />
-        </svg>
-      </div>
-
-      <div
-        style={{
+          width: "1200px",
+          height: "850px",
+          backgroundImage: `url(${BackgroundImage})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          fontFamily: "'Inter', 'Segoe UI', sans-serif",
           position: "relative",
-          zIndex: 2,
-          fontFamily: "Bold Sans Serif Bebas Neue, Montserrat Extra Bold",
-          padding: "20px 100px 0 100px",
-          color: "white",
+          overflow: "hidden",
+          margin: "0 auto",
         }}
       >
-        <h1 style={{ fontSize: "48px", margin: 0, fontWeight: "bold" }}>
-          CERTIFICATE
-        </h1>
-        <p
+        {/* ================= MAIN CONTENT ================= */}
+        <div
           style={{
-            fontSize: "20px",
-            letterSpacing: "4px",
-            textTransform: "uppercase",
-            // marginTop: "5px",
+            position: "relative",
+            zIndex: 2,
+            textAlign: "center",
+            paddingTop: "140px",
           }}
         >
-          Of Completion
-        </p>
-      </div>
+          <h1
+            style={{
+              fontFamily: "'Playfair Display', 'Libre Baskerville', serif",
+              fontSize: "64px",
+              margin: 0,
+              fontWeight: 700,
+              color: "#000000",
+              letterSpacing: "1px",
+            }}
+          >
+            Certificate of Completion
+          </h1>
 
-      <img
-        src={badge}
-        alt="Gold Badge"
-        style={{
-          position: "absolute",
-          top: "20px",
-          right: "100px",
-          width: "220px",
-          zIndex: 2,
-        }}
-      />
+          <p
+            style={{
+              marginTop: "30px",
+              fontSize: "20px",
+              color: "#1a1a1a",
+              letterSpacing: "0.5px",
+              fontWeight: 400,
+            }}
+          >
+            This is to certify that
+          </p>
 
-      <div
-        style={{
-          position: "absolute",
-          top: "40%",
-          width: "100%",
-          textAlign: "center",
-          padding: "0 60px",
-          color: "#333",
-        }}
-      >
-        <p
-          style={{
-            fontSize: "14px",
-            fontWeight: "600",
-            fontFamily: "Light Sans Serif",
-            letterSpacing: "2px",
-            margin: 0,
-          }}
-        >
-          THIS IS TO CERTIFY THAT
-        </p>
+          <h2
+            style={{
+              fontFamily: "'Great Vibes', 'Alex Brush', 'Allura', cursive",
+              fontSize: "50px",
+              margin: "24px 0 18px",   // 🔥 bottom margin matters
+              fontWeight: 400,
+              color: "#000000",
+              lineHeight: 1.25,
+            }}
+          >
+            {studentName || "Morgan Maxwell"}
+          </h2>
 
-        <h2
-          style={{
-            fontSize: "46px",
-            margin: "20px 0 10px 0",
-            fontFamily: "'Garamond', serif",
-            fontWeight: "bold",
-            color: "#111",
-          }}
-        >
-          {studentName}
-        </h2>
+          <div
+            style={{
+              width: "640px",
+              height: "2px",
+              background: "#000000",
+              margin: "0 auto 30px",
+            }}
+          />
 
-        <p
-          style={{
-            fontSize: "18px",
-            lineHeight: 1.6,
-            maxWidth: "700px",
-            margin: "10px auto",
-            color: "#444",
-          }}
-        >
-          has successfully completed the{" "}
-          <b style={{ color: "#000", fontFamily: "Medium Sans Serif Roboto, Poppins)" }}>{courseName}</b> course,
-          <br />
+          <p
+            style={{
+              fontSize: "20px",
+              lineHeight: 1.7,
+              maxWidth: "750px",
+              margin: "0 auto",
+              color: "#1a1a1a",
+              fontWeight: 400,
+            }}
+          >
+            has successfully completed the{" "}
+            <strong style={{ fontWeight: 700 }}>
+              {courseName || "Career Enhancement Upskilling Course"}
+            </strong>
+            ,<br />
+            presented by PugArch Technology
+          </p>
+        </div>
 
-          presented by <span style={{ fontFamily: " Sans Serif Nexa, Futura)" }}>PugArch Technology.</span>
-        </p>
-      </div>
-
-      <div
-        style={{
-          position: "absolute",
-          bottom: "60px",
-          left: "50%", // Changed
-          transform: "translateX(-50%)", // Added
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center", // Changed
-        }}
-      >
-        <p
+        {/* ================= BADGE ================= */}
+        <img
+          src={Badge}
+          alt="Badge"
           style={{
             position: "absolute",
-            fontSize: "10px",
-            color: "#555",
-            margin: "0 0 20px 0",
-            top: "-6px",
-            left: "8%",
+            bottom: "100px",
+            left: "50%",
+            transform: "translateX(-50%)",
+            width: "170px",
+            height: "auto",
+            zIndex: 3,
+          }}
+        />
+
+        {/* ================= PRESENTED BY SECTION ================= */}
+
+        <div
+          style={{
+            position: "absolute",
+            bottom: "145px",
+            left: "350px",
+            transform: "translateX(-50%)",
+            zIndex: 3,
+            textAlign: "center",
           }}
         >
-          Presented By:
-        </p>
-        <img src={logo} alt="PugArch Technology" style={{ width: "180px" }} />
-        <b style={{ fontSize: "10px" }}> T e c h n o l o g y</b>
+          <p
+            style={{
+              fontSize: "11px",
+              fontWeight: 700,
+              marginBottom: "6px",
+              color: "#000",
+              letterSpacing: "0.3px",
+            }}
+          >
+            Presented By:
+          </p>
+
+          <img
+            src={Logo}
+            alt="PugArch Logo"
+            style={{
+              width: "230px",
+              display: "block",
+              margin: "0 auto 4px auto",
+            }}
+          />
+
+          <p
+            style={{
+              fontSize: "13px",
+              fontWeight: 600,
+              color: "#000",
+              margin: 0,
+              letterSpacing: "0.2px",
+            }}
+          >
+            Technology Pvt. Ltd.
+          </p>
+        </div>
+
+
+        {/* ================= SIGNATURE SECTION ================= */}
+        {/* <div
+          style={{
+            position: "absolute",
+            bottom: "160px",
+            right: "200px",
+            textAlign: "center",
+            zIndex: 3,
+            width: "260px",
+          }}
+        >
+   
+          <img
+            src={Signature}
+            alt="Authorized Signature"
+            style={{
+              width: "180px",
+              margin: "0 auto 6px",
+              display: "block",
+            }}
+          />
+
+          
+          <div
+            style={{
+              width: "240px",
+              height: "2px",
+              background: "#000",
+              margin: "0 auto 6px",
+            }}
+          />
+
+          <p
+            style={{
+              fontSize: "14px",
+              fontWeight: 600,
+              color: "#000",
+              margin: "4px 0 2px",
+            }}
+          >
+            {signerName}
+          </p>
+
+          <p
+            style={{
+              fontSize: "12px",
+              fontWeight: 400,
+              color: "#444",
+              margin: 0,
+              letterSpacing: "0.4px",
+            }}
+          >
+            {signerDesignation}
+          </p>
+        </div> */}
       </div>
-    </div>
-  );
-});
+    );
+  }
+);
 
 export default Certificate;
+

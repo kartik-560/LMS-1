@@ -1,8 +1,8 @@
 import React, { forwardRef } from "react";
 import Badge from "../assets/badge.png";
 import Logo from "../assets/logo.png";
-import BackgroundImage from "../assets/certificate_BG.png"; // Add this background image to your assets
-import Signature from "../assets/Sign.png"; // Handwritten signature image
+import BackgroundImage from "../assets/certificate_BG.png"; 
+// import Signature from "../assets/Sign.png"; 
 const Certificate = forwardRef(
   ({ studentName, courseName, signerName = "Authorized Signatory",
     signerDesignation = "Director", }, ref) => {

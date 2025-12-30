@@ -94,42 +94,23 @@ const CourseViewerPage = () => {
 
       const listRaw = await chaptersAPI.listByCourse(courseId);
 
-      // ✅ CRITICAL DEBUG - Log the EXACT structure
-      console.log('[DEBUG 1] Raw response type:', typeof listRaw);
-      console.log('[DEBUG 2] Raw response keys:', Object.keys(listRaw || {}));
-      console.log('[DEBUG 3] listRaw.data exists?', 'data' in (listRaw || {}));
-      console.log('[DEBUG 4] listRaw.data type:', typeof listRaw?.data);
-      console.log('[DEBUG 5] Full raw response:', JSON.stringify(listRaw, null, 2));
-
       let list = [];
 
       // The response is { data: [...chapters...] }
       if (listRaw?.data && Array.isArray(listRaw.data)) {
         list = listRaw.data;
-        console.log('[DEBUG 6] Extracted from listRaw.data');
+
       } else if (Array.isArray(listRaw)) {
         list = listRaw;
-        console.log('[DEBUG 6] listRaw is already an array');
+
       } else {
         console.error('[DEBUG 6] Could not extract chapters array!', listRaw);
       }
-
-      console.log('[DEBUG 7] Extracted list length:', list.length);
-      console.log('[DEBUG 8] First chapter:', list[0]);
 
       const mapped = list
         .sort((a, b) => (a.order || 0) - (b.order || 0))
         .map((ch) => {
           const hasQuiz = Array.isArray(ch.assessments) && ch.assessments.length > 0;
-
-          console.log(`[DEBUG 9] Chapter "${ch.title}":`, {
-            id: ch.id,
-            order: ch.order,
-            assessments: ch.assessments,
-            isArray: Array.isArray(ch.assessments),
-            length: ch.assessments?.length,
-            hasQuiz: hasQuiz
-          });
 
           return {
             id: ch.id,
@@ -145,11 +126,11 @@ const CourseViewerPage = () => {
           };
         });
 
-      console.log('[DEBUG 10] Final mapped chapters:', mapped);
+
 
       // Check specifically for the quiz chapter
       const quizChapter = mapped.find(ch => ch.title.includes('Quiz'));
-      console.log('[DEBUG 11] Quiz chapter found:', quizChapter);
+
 
       setChapters(mapped);
 
@@ -163,7 +144,7 @@ const CourseViewerPage = () => {
             initial = found;
           }
         }
-        console.log('[DEBUG 12] Initial chapter:', initial);
+
         setCurrentChapter(initial);
         hydrateChapter(initial.id);
       }
@@ -208,7 +189,7 @@ const CourseViewerPage = () => {
 
     // ✅ If already submitted, don't load the quiz
     if (wasSubmitted) {
-      console.log('[DEBUG] Quiz already submitted (chapter completed), not loading questions');
+
       return;
     }
 
@@ -348,7 +329,7 @@ const CourseViewerPage = () => {
   const markChapterComplete = async ({ advance = true } = {}) => {
 
     if (isStaff) {
-      console.log("Staff users don't track progress");
+
       if (advance) {
         goToNextChapter();
       }
@@ -361,7 +342,7 @@ const CourseViewerPage = () => {
     }
 
     if (isChapterCompleted(currentChapter.id)) {
-      console.log("Chapter already completed");
+
       toast.info("Chapter already completed!");
       if (advance) {
         goToNextChapter();
@@ -370,7 +351,7 @@ const CourseViewerPage = () => {
     }
 
     try {
-      console.log("Marking chapter complete:", currentChapter.id);
+
       await progressAPI.completeChapter(currentChapter.id);
 
       setCompletedChapterIds((prev) => {
@@ -541,7 +522,7 @@ const CourseViewerPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="h-screen bg-gray-100 flex overflow-hidden">
       {/* Mobile overlay */}
       {sidebarOpen && (
         <div
@@ -573,7 +554,14 @@ const CourseViewerPage = () => {
                 </button>
               </div>
 
-              <Badge variant="info" size="sm" className="mb-3">{course.level}</Badge>
+              <div className="flex items-center justify-between mb-3">
+                <Badge variant="info" size="sm">{course.level}</Badge>
+                <div className="text-xs text-gray-500">
+             
+                    <span className="font-medium text-gray-900"> <b>Course Status : </b>{course.status || 'Published'}</span>
+              
+                </div>
+              </div>
 
               {/* Only show progress for students */}
               {!isStaff && (
@@ -590,7 +578,8 @@ const CourseViewerPage = () => {
               )}
             </div>
 
-            <div className="overflow-y-auto h-[calc(100vh-200px)] p-3">
+
+            <div className="overflow-y-auto h-[calc(100vh-14rem)] p-3">
               <div className="space-y-2">
                 <div className="text-xs text-gray-500 font-medium px-2">Course Content</div>
                 <div className="border rounded-lg bg-white">
@@ -648,10 +637,6 @@ const CourseViewerPage = () => {
                   )}
                 </div>
               </div>
-            </div>
-
-            <div className="p-4 border-t text-xs text-gray-500">
-              <div>Course status: <span className="font-medium text-gray-900">{course.status || 'Published'}</span></div>
             </div>
           </>
         )}
@@ -715,7 +700,7 @@ const CourseViewerPage = () => {
         </div>
 
         {/* Content card - Modified for staff viewing + Mobile responsive */}
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-8xl mx-auto ">
           <div className="bg-white border rounded-lg md:rounded-2xl shadow p-4 md:p-6">
             {!currentChapter ? (
               <EmptyPrompt />
@@ -759,7 +744,7 @@ const CourseViewerPage = () => {
                   )}
                 </div>
 
-                <div className="prose max-w-none mb-4">
+                {/* <div className="prose max-w-none mb-4">
                   <div className="h-64 md:h-72 overflow-y-auto border rounded-lg p-3 md:p-4 bg-gray-50">
                     {contentPages.length > 0 ? (
                       <div className="whitespace-pre-line text-sm md:text-base">
@@ -769,7 +754,23 @@ const CourseViewerPage = () => {
                       <div className="text-gray-600 text-sm md:text-base">{currentChapter.content || 'Chapter content goes here.'}</div>
                     )}
                   </div>
+                </div> */}
+                <div className="prose max-w-none mb-4">
+                  <div className="h-[calc(100vh-20rem)] md:h-[calc(100vh-22rem)] overflow-y-auto border rounded-lg p-3 md:p-4 bg-gray-50">
+                    {contentPages.length > 0 ? (
+                      <div
+                        className="text-sm md:text-base"
+                        dangerouslySetInnerHTML={{ __html: contentPages[pageIndex] }}
+                      />
+                    ) : (
+                      <div
+                        className="text-gray-600 text-sm md:text-base"
+                        dangerouslySetInnerHTML={{ __html: currentChapter.content || 'Chapter content goes here.' }}
+                      />
+                    )}
+                  </div>
                 </div>
+
 
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mt-6">
                   {contentPages.length > 1 && (
@@ -958,7 +959,6 @@ function QuizView({
     </div>
   );
 }
-
 
 function QuestionBlock({ index, q, value, onChange, disabled, isStaff }) {
   const isMulti =

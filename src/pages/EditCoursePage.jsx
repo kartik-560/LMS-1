@@ -9,7 +9,9 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import useAuthStore from "../store/useAuthStore";
 import ImagePicker from "./Imagepicker";
-
+import ReactQuill, { Quill } from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+import ImageResize from 'quill-image-resize-module-react';
 import api, {
   coursesAPI,
   chaptersAPI,
@@ -150,7 +152,7 @@ export default function EditCoursePage() {
   const { courseId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
- 
+
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
 
@@ -191,6 +193,244 @@ export default function EditCoursePage() {
     formState: { errors },
   } = useForm();
   const watchedValues = watch();
+  Quill.register('modules/imageResize', ImageResize);
+
+
+  const showImageToolbar = React.useCallback((img) => {
+    console.log('🎯 showImageToolbar called!', img);
+
+    const existingToolbar = document.querySelector('.image-toolbar');
+    if (existingToolbar) {
+      console.log('🗑️ Removing existing toolbar');
+      existingToolbar.remove();
+    }
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'image-toolbar';
+
+    const rect = img.getBoundingClientRect();
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+
+    toolbar.style.cssText = `
+    position: absolute !important;
+    top: ${rect.top + scrollTop - 60}px !important;
+    left: ${rect.left + scrollLeft}px !important;
+    background: white !important;
+    border: 2px solid #333 !important;
+    border-radius: 6px !important;
+    padding: 8px !important;
+    display: flex !important;
+    gap: 8px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    z-index: 999999 !important;
+  `;
+
+    const buttons = [
+      { label: '⬅', class: 'align-left', title: 'Align Left', bg: '#3b82f6' },
+      { label: '⬆', class: 'align-center', title: 'Align Center', bg: '#3b82f6' },
+      { label: '➡', class: 'align-right', title: 'Align Right', bg: '#3b82f6' },
+      { label: '❌', class: 'delete', title: 'Delete Image', bg: '#ef4444' }
+    ];
+
+    buttons.forEach(({ label, class: className, title, bg }) => {
+      const btn = document.createElement('button');
+      btn.innerHTML = label;
+      btn.title = title;
+      btn.type = 'button';
+
+      btn.style.cssText = `
+      padding: 10px 15px !important;
+      border: none !important;
+      background: ${bg} !important;
+      color: white !important;
+      cursor: pointer !important;
+      border-radius: 4px !important;
+      font-size: 16px !important;
+      min-width: 45px !important;
+    `;
+
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('🔘 Button clicked:', className);
+
+        if (className === 'delete') {
+          const blot = Quill.find(img);
+          if (blot) {
+            blot.remove();
+          }
+
+          if (img.parentNode) {
+            img.remove();
+          }
+
+          const editor = img.closest('.ql-editor');
+          if (editor && editor.parentElement) {
+            const event = new Event('text-change', { bubbles: true });
+            editor.parentElement.dispatchEvent(event);
+          }
+        } else {
+          img.classList.remove('align-left', 'align-center', 'align-right');
+          img.classList.add(className);
+        }
+
+        toolbar.remove();
+      });
+
+      toolbar.appendChild(btn);
+    });
+
+    document.body.appendChild(toolbar);
+    console.log('✅ Toolbar appended to body', toolbar);
+
+    const removeToolbar = (e) => {
+      if (!toolbar.contains(e.target) && e.target !== img) {
+        toolbar.remove();
+        document.removeEventListener('click', removeToolbar);
+      }
+    };
+
+    setTimeout(() => {
+      document.addEventListener('click', removeToolbar);
+    }, 10);
+  }, []);
+
+  // Image handler
+  const imageHandler = React.useCallback(function () {
+    console.log('📷 Image handler called');
+    const input = document.createElement('input');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'image/*');
+    input.click();
+
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+
+      console.log('📁 File selected:', file.name);
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        console.log('🖼️ Image loaded, inserting into editor');
+        const quill = this.quill;
+        const range = quill.getSelection(true);
+
+        quill.insertEmbed(range.index, 'image', e.target.result);
+        quill.setSelection(range.index + 1);
+
+        setTimeout(() => {
+          const images = quill.root.querySelectorAll('img');
+          console.log('🔍 Found images:', images.length);
+          const lastImage = images[images.length - 1];
+
+          if (lastImage) {
+            console.log('🎯 Last image found:', lastImage);
+
+            if (!lastImage.dataset.hasToolbar) {
+              lastImage.dataset.hasToolbar = 'true';
+
+              console.log('✅ Attaching contextmenu (right-click) handler to image');
+
+              lastImage.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('🖱️➡️ Image RIGHT-CLICKED!');
+                showImageToolbar(lastImage);
+              });
+            }
+          }
+        }, 200);
+      };
+
+      reader.readAsDataURL(file);
+    };
+  }, [showImageToolbar]);
+
+  // Table handler
+  const tableHandler = React.useCallback(function () {
+    console.log('📊 Table button clicked!');
+    try {
+      const quill = this.quill;
+      const range = quill.getSelection(true) || { index: 0 };
+
+      const tableText = '\n\n┌───────────┬───────────┬───────────┐\n│  Cell 1   │  Cell 2   │  Cell 3   │\n├───────────┼───────────┼───────────┤\n│  Cell 4   │  Cell 5   │  Cell 6   │\n├───────────┼───────────┼───────────┤\n│  Cell 7   │  Cell 8   │  Cell 9   │\n└───────────┴───────────┴───────────┘\n\n';
+
+      quill.insertText(range.index, tableText, 'user');
+      quill.setSelection(range.index + tableText.length);
+
+      console.log('✅ Table inserted');
+    } catch (error) {
+      console.error('❌ Error:', error);
+    }
+  }, []);
+
+  // Modules configuration
+  const modules = useMemo(() => ({
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        ['link', 'image'],
+        ['insertTable'],
+        ['clean']
+      ],
+      handlers: {
+        image: imageHandler,
+        insertTable: tableHandler
+      }
+    },
+    imageResize: {
+      parchment: Quill.import('parchment'),
+      modules: ['Resize', 'DisplaySize']
+    },
+    clipboard: {
+      matchVisual: false
+    }
+  }), [imageHandler, tableHandler]);
+
+  const formats = [
+    'header',
+    'bold', 'italic', 'underline', 'strike',
+    'list', 'bullet',
+    'link', 'image',
+    'width', 'height',
+    'float', 'align'
+  ];
+
+  useEffect(() => {
+    const attachImageListeners = () => {
+      const editors = document.querySelectorAll('.ql-editor');
+
+      editors.forEach(editor => {
+        const images = editor.querySelectorAll('img');
+
+        images.forEach(img => {
+          if (!img.dataset.hasToolbar) {
+            img.dataset.hasToolbar = 'true';
+
+            // Right-click for toolbar
+            img.addEventListener('contextmenu', (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              console.log('🖱️➡️ Existing image RIGHT-CLICKED!');
+              showImageToolbar(img);
+            });
+
+            console.log('✅ Attached listener to existing image');
+          }
+        });
+      });
+    };
+
+    // Run after a small delay to ensure ReactQuill has rendered
+    const timer = setTimeout(() => {
+      attachImageListeners();
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [lessons, showImageToolbar]);
 
   const addLesson = (type = "text") => {
     setLessons((prev) => [
@@ -832,11 +1072,13 @@ export default function EditCoursePage() {
                         <div className="mt-4 space-y-4">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Chapter Content</label>
-                            <textarea
-                              rows={3}
+                            <ReactQuill
+                              theme="snow"
                               value={lesson.content}
-                              onChange={(e) => updateLesson(lesson.id, "content", e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                              onChange={(value) => updateLesson(lesson.id, "content", value)}
+                              modules={modules}
+                              formats={formats}
+                              className="bg-white"
                               placeholder="Describe what this lesson covers..."
                             />
                           </div>

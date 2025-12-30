@@ -4,9 +4,9 @@
 
 @layer base {
   html {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: "Inter", system-ui, sans-serif;
   }
-  
+
   body {
     @apply bg-gray-50 text-gray-900;
   }
@@ -16,27 +16,27 @@
   .btn-primary {
     @apply bg-primary-600 hover:bg-primary-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
   }
-  
+
   .btn-secondary {
     @apply bg-white hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-lg border border-gray-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2;
   }
-  
+
   .btn-accent {
     @apply bg-accent-600 hover:bg-accent-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:ring-offset-2;
   }
-  
+
   .input-field {
     @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-colors duration-200;
   }
-  
+
   .card {
     @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
   }
-  
+
   .sidebar-item {
     @apply flex items-center px-3 py-2 text-sm font-medium text-gray-700 rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors duration-200;
   }
-  
+
   .sidebar-item.active {
     @apply bg-primary-50 text-primary-700;
   }
@@ -47,7 +47,98 @@
     text-wrap: balance;
   }
 
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
 }
 
+/* ReactQuill Image Alignment Styles */
+.ql-editor img {
+  cursor: pointer;
+  max-width: 100%;
+  height: auto;
+}
+
+.ql-editor img.align-left {
+  float: left;
+  margin-right: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.ql-editor img.align-center {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  margin-bottom: 0.5rem;
+}
+
+.ql-editor img.align-right {
+  float: right;
+  margin-left: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+/* Table styling for ReactQuill v2 */
+/* Table styling */
+.ql-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.ql-editor table td {
+  border: 1px solid #000;
+  padding: 8px;
+  min-width: 100px;
+  vertical-align: top;
+}
+
+.ql-editor table td:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+/* Table toolbar button */
+.ql-snow .ql-toolbar button.ql-table {
+  width: auto !important;
+}
+
+.ql-snow .ql-toolbar button.ql-table::before {
+  content: "⊞" !important;
+  font-size: 18px !important;
+  font-weight: bold !important;
+}
+
+/* Custom table button */
+.ql-toolbar .ql-insertTable::before {
+  content: "⊞" !important;
+  font-size: 18px !important;
+  font-weight: bold !important;
+}
+
+.ql-toolbar .ql-insertTable {
+  width: 28px !important;
+}
+
+/* Table styling */
+.ql-editor table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.ql-editor table td {
+  border: 1px solid #000;
+  padding: 8px;
+  min-width: 100px;
+  vertical-align: top;
+}
+
+.ql-editor table td:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}

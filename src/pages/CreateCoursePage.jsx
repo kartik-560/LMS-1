@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { BookOpen, Plus, Trash2, Save, ArrowLeft, Eye } from "lucide-react";
@@ -7,8 +7,11 @@ import Button from "../components/ui/Button";
 import Input from "../components/ui/Input";
 import useAuthStore from "../store/useAuthStore";
 import ImagePicker from "./Imagepicker";
+import ReactQuill, { Quill } from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+import ImageResize from 'quill-image-resize-module-react';
 
-import  {
+import {
   coursesAPI,
   chaptersAPI,
   uploadsAPI,
@@ -27,6 +30,7 @@ const emptyQuizQuestion = () => ({
   pairs: [{ id: crypto.randomUUID(), left: "", right: "" }],
   sampleAnswer: "",
 });
+
 
 export default function CreateCoursePage() {
   const navigate = useNavigate();
@@ -52,6 +56,220 @@ export default function CreateCoursePage() {
   const isSuperAdmin = roleNorm === "SUPERADMIN";
   const isAdminOnly = roleNorm === "ADMIN";
   const isAdmin = isSuperAdmin || isAdminOnly;
+
+  Quill.register('modules/imageResize', ImageResize);
+
+
+  const showImageToolbar = React.useCallback((img) => {
+
+
+    const existingToolbar = document.querySelector('.image-toolbar');
+    if (existingToolbar) {
+
+      existingToolbar.remove();
+    }
+
+    const toolbar = document.createElement('div');
+    toolbar.className = 'image-toolbar';
+
+    const rect = img.getBoundingClientRect();
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
+
+    toolbar.style.cssText = `
+    position: absolute !important;
+    top: ${rect.top + scrollTop - 60}px !important;
+    left: ${rect.left + scrollLeft}px !important;
+    background: white !important;
+    border: 2px solid #333 !important;
+    border-radius: 6px !important;
+    padding: 8px !important;
+    display: flex !important;
+    gap: 8px !important;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3) !important;
+    z-index: 999999 !important;
+  `;
+
+    const buttons = [
+      { label: '⬅', class: 'align-left', title: 'Align Left', bg: '#3b82f6' },
+      { label: '⬆', class: 'align-center', title: 'Align Center', bg: '#3b82f6' },
+      { label: '➡', class: 'align-right', title: 'Align Right', bg: '#3b82f6' },
+      { label: '❌', class: 'delete', title: 'Delete Image', bg: '#ef4444' }
+    ];
+
+    buttons.forEach(({ label, class: className, title, bg }) => {
+      const btn = document.createElement('button');
+      btn.innerHTML = label;
+      btn.title = title;
+      btn.type = 'button';
+
+      btn.style.cssText = `
+      padding: 10px 15px !important;
+      border: none !important;
+      background: ${bg} !important;
+      color: white !important;
+      cursor: pointer !important;
+      border-radius: 4px !important;
+      font-size: 16px !important;
+      min-width: 45px !important;
+    `;
+
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+
+        if (className === 'delete') {
+          const blot = Quill.find(img);
+          if (blot) {
+            blot.remove();
+          }
+
+          if (img.parentNode) {
+            img.remove();
+          }
+
+          const editor = img.closest('.ql-editor');
+          if (editor && editor.parentElement) {
+            const event = new Event('text-change', { bubbles: true });
+            editor.parentElement.dispatchEvent(event);
+          }
+        } else {
+          img.classList.remove('align-left', 'align-center', 'align-right');
+          img.classList.add(className);
+        }
+
+        toolbar.remove();
+      });
+
+      toolbar.appendChild(btn);
+    });
+
+    document.body.appendChild(toolbar);
+
+
+    const removeToolbar = (e) => {
+      if (!toolbar.contains(e.target) && e.target !== img) {
+        toolbar.remove();
+        document.removeEventListener('click', removeToolbar);
+      }
+    };
+
+    setTimeout(() => {
+      document.addEventListener('click', removeToolbar);
+    }, 10);
+  }, []);
+
+  const imageHandler = React.useCallback(function () {
+
+    const input = document.createElement('input');
+    input.setAttribute('type', 'file');
+    input.setAttribute('accept', 'image/*');
+    input.click();
+
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+
+
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+
+        const quill = this.quill;
+        const range = quill.getSelection(true);
+
+        quill.insertEmbed(range.index, 'image', e.target.result);
+        quill.setSelection(range.index + 1);
+
+        setTimeout(() => {
+          const images = quill.root.querySelectorAll('img');
+
+          const lastImage = images[images.length - 1];
+
+          if (lastImage) {
+
+
+            if (!lastImage.dataset.hasToolbar) {
+              lastImage.dataset.hasToolbar = 'true';
+
+
+
+              // Use RIGHT-CLICK instead of double-click
+              lastImage.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+
+                showImageToolbar(lastImage);
+              });
+            }
+          }
+        }, 200);
+      };
+
+      reader.readAsDataURL(file);
+    };
+  }, [showImageToolbar]);
+
+  const tableHandler = React.useCallback(function () {
+    console.log('📊 Table button clicked!');
+    try {
+      const quill = this.quill;
+      const range = quill.getSelection(true) || { index: 0 };
+
+      // Insert a simple text table
+      const tableText = '\n\n┌───────────┬───────────┬───────────┐\n│  Cell 1   │  Cell 2   │  Cell 3   │\n├───────────┼───────────┼───────────┤\n│  Cell 4   │  Cell 5   │  Cell 6   │\n├───────────┼───────────┼───────────┤\n│  Cell 7   │  Cell 8   │  Cell 9   │\n└───────────┴───────────┴───────────┘\n\n';
+
+      quill.insertText(range.index, tableText, 'user');
+      quill.setSelection(range.index + tableText.length);
+
+      console.log('✅ Table inserted');
+    } catch (error) {
+      console.error('❌ Error:', error);
+    }
+  }, []);
+
+
+
+  const modules = useMemo(() => ({
+    toolbar: {
+      container: [
+        [{ 'header': [1, 2, 3, false] }],
+        ['bold', 'italic', 'underline', 'strike'],
+        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+        ['link', 'image'],
+        ['insertTable'],
+        ['clean']
+      ],
+      handlers: {
+        image: imageHandler,
+        insertTable: tableHandler
+      }
+    },
+    imageResize: {
+      parchment: Quill.import('parchment'),
+      modules: ['Resize', 'DisplaySize']
+    },
+    clipboard: {
+      matchVisual: false,
+      matchers: [
+        ['table', function (node, delta) {
+          return delta; // Preserve table content
+        }]
+      ]
+    }
+  }), [imageHandler, tableHandler]);
+
+
+  const formats = [
+    'header',
+    'bold', 'italic', 'underline', 'strike',
+    'list', 'bullet',
+    'link', 'image',
+    'width', 'height',
+    'float', 'align',
+    'table'
+  ];
 
   useEffect(() => {
     if (!user) return;
@@ -570,9 +788,10 @@ export default function CreateCoursePage() {
                                 updateLesson(lesson.id, "type", e.target.value)
                               }
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                              disabled
                             >
                               <option value="text">Text & PDF</option>
-                            
+
                             </select>
                           </div>
                         )}
@@ -597,19 +816,19 @@ export default function CreateCoursePage() {
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                               Chapter Content
                             </label>
-                            <textarea
-                              rows={3}
+                            <ReactQuill
+                              theme="snow"
                               value={lesson.content}
-                              onChange={(e) =>
-                                updateLesson(
-                                  lesson.id,
-                                  "content",
-                                  e.target.value
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                              onChange={(value) => {
+                                console.log('Content changed:', value);
+                                updateLesson(lesson.id, "content", value);
+                              }}
+                              modules={modules}
+                              formats={formats}
+                              className="bg-white"
                               placeholder="Describe what this lesson covers..."
                             />
+
                           </div>
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -734,15 +953,7 @@ export default function CreateCoursePage() {
                                       <option value="multiple">
                                         Multiple Correct Options
                                       </option>
-                                      <option value="numerical">
-                                        Numerical/Fill in the Blank
-                                      </option>
-                                      <option value="match">
-                                        Match the Column
-                                      </option>
-                                      <option value="subjective">
-                                        Subjective
-                                      </option>
+
                                     </select>
                                   </div>
 

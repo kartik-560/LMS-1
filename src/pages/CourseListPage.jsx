@@ -7,7 +7,8 @@ import {
   Brain,
   FileText,
   Trophy,
-  ArrowLeft
+  ArrowLeft,
+  Loader2
 } from "lucide-react";
 import { toast } from "react-hot-toast";
 
@@ -22,9 +23,7 @@ import useAuthStore from "../store/useAuthStore";
 import Progress from "../components/ui/Progress";
 import Button from "../components/ui/Button";
 
-// --- START OF CHANGE ---
 const PAGE_SIZE = 10;
-// --- END OF CHANGE ---
 
 const CourseListPage = () => {
   const navigate = useNavigate();
@@ -35,15 +34,12 @@ const CourseListPage = () => {
   const [currentProgress, setCurrentProgress] = useState({});
   const hasHydrated = true;
 
-  // --- START OF CHANGE ---
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  // Reset to page 1 when auth state changes
   useEffect(() => {
     setCurrentPage(1);
   }, [isAuthenticated]);
-  // --- END OF CHANGE ---
 
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated) {
@@ -51,9 +47,7 @@ const CourseListPage = () => {
       return;
     }
     fetchStudentData();
-    // --- START OF CHANGE ---
   }, [hasHydrated, isAuthenticated, currentPage]);
-
 
   const fetchStudentData = async () => {
     const abort = new AbortController();
@@ -160,7 +154,6 @@ const CourseListPage = () => {
 
       myCourses = myCourses.map(normalizeCourse);
 
-      // ✅ Only fetch chapters and completed chapters (removed summaries)
       const [chaptersList, completedChaptersList] = await Promise.all([
         Promise.all(
           myCourses.map((c) =>
@@ -214,12 +207,10 @@ const CourseListPage = () => {
           completedChapters: completedCourseChapters,
         };
 
-        // Calculate nextAction based on progress
         const completedCount = completedCourseChapters.length;
         const totalCount = totalCourseChapters.length;
         const isComplete = totalCount > 0 && completedCount >= totalCount;
 
-        // Check if test is completed from localStorage
         const completedTests = JSON.parse(localStorage.getItem("completedTests") || "{}");
         const isTestCompleted = completedTests[course.id]?.completed;
 
@@ -286,8 +277,6 @@ const CourseListPage = () => {
         chapters = response.chapters;
       }
 
-
-
       if (!chapters || chapters.length === 0) {
         navigate(`/courses/${encodedId}`, {
           state: { courseId: id },
@@ -324,7 +313,6 @@ const CourseListPage = () => {
     }
   };
 
-  // --- START OF CHANGE ---
   const handleNextPage = () => {
     setCurrentPage((prev) => Math.min(prev + 1, totalPages));
   };
@@ -332,13 +320,11 @@ const CourseListPage = () => {
   const handlePrevPage = () => {
     setCurrentPage((prev) => Math.max(prev - 1, 1));
   };
-  // --- END OF CHANGE ---
 
   const goToFinalTest = async (courseId) => {
     try {
       const finalTestResp = await assessmentsAPI.getFinalTestByCourse(courseId);
 
-      // Properly unwrap the response
       const finalTest = finalTestResp?.data ?? finalTestResp;
 
       if (!finalTest || !finalTest.id) {
@@ -346,7 +332,6 @@ const CourseListPage = () => {
         return;
       }
 
-      // Navigate to test with state to track course completion
       navigate(`/view_finaltest?assessmentId=${finalTest.id}`, {
         state: { courseId: courseId }
       });
@@ -356,43 +341,40 @@ const CourseListPage = () => {
     }
   };
 
-
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-xl text-gray-600">Loading courses...</div>
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
+          <p className="text-lg text-gray-600 font-medium">Loading your courses...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full max-w-7xl mx-auto p-4 sm:p-6 ">
-      <div className="flex items-center justify-between mb-6">
-        {/* Page Title */}
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-          My Courses
-        </h1>
+    <div className="min-h-screen bg-gray-50 py-8 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8 bg-gray-800 px-[20px] py-[20px] rounded-3xl ">
+          <h1 className="text-3xl font-bold text-white">
+            My Courses
+          </h1>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate("/dashboard")}
+            className="flex items-center text-cenetr text-white bg-[#4285F4] "
+          >
+            <ArrowLeft size={18} className="mr-2" />
+            Back to Dashboard
+          </Button>
+        </div>
 
-        {/* Back to Dashboard Button - Top Right */}
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => navigate("/dashboard")}
-          className="flex items-center"
-        >
-          <ArrowLeft size={18} className="mr-2" />
-          Back to Dashboard
-        </Button>
-      </div>
-
-      <div className="bg-white rounded-lg shadow-md p-4 sm:p-6 hover:shadow-lg transition-shadow">
         {assignedCourses.length === 0 ? (
-          <div className="text-center py-8">
-            <BookOpen
-              size={48}
-              className="mx-auto text-gray-400 mb-4"
-            />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <BookOpen size={64} className="mx-auto text-gray-400 mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
               No courses assigned yet
             </h3>
             <p className="text-gray-600">
@@ -401,51 +383,82 @@ const CourseListPage = () => {
           </div>
         ) : (
           <>
-            <div className="space-y-6">
+            {/* Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {assignedCourses.map((course) => {
                 const progress = currentProgress[course.id];
                 const completedCount = progress?.completedChapters?.length || 0;
-                const totalCount = course.totalChapters || 1; // Prevent division by zero
+                const totalCount = course.totalChapters || 1;
                 const actualProgress = Math.round((completedCount / totalCount) * 100);
+
+                const completedTests = JSON.parse(
+                  localStorage.getItem("completedTests") || "{}"
+                );
+                const isTestCompleted = completedTests[course.id]?.completed;
+                const hasTest = course.nextAction?.type === "course-test";
 
                 return (
                   <div
                     key={course.id}
-                    className="border border-gray-200 rounded-lg p-4 sm:p-6 hover:shadow-sm transition-shadow"
+                    className="bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col"
                   >
-                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between space-y-4 sm:space-y-0 mb-4">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-3">
-                          <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-lg overflow-hidden bg-gray-100 flex-shrink-0">
-                            <img
-                              src={course.thumbnail || FALLBACK_THUMB}
-                              alt={course.title}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <div>
-                            <h3 className="text-base sm:text-lg font-semibold text-gray-900">
-                              {course.title}
-                            </h3>
-                            <p className="text-sm text-gray-600">
-                              by{" "}
-                              {course.instructorNames?.[0] ||
-                                "Instructor"}
-                            </p>
+                    {/* Course Thumbnail */}
+                    <div className="relative h-48 bg-gradient-to-br from-purple-500 to-blue-600 overflow-hidden">
+                      <img
+                        src={course.thumbnail || FALLBACK_THUMB}
+                        alt={course.title}
+                        className="w-full h-full object-cover"
+                      />
+                      <div className="absolute top-3 right-3">
+                        <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-500 text-white shadow-lg">
+                          published
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Course Content */}
+                    <div className="p-5 flex-1 flex flex-col">
+                      {/* Title & Instructor */}
+                      <div className="mb-4">
+                        <h3 className="text-lg font-bold text-gray-900 mb-1 line-clamp-2">
+                          {course.title}
+                        </h3>
+                        {/* <p className="text-sm text-gray-600">
+                          by {course.instructorNames?.[0] || "Instructor"}
+                        </p> */}
+                      </div>
+
+                      {/* Progress Section */}
+                      <div className="mb-4 flex-1">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-xs font-medium text-gray-700">
+                            Progress
+                          </span>
+                          <span className="text-sm font-bold text-blue-600">
+                            {actualProgress}%
+                          </span>
+                        </div>
+                        <Progress value={actualProgress} className="h-2 mb-3" />
+
+                        {/* Stats */}
+                        <div className="flex items-center justify-between text-sm">
+                          <div className="flex items-center gap-2 mt-7 text-gray-600">
+                            <BookOpen size={16} />
+                            <span>
+                              {completedCount}/{totalCount} Chapters
+                            </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-                        {/* Primary Action Button */}
+                      {/* Action Buttons */}
+                      <div className="space-y-2">
                         <Button
-                          key={`primary-${course.id}`}
                           size="sm"
-                          className="w-full sm:w-auto"
+                          className="w-full justify-center"
                           onClick={() => goToCourse(course.id)}
                         >
-                          <Play size={16} className="mr-1" />
-                          {/* ✅ Use actualProgress directly */}
+                          <Play size={16} className="mr-2" />
                           {actualProgress === 0
                             ? "Start Course"
                             : actualProgress >= 100
@@ -453,94 +466,29 @@ const CourseListPage = () => {
                               : "Continue Learning"}
                         </Button>
 
-                        {/* Final Test Button */}
-                        {(() => {
-                          const completedTests = JSON.parse(
-                            localStorage.getItem("completedTests") || "{}"
-                          );
-                          const isTestCompleted = completedTests[course.id]?.completed;
+                        {actualProgress >= 100 && !isTestCompleted && hasTest && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full justify-center"
+                            onClick={() => goToFinalTest(course.id)}
+                          >
+                            <FileText size={16} className="mr-2" />
+                            Take Final Test
+                          </Button>
+                        )}
 
-                          // ✅ Use actualProgress and check for nextAction
-                          const hasTest = course.nextAction?.type === "course-test";
-
-                          if (actualProgress >= 100 && !isTestCompleted && hasTest) {
-                            return (
-                              <Button
-                                key={`test-${course.id}`}
-                                size="sm"
-                                variant="outline"
-                                className="w-full sm:w-auto"
-                                onClick={() => goToFinalTest(course.id)}
-                              >
-                                <FileText size={16} className="mr-1" />
-                                Take Final Test
-                              </Button>
-                            );
-                          }
-                          return null;
-                        })()}
-
-                        {/* View Certificate Button */}
-                        {(() => {
-                          const completedTests = JSON.parse(
-                            localStorage.getItem("completedTests") || "{}"
-                          );
-                          const isTestCompleted = completedTests[course.id]?.completed;
-
-                          if (isTestCompleted) {
-                            return (
-                              <Button
-                                key={`certificate-${course.id}`}
-                                size="sm"
-                                variant="outline"
-                                className="w-full sm:w-auto"
-                                onClick={() => navigate(`/certificate/${course.id}`)}
-                              >
-                                <Trophy size={16} className="mr-1" />
-                                View Certificate
-                              </Button>
-                            );
-                          }
-                          return null;
-                        })()}
-                      </div>
-                    </div>
-
-
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-xs sm:text-sm">
-                        <span className="text-gray-600">
-                          Overall Progress
-                        </span>
-
-                        <span className="font-medium text-gray-900">
-                          {actualProgress}%
-                        </span>
-                      </div>
-
-                      <Progress value={actualProgress} size="sm" />
-
-                      <div className="grid grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
-                        <div className="text-center">
-                          <div className="font-medium text-gray-900">
-
-                            {progress?.completedChapters?.length || 0}/
-                            {course.totalChapters}
-                          </div>
-                          <div className="text-gray-500">Chapters</div>
-                        </div>
-                        {/* <div className="text-center">
-                                <div className="font-medium text-gray-900">
-
-                                  {aiInterviewStatus[course.id]?.completed
-                                    ? "1/1"
-                                    : "0/1"}
-                                </div>
-                                <div className="text-gray-500">
-                                  AI Interview
-                                </div>
-                              </div> */}
+                        {isTestCompleted && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full justify-center"
+                            onClick={() => navigate(`/certificate/${course.id}`)}
+                          >
+                            <Trophy size={16} className="mr-2" />
+                            View Certificate
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -548,9 +496,9 @@ const CourseListPage = () => {
               })}
             </div>
 
-            {/* --- START OF CHANGE: Pagination Controls --- */}
+            {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex justify-between items-center mt-8 pt-4 border-t border-gray-200">
+              <div className="flex justify-between items-center mt-8 pt-6">
                 <Button
                   onClick={handlePrevPage}
                   disabled={currentPage === 1}
@@ -559,7 +507,7 @@ const CourseListPage = () => {
                 >
                   Previous
                 </Button>
-                <span className="text-sm text-gray-700">
+                <span className="text-sm font-medium text-gray-700">
                   Page {currentPage} of {totalPages}
                 </span>
                 <Button
@@ -572,7 +520,6 @@ const CourseListPage = () => {
                 </Button>
               </div>
             )}
-            {/* --- END OF CHANGE --- */}
           </>
         )}
       </div>

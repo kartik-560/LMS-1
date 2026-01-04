@@ -677,11 +677,11 @@ const StudentDashboardPage = () => {
                                   <h3 className="text-base sm:text-lg font-semibold text-gray-900">
                                     {course.title}
                                   </h3>
-                                  <p className="text-sm text-gray-600">
+                                  {/* <p className="text-sm text-gray-600">
                                     by{" "}
                                     {course.instructorNames?.[0] ||
                                       "Instructor"}
-                                  </p>
+                                  </p> */}
                                 </div>
                               </div>
                             </div>

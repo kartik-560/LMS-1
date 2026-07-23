@@ -7,7 +7,10 @@ import useAuthStore from "../store/useAuthStore";
 import { useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { Editor } from "@monaco-editor/react";
-
+import { runPythonTestCases } from "../utils/pyodideRunner";
+import { runJavaScriptTestCases } from "../utils/jsRunner";
+import { runCppTestCases } from "../utils/cppRunner"; // <-- NEW
+import { runPhpTestCases } from "../utils/phpRunner";
 
 export default function ViewFinalTest() {
     const { user, userRole } = useAuthStore((state) => ({
@@ -194,7 +197,40 @@ export default function ViewFinalTest() {
 
         try {
             setIsSubmitted(true);
-            const data = await assessmentsAPI.submitAttempt(assessmentId, answers);
+
+            // 1. Format answers by evaluating coding questions client-side before sending
+            const formattedAnswers = { ...answers };
+
+            if (assessment?.questions) {
+                for (const q of assessment.questions) {
+                    if (q.type === 'coding') {
+                        const userCode = answers[q.id] || q.codeStub || "";
+                        const allTestCases = typeof q.testCases === "string"
+                            ? JSON.parse(q.testCases)
+                            : (q.testCases || []);
+
+                        let evalResults = [];
+                        try {
+                            if (q.language === "python") {
+                                evalResults = await runPythonTestCases(userCode, allTestCases);
+                            } else {
+                                evalResults = await runJavaScriptTestCases(userCode, allTestCases);
+                            }
+                        } catch (evalErr) {
+                            console.error(`Error auto-evaluating question ${q.id}:`, evalErr);
+                        }
+
+                        formattedAnswers[q.id] = {
+                            code: userCode,
+                            passedAll: evalResults.length > 0 && evalResults.every(r => r.passed)
+                        };
+                    }
+                }
+            }
+
+            // 2. Submit formatted answers to backend
+            const data = await assessmentsAPI.submitAttempt(assessmentId, formattedAnswers);
+
             setResult({
                 score: data.score,
                 submittedAt: data.submittedAt,
@@ -229,29 +265,38 @@ export default function ViewFinalTest() {
 
         try {
             setIsSubmitted(true);
-            const data = await assessmentsAPI.submitAttempt(assessmentId, answers);
-            setResult({
-                score: data.score,
-                submittedAt: data.submittedAt,
-                earnedPoints: data.earnedPoints,
-                totalPoints: data.totalPoints,
-                attemptNumber: data.attemptNumber,
-                attemptsRemaining: data.attemptsRemaining,
-                maxAttempts: data.maxAttempts,
-                certificateGenerated: data.certificateGenerated,
-            });
 
-            // Check if certificate was already generated during submission
-            if (data.certificateGenerated && data.score >= 70) {
-                setCertificateStatus("generated");
+            // Evaluate all coding questions client-side before sending to server
+            const formattedAnswers = { ...answers };
+
+            for (const q of assessment.questions) {
+                if (q.type === 'coding') {
+                    const userCode = answers[q.id] || q.codeStub || "";
+                    const allTestCases = typeof q.testCases === "string"
+                        ? JSON.parse(q.testCases)
+                        : (q.testCases || []);
+
+                    let evalResults = [];
+                    if (q.language === "python") {
+                        evalResults = await runPythonTestCases(userCode, allTestCases);
+                    } else {
+                        evalResults = await runJavaScriptTestCases(userCode, allTestCases);
+                    }
+
+                    formattedAnswers[q.id] = {
+                        code: userCode,
+                        passedAll: evalResults.every(r => r.passed)
+                    };
+                }
             }
+
+            const data = await assessmentsAPI.submitAttempt(assessmentId, formattedAnswers);
+            setResult(data);
         } catch (err) {
-            setError(err.response?.data?.error || err.message || "Failed to submit assessment");
+            setError(err.response?.data?.error || err.message);
             setIsSubmitted(false);
-            setShowWarning(false);
         }
     };
-
     // ✅ Function to generate certificate
     const handleGenerateCertificate = async () => {
         try {
@@ -523,120 +568,35 @@ export default function ViewFinalTest() {
         handleAnswerChange(questionId, value);
     };
 
- const handleRunCode = async (question) => {
-    if (isReadOnly) return;
-    setIsExecuting(true);
-    
-    const code = answers[question.id] || question.codeStub;
-    const publicTestCases = question.testCases?.filter(tc => !tc.isHidden) || [];
+    const handleRunCode = async (question) => {
+        if (isReadOnly) return;
+        setIsExecuting(true);
 
-    const languageMap = {
-        javascript: { lang: "nodejs", version: "4" },
-        python: { lang: "python3", version: "4" },
-        cpp: { lang: "cpp17", version: "1" },
-        php: { lang: "php", version: "4" }
-    };
-    const targetLang = languageMap[question.language || "javascript"];
+        const code = answers[question.id] || question.codeStub || "";
+        const publicTestCases = question.testCases?.filter(tc => !tc.isHidden) || [];
 
-    if (publicTestCases.length === 0) {
-        // ... (Keep your basic run logic here if you want)
-        setIsExecuting(false);
-        return;
-    }
-
-    // 1. Convert all test cases into a JSON string to inject into the runner
-    const inputsArray = publicTestCases.map(tc => tc.input || "");
-    const inputsJSON = JSON.stringify(inputsArray);
-
-    // 2. Inject the Batch System Runner
-    let scriptToRun = code;
-    if (targetLang.lang === "nodejs") {
-        scriptToRun += `
-\n// --- Hidden Batch System Runner ---
-try {
-    const inputs = ${inputsJSON};
-    const results = [];
-    
-    for (let i = 0; i < inputs.length; i++) {
         try {
-            const parsedInput = inputs[i] ? JSON.parse(inputs[i]) : {};
-            const output = calculateTotal(parsedInput);
-            results.push(String(output));
-        } catch(e) {
-            results.push("Error: " + e.message);
-        }
-    }
-    // Print a separator, then print the results array as JSON
-    console.log("\\n===RESULTS===");
-    console.log(JSON.stringify(results));
-} catch(e) {
-    console.log("\\n===RESULTS===");
-    console.log(JSON.stringify([]));
-}`;
-    }
-
-    try {
-        // 3. Send ONLY ONE request to your backend/JDoodle
-        const response = await fetch("http://localhost:5000/api/execute-code", { 
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${useAuthStore.getState().token}` 
-            },
-            body: JSON.stringify({
-                language: targetLang.lang,
-                versionIndex: targetLang.version,
-                script: scriptToRun,
-                stdin: "" // We don't need standard input anymore!
-            })
-        });
-
-        const data = await response.json();
-        const rawOutput = String(data.output || data.error || "").trim();
-
-        // 4. Extract the results using our secret flag
-        let parsedOutputs = [];
-        const parts = rawOutput.split('===RESULTS===');
-        
-        if (parts.length > 1) {
-            try {
-                parsedOutputs = JSON.parse(parts[1].trim());
-            } catch(e) {
-                console.error("Failed to parse results array");
+            let results = [];
+            if (question.language === "python") {
+                results = await runPythonTestCases(code, publicTestCases);
+            } else if (question.language === "cpp") {
+                results = await runCppTestCases(code, publicTestCases);
+            } else if (question.language === "php") {
+                results = await runPhpTestCases(code, publicTestCases);
+            } else {
+                results = await runJavaScriptTestCases(code, publicTestCases);
             }
+
+            setExecutionResults(prev => ({
+                ...prev,
+                [question.id]: { type: 'table', data: results }
+            }));
+        } catch (err) {
+            toast.error("Execution failed: " + err.message);
+        } finally {
+            setIsExecuting(false);
         }
-
-        // 5. Build the table data
-        const results = publicTestCases.map((tc, i) => {
-            const actualOutput = parsedOutputs[i] !== undefined ? parsedOutputs[i] : rawOutput;
-            const expectedOutput = String(tc.expectedOutput || "").trim();
-            
-            // It passes if the actual output matches expected, and the API didn't crash
-            const passed = actualOutput === expectedOutput && data.statusCode === 200;
-
-            return {
-                testCaseNumber: i + 1,
-                input: tc.input || "(Empty)",
-                expected: expectedOutput,
-                actual: actualOutput,
-                passed: passed,
-                isError: !!data.error || data.statusCode !== 200
-            };
-        });
-
-        setExecutionResults(prev => ({
-            ...prev,
-            [question.id]: { type: 'table', data: results }
-        }));
-    } catch (err) {
-        setExecutionResults(prev => ({
-            ...prev,
-            [question.id]: { type: 'basic', output: "Error executing code. Check connection.", isError: true }
-        }));
-    } finally {
-        setIsExecuting(false);
-    }
-};
+    };
 
     return (
         // Expanded max-width for large monitors and responsive padding

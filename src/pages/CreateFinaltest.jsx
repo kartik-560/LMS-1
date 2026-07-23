@@ -5,6 +5,7 @@ import Button from "../components/ui/Button";
 import { assessmentsAPI } from "../services/api";
 import { coursesAPI } from "../services/api";
 import useAuthStore from "../store/useAuthStore";
+
 const createNewQuestion = () => ({
   id: crypto.randomUUID(),
   type: "single",
@@ -68,7 +69,6 @@ export default function CreateFinaltest({ initialLesson }) {
       setLoadingCourses(false);
     }
   };
-
 
   const updateLesson = (field, value) => {
     setLesson((prev) => ({ ...prev, [field]: value }));
@@ -170,26 +170,6 @@ export default function CreateFinaltest({ initialLesson }) {
         };
       }
 
-      // if (q.type === "numerical") {
-      //   return {
-      //     ...baseQuestion,
-      //     correctText: q.correctText,
-      //   };
-      // }
-
-      // if (q.type === "match") {
-      //   return {
-      //     ...baseQuestion,
-      //     pairs: JSON.stringify(q.pairs),
-      //   };
-      // }
-
-      // if (q.type === "subjective") {
-      //   return {
-      //     ...baseQuestion,
-      //     sampleAnswer: q.sampleAnswer,
-      //   };
-      // }
       if (q.type === "coding") {
         return {
           ...baseQuestion,
@@ -238,7 +218,6 @@ export default function CreateFinaltest({ initialLesson }) {
       return false;
     }
 
-
     for (let i = 0; i < lesson.questions.length; i++) {
       const q = lesson.questions[i];
 
@@ -276,21 +255,6 @@ export default function CreateFinaltest({ initialLesson }) {
           return false;
         }
       }
-
-      // if (q.type === "numerical" && !q.correctText.trim()) {
-      //   setError(`Question ${i + 1}: Please provide the correct answer`);
-      //   return false;
-      // }
-
-      // if (q.type === "match" && (!q.pairs || q.pairs.length === 0)) {
-      //   setError(`Question ${i + 1}: Please add at least one match pair`);
-      //   return false;
-      // }
-
-      // if (q.type === "subjective" && !q.sampleAnswer.trim()) {
-      //   setError(`Question ${i + 1}: Please provide a sample answer`);
-      //   return false;
-      // }
     }
 
     return true;
@@ -347,12 +311,11 @@ export default function CreateFinaltest({ initialLesson }) {
 
     if (normalized === "SUPERADMIN") return "/superadmin";
     if (normalized === "ADMIN") return "/admin";
-    if (normalized === "INSTRUCTOR") return "/instructor"; // if you have one
-    if (normalized === "STUDENT") return "/dashboard";     // or "/student"
+    if (normalized === "INSTRUCTOR") return "/instructor";
+    if (normalized === "STUDENT") return "/dashboard"; 
 
-    return "/"; // fallback
+    return "/";
   };
-
 
   return (
     <div className="max-w-6xl mx-auto p-6">
@@ -373,7 +336,6 @@ export default function CreateFinaltest({ initialLesson }) {
           Back to Dashboard
         </Button>
       </div>
-
 
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3">
@@ -500,7 +462,6 @@ export default function CreateFinaltest({ initialLesson }) {
                   Question {qIdx + 1}
                 </h4>
                 <div className="flex gap-2">
-
                   {qIdx === lesson.questions.length - 1 && (
                     <Button
                       type="button"
@@ -538,9 +499,6 @@ export default function CreateFinaltest({ initialLesson }) {
                     <option value="single">Single Choice</option>
                     <option value="multiple">Multiple Choice</option>
                     <option value="coding">Programming / Coding</option>
-                    {/* <option value="numerical">Numerical</option>
-                    <option value="match">Match the Column</option>
-                    <option value="subjective">Subjective</option> */}
                   </select>
                 </div>
                 <div className="md:col-span-2">
@@ -638,10 +596,11 @@ export default function CreateFinaltest({ initialLesson }) {
                         onChange={(e) => updateQuestion(q.id, "language", e.target.value)}
                         className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                       >
-                        <option value="javascript">JavaScript (Node.js)</option>
+                        {/* ONLY SUPPORTED CLIENT-SIDE LANGUAGES ADDED HERE */}
+                        <option value="javascript">JavaScript</option>
+                        <option value="python">Python 3</option>
+                        <option value="cpp">C / C++</option>
                         <option value="php">PHP</option>
-                        <option value="python">Python</option>
-                        <option value="cpp">C++</option>
                       </select>
                     </div>
                     <div>
@@ -737,113 +696,6 @@ export default function CreateFinaltest({ initialLesson }) {
                   </div>
                 </div>
               )}
-
-              {/* {q.type === "numerical" && (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Correct Answer *
-                  </label>
-                  <input
-                    type="text"
-                    value={q.correctText || ""}
-                    onChange={(e) =>
-                      updateQuestion(q.id, "correctText", e.target.value)
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    placeholder="e.g., 42"
-                  />
-                </div>
-              )}
-
-              {q.type === "match" && (
-                <div className="mt-4 space-y-2">
-                  <div className="flex items-center justify-between mb-3">
-                    <label className="block text-sm font-medium text-gray-700">
-                      Match Pairs *
-                    </label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() =>
-                        updateQuestion(q.id, "pairs", [
-                          ...(q.pairs || []),
-                          { id: crypto.randomUUID(), left: "", right: "" },
-                        ])
-                      }
-                      className="text-sm"
-                    >
-                      <Plus size={14} className="mr-1" /> Add Pair
-                    </Button>
-                  </div>
-                  {(q.pairs || []).map((p) => (
-                    <div
-                      key={p.id}
-                      className="grid grid-cols-[1fr_1fr_auto] gap-3 items-center"
-                    >
-                      <input
-                        type="text"
-                        value={p.left}
-                        onChange={(e) =>
-                          updateQuestion(
-                            q.id,
-                            "pairs",
-                            q.pairs.map((x) =>
-                              x.id === p.id ? { ...x, left: e.target.value } : x
-                            )
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Left item"
-                      />
-                      <input
-                        type="text"
-                        value={p.right}
-                        onChange={(e) =>
-                          updateQuestion(
-                            q.id,
-                            "pairs",
-                            q.pairs.map((x) =>
-                              x.id === p.id ? { ...x, right: e.target.value } : x
-                            )
-                          )
-                        }
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Right item"
-                      />
-                      <button
-                        type="button"
-                        className="text-red-500 hover:text-red-700 hover:bg-red-50 p-2 rounded transition-colors"
-                        onClick={() =>
-                          updateQuestion(
-                            q.id,
-                            "pairs",
-                            q.pairs.filter((x) => x.id !== p.id)
-                          )
-                        }
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {q.type === "subjective" && (
-                <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sample Answer *
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={q.sampleAnswer || ""}
-                    onChange={(e) =>
-                      updateQuestion(q.id, "sampleAnswer", e.target.value)
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-                    placeholder="Provide a sample answer for reference"
-                  />
-                </div>
-              )} */}
             </div>
           ))}
         </div>
